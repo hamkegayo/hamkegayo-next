@@ -3,13 +3,12 @@
 import { createClient } from "@/utils/supabase/server";
 import { partnerEmail } from "@/lib/partner";
 
-// 로그인 성공 후 이동 경로 (사용자/파트너 홈은 추후 작성 예정 → 임시로 메인)
+// 로그인 성공 후 이동 경로 (파트너 메인은 추후 작성 → 현재 준비 중 안내)
 const USER_HOME = "/";
-const PARTNER_HOME = "/";
 
 export type LoginResult =
   | { ok: true; redirectTo: string }
-  | { ok: false; message: string };
+  | { ok: false; message: string; tone?: "error" | "info" };
 
 /** 일반 사용자 로그인 (이메일 + 비밀번호) */
 export async function loginUser(input: {
@@ -57,5 +56,7 @@ export async function loginPartner(input: {
     return { ok: false, message: "파트너 계정이 아닙니다." };
   }
 
-  return { ok: true, redirectTo: PARTNER_HOME };
+  // 파트너 메인 화면은 아직 준비 중 → 세션은 만들지 않고 안내만
+  await supabase.auth.signOut();
+  return { ok: false, message: "준비 중입니다.", tone: "info" };
 }

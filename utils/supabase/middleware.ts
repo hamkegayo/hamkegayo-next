@@ -5,6 +5,8 @@ import { NextResponse, type NextRequest } from "next/server";
 // 여기에 프리픽스만 등록하면 미들웨어가 자동으로 가드한다.
 const USER_PREFIXES = ["/mypage"];
 const PARTNER_PREFIXES = ["/partner"];
+// 로그인 상태에서 접근 시 홈으로 돌려보낼 라우트
+const AUTH_PAGES = ["/login", "/signup"];
 
 function matches(pathname: string, prefixes: string[]): boolean {
   return prefixes.some(
@@ -60,6 +62,10 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user) {
+    // 이미 로그인했는데 로그인/회원가입 페이지 접근 → 홈으로
+    if (matches(pathname, AUTH_PAGES)) {
+      return redirect("/");
+    }
     // 역할이 맞지 않는 영역 접근 차단
     if (role !== "PARTNER" && matches(pathname, PARTNER_PREFIXES)) {
       return redirect("/");
@@ -67,8 +73,6 @@ export async function updateSession(request: NextRequest) {
     if (role !== "USER" && matches(pathname, USER_PREFIXES)) {
       return redirect("/");
     }
-    // NOTE: 홈을 (user) 그룹으로 옮긴 뒤, 로그인 상태에서 /login·/signup 접근 시
-    //       홈으로 돌려보내는 가드를 여기서 다시 활성화할 것.
   }
 
   return response;
