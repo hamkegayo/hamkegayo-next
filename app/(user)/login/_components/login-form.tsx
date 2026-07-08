@@ -77,7 +77,8 @@ export function LoginForm() {
           : await loginPartner({ loginId: v.loginId, password: v.password });
 
       if (!res.ok) {
-        toast.error(res.message);
+        if (res.tone === "info") toast.info(res.message);
+        else toast.error(res.message);
         return;
       }
       router.push(res.redirectTo);
