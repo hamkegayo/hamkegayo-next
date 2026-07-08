@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Image from "next/image";
 import { Eye, EyeOff } from "lucide-react";
@@ -10,7 +12,14 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { loginSchema, type LoginType, type LoginValues } from "../_lib/schema";
+import {
+  loginDefaultValues,
+  partnerLoginSchema,
+  userLoginSchema,
+  type LoginFormValues,
+  type LoginType,
+} from "../_lib/schema";
+import { loginUser, loginPartner } from "../_lib/actions";
 
 const TABS: { type: LoginType; label: string }[] = [
   { type: "user", label: "일반 로그인" },
@@ -20,8 +29,22 @@ const TABS: { type: LoginType; label: string }[] = [
 const READY_MESSAGE = "준비 중인 기능입니다.";
 
 export function LoginForm() {
+  const router = useRouter();
   const [type, setType] = useState<LoginType>("user");
+  const typeRef = useRef<LoginType>("user");
   const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // 활성 탭에 따라 스키마를 선택하는 커스텀 resolver
+  const resolver: Resolver<LoginFormValues> = (values, context, options) => {
+    const schema =
+      typeRef.current === "user" ? userLoginSchema : partnerLoginSchema;
+    return (zodResolver(schema) as unknown as Resolver<LoginFormValues>)(
+      values,
+      context,
+      options,
+    );
+  };
 
   const {
     register,
@@ -29,23 +52,39 @@ export function LoginForm() {
     reset,
     clearErrors,
     formState: { errors },
-  } = useForm<LoginValues>({
-    resolver: zodResolver(loginSchema),
+  } = useForm<LoginFormValues>({
+    resolver,
     mode: "onSubmit",
     reValidateMode: "onSubmit",
-    defaultValues: { email: "", password: "" },
+    defaultValues: loginDefaultValues,
   });
 
   const changeTab = (next: LoginType) => {
     if (next === type) return;
+    typeRef.current = next;
     setType(next);
     setShowPassword(false);
-    reset();
+    reset(loginDefaultValues);
   };
 
-  const onSubmit = (values: LoginValues) => {
-    // TODO(be): 로그인 유형(type)에 따라 분리된 인증 테이블로 요청 처리
-    console.log("[login] submit", { type, ...values });
+  const onSubmit = async (v: LoginFormValues) => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const res =
+        typeRef.current === "user"
+          ? await loginUser({ email: v.email, password: v.password })
+          : await loginPartner({ loginId: v.loginId, password: v.password });
+
+      if (!res.ok) {
+        toast.error(res.message);
+        return;
+      }
+      router.push(res.redirectTo);
+      router.refresh();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const notReady = () => toast.info(READY_MESSAGE);
@@ -91,29 +130,51 @@ export function LoginForm() {
         noValidate
         className="mx-auto mt-10 max-w-md"
       >
-        {/* 이메일 */}
-        <div className="space-y-2">
-          <Label htmlFor="email">이메일</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            placeholder="name@example.com"
-            aria-invalid={!!errors.email}
-            {...register("email", {
-              // 에러가 뜬 뒤 다시 입력하면 원래(도움말) 상태로 되돌림
-              onChange: () => errors.email && clearErrors("email"),
-            })}
-          />
-          <p
-            className={cn(
-              "text-sm",
-              errors.email ? "text-destructive" : "text-muted-foreground",
-            )}
-          >
-            {errors.email?.message ?? "가입 시 사용한 이메일을 입력해 주세요."}
-          </p>
-        </div>
+        {/* 이메일 / 아이디 */}
+        {type === "user" ? (
+          <div className="space-y-2">
+            <Label htmlFor="email">이메일</Label>
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="name@example.com"
+              aria-invalid={!!errors.email}
+              {...register("email", {
+                onChange: () => errors.email && clearErrors("email"),
+              })}
+            />
+            <p
+              className={cn(
+                "text-sm",
+                errors.email ? "text-destructive" : "text-muted-foreground",
+              )}
+            >
+              {errors.email?.message ?? "가입 시 사용한 이메일을 입력해 주세요."}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Label htmlFor="loginId">아이디</Label>
+            <Input
+              id="loginId"
+              autoComplete="username"
+              placeholder="제공 받은 아이디를 입력해주세요"
+              aria-invalid={!!errors.loginId}
+              {...register("loginId", {
+                onChange: () => errors.loginId && clearErrors("loginId"),
+              })}
+            />
+            <p
+              className={cn(
+                "text-sm",
+                errors.loginId ? "text-destructive" : "text-muted-foreground",
+              )}
+            >
+              {errors.loginId?.message ?? "발급받은 아이디를 입력해 주세요."}
+            </p>
+          </div>
+        )}
 
         {/* 비밀번호 */}
         <div className="mt-5 space-y-2">
@@ -156,7 +217,8 @@ export function LoginForm() {
         {/* 로그인 버튼 */}
         <button
           type="submit"
-          className="mt-8 h-12 w-full rounded-lg bg-brand text-base font-bold text-brand-foreground transition-colors hover:bg-brand/90"
+          disabled={submitting}
+          className="mt-8 h-12 w-full rounded-lg bg-brand text-base font-bold text-brand-foreground transition-colors hover:bg-brand/90 disabled:opacity-60"
         >
           로그인
         </button>
@@ -187,10 +249,9 @@ export function LoginForm() {
 
         {/* 하단 링크 */}
         <div className="mt-6 flex items-center justify-center gap-4 text-sm font-semibold text-foreground">
-          {/* 회원가입: 추후 개발 예정 */}
-          <a href="#" className="transition-colors hover:text-brand">
+          <Link href="/signup" className="transition-colors hover:text-brand">
             회원가입
-          </a>
+          </Link>
           <button
             type="button"
             onClick={notReady}

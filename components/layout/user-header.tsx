@@ -6,6 +6,7 @@ import { ZoomIn } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useZoom } from "@/components/providers/zoom-provider";
+import { MemberMenu } from "@/components/layout/member-menu";
 
 // 상단 네비게이션 항목 (라우트는 추후 개발 예정)
 const NAV_ITEMS = [
@@ -15,7 +16,10 @@ const NAV_ITEMS = [
   { label: "QnA", href: "#" },
 ];
 
-export function UserHeader() {
+/** 로그인 회원 정보 (비로그인 시 null) */
+export type HeaderMember = { name: string; subText: string } | null;
+
+export function UserHeader({ member }: { member: HeaderMember }) {
   const { enlarged, toggle } = useZoom();
 
   return (
@@ -71,19 +75,25 @@ export function UserHeader() {
             예약하기
           </Link>
 
-          <Link
-            href="/login"
-            className="transition-colors hover:text-brand"
-          >
-            로그인
-          </Link>
-          <span className="text-border">|</span>
-          <Link
-            href="#"
-            className={cn("transition-colors hover:text-brand")}
-          >
-            회원가입
-          </Link>
+          {member ? (
+            <MemberMenu name={member.name} subText={member.subText} />
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="transition-colors hover:text-brand"
+              >
+                로그인
+              </Link>
+              <span className="text-border">|</span>
+              <Link
+                href="/signup"
+                className="transition-colors hover:text-brand"
+              >
+                회원가입
+              </Link>
+            </>
+          )}
         </nav>
       </div>
     </header>
