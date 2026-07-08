@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Geist } from "next/font/google";
+import localFont from "next/font/local";
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/sonner";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
+// 전역 폰트: Pretendard (Variable)
+const pretendard = localFont({
+  src: "../public/fonts/PretendardVariable.woff2",
+  variable: "--font-sans",
+  display: "swap",
+  weight: "45 920",
+});
 
 // 메타데이터 초기화
 export const metadata: Metadata = {
@@ -28,7 +34,7 @@ export default function RootLayout({
     <html
       lang="ko"
       suppressHydrationWarning
-      className={cn("font-sans", geist.variable)}
+      className={cn("font-sans", pretendard.variable)}
     >
       {/* 뷰포트 높이 고정 및 안티앨리어싱(폰트 스무딩) 적용 */}
       <body className="min-h-screen bg-white text-slate-900 antialiased">
