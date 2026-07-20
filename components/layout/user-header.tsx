@@ -14,7 +14,7 @@ const NAV_ITEMS = [
     { label: "메인", href: "/" },
     { label: "서비스 소개", href: "/service" },
     { label: "이용 후기", href: "#" },
-    { label: "QnA", href: "#" },
+    { label: "QnA", href: "/faq" },
 ];
 
 /** 로그인 회원 정보 (비로그인 시 null) */

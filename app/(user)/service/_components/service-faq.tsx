@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -92,9 +93,12 @@ function FaqAccordion() {
             </div>
 
             <div className="mt-6">
-                <ComingSoonButton className="text-brand hover:text-brand/80 text-sm font-bold transition-colors">
+                <Link
+                    href="/faq"
+                    className="bg-brand/10 text-brand hover:bg-brand/15 inline-flex items-center rounded-lg px-4 py-2.5 text-sm font-bold transition-colors"
+                >
                     전체 FAQ 보기
-                </ComingSoonButton>
+                </Link>
             </div>
         </div>
     );

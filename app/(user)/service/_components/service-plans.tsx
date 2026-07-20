@@ -96,8 +96,10 @@ function PlanCard({ plan }: { plan: Plan }) {
 
             <hr className="border-border my-6" />
 
-            <p className="text-foreground text-sm font-semibold">이용 요금</p>
-            <p className="text-brand mt-1 text-lg font-extrabold">
+            <p className="text-foreground text-center text-sm font-semibold">
+                이용 요금
+            </p>
+            <p className="text-brand mt-1 text-center text-lg font-extrabold">
                 {plan.price}{" "}
                 <span className="text-muted-foreground text-sm font-medium">
                     {plan.priceNote}
