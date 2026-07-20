@@ -55,11 +55,13 @@ export function StepNav({
     onPrev,
     nextLabel = "다음",
     nextType = "submit",
+    nextDisabled = false,
     onNext,
 }: {
     onPrev?: () => void;
     nextLabel?: string;
     nextType?: "submit" | "button";
+    nextDisabled?: boolean;
     onNext?: () => void;
 }) {
     return (
@@ -76,7 +78,13 @@ export function StepNav({
             <button
                 type={nextType}
                 onClick={onNext}
-                className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-10 py-3 text-sm font-bold transition-colors"
+                disabled={nextDisabled}
+                className={cn(
+                    "rounded-lg px-10 py-3 text-sm font-bold transition-colors",
+                    nextDisabled
+                        ? "bg-muted text-muted-foreground cursor-not-allowed"
+                        : "bg-brand text-brand-foreground hover:bg-brand/90",
+                )}
             >
                 {nextLabel}
             </button>

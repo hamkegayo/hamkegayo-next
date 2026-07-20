@@ -33,3 +33,33 @@ export const RELATION_OPTIONS: string[] = [
     "친척",
     "기타",
 ];
+
+/** 결제수단 */
+export const PAY_METHODS: { value: string; label: string }[] = [
+    { value: "card", label: "카드" },
+    { value: "bank", label: "무통장" },
+];
+
+/** 결제 카드사 */
+export const CARD_COMPANIES: string[] = [
+    "신한카드",
+    "삼성카드",
+    "현대카드",
+    "국민카드",
+    "우리카드",
+    "하나카드",
+    "롯데카드",
+    "BC카드",
+    "농협카드",
+];
+
+/** 할부 기간 */
+export const INSTALLMENTS: string[] = [
+    "일시불",
+    "2개월",
+    "3개월",
+    "4개월",
+    "5개월",
+    "6개월",
+    "12개월",
+];

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /** 예약 플로우 전체 단계 수 (진행 점 인디케이터 기준) */
-export const TOTAL_STEPS = 6;
+export const TOTAL_STEPS = 7;
 
 export type Gender = "female" | "male" | "";
 export type Plan = "basic" | "plus" | "";
@@ -33,6 +33,8 @@ export type ReservationData = {
     hospitalAddress: string;
     // STEP3 · 서비스 선택
     plan: Plan;
+    // STEP6 · 파트너 선택
+    partnerId: string;
 };
 
 const initialData: ReservationData = {
@@ -57,6 +59,7 @@ const initialData: ReservationData = {
     departAddress: "",
     hospitalAddress: "",
     plan: "",
+    partnerId: "",
 };
 
 type ReservationState = {
@@ -69,6 +72,7 @@ type ReservationState = {
     patch: (partial: Partial<ReservationData>) => void;
     next: () => void;
     prev: () => void;
+    goStep: (step: number) => void;
 };
 
 export const useReservationStore = create<ReservationState>((set) => ({
@@ -79,4 +83,32 @@ export const useReservationStore = create<ReservationState>((set) => ({
     patch: (partial) => set((s) => ({ data: { ...s.data, ...partial } })),
     next: () => set((s) => ({ step: Math.min(s.step + 1, TOTAL_STEPS) })),
     prev: () => set((s) => ({ step: Math.max(s.step - 1, 1) })),
+    goStep: (step) => set({ step: Math.min(Math.max(step, 1), TOTAL_STEPS) }),
 }));
+
+/** 플랜 표시용 라벨 / 가격 (베이직 20,000 / 플러스 25,000 통일) */
+export const PLAN_INFO: Record<
+    Exclude<Plan, "">,
+    {
+        short: string;
+        label: string;
+        badge: string;
+        price: number;
+        extra: number;
+    }
+> = {
+    basic: {
+        short: "베이직",
+        label: "베이직 서비스 (병원에서 만남 + 진료 동행)",
+        badge: "[베이직] 병원 동행 서비스",
+        price: 20000,
+        extra: 10000,
+    },
+    plus: {
+        short: "플러스",
+        label: "플러스 서비스 (자택 픽업 + 병원 동행)",
+        badge: "[플러스] 병원 동행 서비스",
+        price: 25000,
+        extra: 12500,
+    },
+};

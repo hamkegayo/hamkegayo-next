@@ -78,8 +78,6 @@ export function StepServiceSelect() {
             toast.info("원하는 서비스를 선택해 주세요.");
             return;
         }
-        // 다음 단계(STEP4~)는 추후 구현 — 현재는 스텁
-        toast.info("다음 단계는 준비 중입니다.");
         next();
     };
 
