@@ -35,6 +35,9 @@ export type ReservationData = {
     plan: Plan;
     // STEP6 · 파트너 선택
     partnerId: string;
+    // STEP4 등록 결과 (서버 반환)
+    reservationCode: string;
+    reservationId: string;
 };
 
 const initialData: ReservationData = {
@@ -60,6 +63,8 @@ const initialData: ReservationData = {
     hospitalAddress: "",
     plan: "",
     partnerId: "",
+    reservationCode: "",
+    reservationId: "",
 };
 
 type ReservationState = {

@@ -71,7 +71,9 @@ export function StepComplete() {
     const partner = getPartner(data.partnerId);
     const plan = PLAN_INFO[data.plan || "basic"];
 
+    // 서버가 발급한 예약번호 사용 (없으면 표시용 임시 생성)
     const [reservationNo] = useState(() => {
+        if (data.reservationCode) return data.reservationCode;
         const now = new Date();
         const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
         const rand = String(Math.floor(1000 + Math.random() * 9000));

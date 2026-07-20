@@ -83,3 +83,11 @@ export const step4Schema = z
 export type Step1Values = z.infer<typeof step1Schema>;
 export type Step2Values = z.infer<typeof step2Schema>;
 export type Step4Values = z.infer<typeof step4Schema>;
+
+/** 서버 예약 등록 입력 (STEP1 + STEP2 + 플랜, 성별/플랜은 enum으로 강화) */
+export const reservationServerSchema = step1Schema.merge(step2Schema).extend({
+    userGender: z.enum(["female", "male"]),
+    plan: z.enum(["basic", "plus"]),
+});
+
+export type ReservationInput = z.infer<typeof reservationServerSchema>;

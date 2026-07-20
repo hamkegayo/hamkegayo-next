@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { formatCardNumber, digitsOnly } from "@/lib/format";
@@ -12,6 +14,7 @@ import { Section } from "@/app/(user)/_components/home/section";
 import { useReservationStore, PLAN_INFO } from "../_store/reservation-store";
 import { step4Schema, type Step4Values } from "../_lib/schema";
 import { CARD_COMPANIES, INSTALLMENTS, PAY_METHODS } from "../_lib/options";
+import { createReservation } from "../_actions/reservation";
 import { StepBand, StepNav } from "./step-band";
 import { FieldError, FieldLabel, NativeSelect } from "./fields";
 
@@ -39,9 +42,11 @@ function Readonly({ label, value }: { label: string; value?: string }) {
 }
 
 export function StepPayment() {
-    const { data, next, prev } = useReservationStore();
+    const { data, patch, next, prev } = useReservationStore();
+    const router = useRouter();
     const plan = PLAN_INFO[data.plan || "basic"];
     const [agreed, setAgreed] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
     const {
         register,
@@ -67,9 +72,26 @@ export function StepPayment() {
     const method = watch("method");
     const isCard = method === "card";
 
-    const onSubmit = () => {
-        // 실제 결제는 스텁 — 검증 통과 시 다음(매칭) 단계로
-        next();
+    const onSubmit = async () => {
+        // 결제는 스텁. 검증 통과 시 예약을 MATCHING 상태로 등록한다.
+        if (submitting) return;
+        setSubmitting(true);
+        try {
+            const res = await createReservation(data);
+            if (!res.ok) {
+                if (res.reason === "auth") {
+                    toast.error(res.message);
+                    router.push("/login");
+                } else {
+                    toast.error(res.message);
+                }
+                return;
+            }
+            patch({ reservationCode: res.code, reservationId: res.id });
+            next();
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     return (
@@ -463,7 +485,11 @@ export function StepPayment() {
                         </div>
                     </div>
 
-                    <StepNav onPrev={prev} nextDisabled={!agreed} />
+                    <StepNav
+                        onPrev={prev}
+                        nextLabel={submitting ? "예약 등록 중…" : "다음"}
+                        nextDisabled={!agreed || submitting}
+                    />
                 </form>
             </Section>
         </>
