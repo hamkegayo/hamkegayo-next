@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@base-ui/react/dialog";
 import { LogOut, Menu as MenuIcon, UserRound, X } from "lucide-react";
-import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { logout } from "@/app/(user)/_actions/auth";
@@ -32,8 +31,6 @@ export function MobileNav({
         router.push("/login");
         router.refresh();
     };
-
-    const notReady = () => toast.info("준비 중인 기능입니다.");
 
     return (
         <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -101,14 +98,14 @@ export function MobileNav({
                     {/* 인증 영역 */}
                     {member ? (
                         <div className="flex flex-col">
-                            <button
-                                type="button"
-                                onClick={notReady}
+                            <Link
+                                href="/mypage"
+                                onClick={() => setOpen(false)}
                                 className="text-foreground hover:bg-muted flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors"
                             >
                                 <UserRound className="size-4" />
                                 마이페이지
-                            </button>
+                            </Link>
                             <button
                                 type="button"
                                 onClick={onLogout}
