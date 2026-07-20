@@ -11,8 +11,8 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 
 // 상단 네비게이션 항목 (라우트는 추후 개발 예정)
 const NAV_ITEMS = [
-    { label: "메인", href: "#" },
-    { label: "서비스 소개", href: "#" },
+    { label: "메인", href: "/" },
+    { label: "서비스 소개", href: "/service" },
     { label: "이용 후기", href: "#" },
     { label: "QnA", href: "#" },
 ];
