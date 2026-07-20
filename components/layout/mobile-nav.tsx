@@ -63,7 +63,7 @@ export function MobileNav({
 
                     {/* 예약하기 — 핵심 CTA, 최상단 강조 배치 */}
                     <Link
-                        href="#"
+                        href="/reservation"
                         onClick={() => setOpen(false)}
                         className="bg-brand text-brand-foreground hover:bg-brand/90 mb-4 rounded-xl px-4 py-3 text-center text-base font-bold shadow-sm transition-colors"
                     >

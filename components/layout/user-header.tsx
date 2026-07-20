@@ -74,7 +74,7 @@ export function UserHeader({ member }: { member: HeaderMember }) {
 
                     {/* 예약하기 — 데스크톱 전용 (모바일은 햄버거 드로어 최상단에 배치) */}
                     <Link
-                        href="#"
+                        href="/reservation"
                         className="bg-brand text-brand-foreground hover:bg-brand/90 hidden rounded-full px-4 py-1.5 font-semibold transition-colors md:inline-flex"
                     >
                         예약하기
