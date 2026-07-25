@@ -186,7 +186,8 @@ export default function PartnerSettlementHistory() {
 
             {/* 테이블 */}
             <div className="border-border bg-background mt-4 overflow-hidden rounded-2xl border">
-                <div className="overflow-x-auto">
+                {/* 데스크톱: 표 */}
+                <div className="hidden overflow-x-auto md:block">
                     <table className="w-full min-w-[860px] text-sm">
                         <thead>
                             <tr className="border-border text-muted-foreground border-b text-left">
@@ -273,6 +274,76 @@ export default function PartnerSettlementHistory() {
                         </tbody>
                     </table>
                 </div>
+
+                {/* 모바일: 카드 리스트 */}
+                <ul className="divide-border divide-y md:hidden">
+                    {list.map((r) => {
+                        const fee = r.amount ? calcFee(r.amount) : null;
+                        const isPaid = r.status === "paid";
+                        return (
+                            <li key={r.id}>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelected(r)}
+                                    className="hover:bg-muted/30 block w-full px-5 py-4 text-left transition-colors"
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="text-foreground font-bold">
+                                                {r.hospital} 동행 ({r.plan})
+                                            </p>
+                                            <p className="text-muted-foreground mt-0.5 text-xs">
+                                                {r.id} · {r.serviceDate}
+                                            </p>
+                                        </div>
+                                        <span
+                                            className={cn(
+                                                "shrink-0 rounded-full px-2.5 py-1 text-xs font-bold",
+                                                isPaid
+                                                    ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15"
+                                                    : "bg-brand/10 text-brand",
+                                            )}
+                                        >
+                                            {isPaid ? "지급 완료" : "지급 예정"}
+                                        </span>
+                                    </div>
+                                    <dl className="text-muted-foreground mt-3 space-y-1 text-xs">
+                                        <div className="flex justify-between gap-3">
+                                            <dt>정산 금액</dt>
+                                            <dd className="text-foreground font-bold">
+                                                {r.amount
+                                                    ? `${r.amount.toLocaleString()}원`
+                                                    : "-"}
+                                            </dd>
+                                        </div>
+                                        <div className="flex justify-between gap-3">
+                                            <dt>원천징수/수수료</dt>
+                                            <dd>
+                                                {fee
+                                                    ? `${fee.withholding.toLocaleString()}원 (${pct})`
+                                                    : "-"}
+                                            </dd>
+                                        </div>
+                                        <div className="flex justify-between gap-3">
+                                            <dt>실수령 금액</dt>
+                                            <dd className="text-brand font-bold">
+                                                {fee
+                                                    ? `${fee.net.toLocaleString()}원`
+                                                    : "-"}
+                                            </dd>
+                                        </div>
+                                        <div className="flex justify-between gap-3">
+                                            <dt>정산일</dt>
+                                            <dd className="text-foreground">
+                                                {r.settledDate ?? "-"}
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                </button>
+                            </li>
+                        );
+                    })}
+                </ul>
 
                 {/* 페이지네이션 (UI 전용) */}
                 <div className="border-border flex items-center justify-center gap-2 border-t py-4">

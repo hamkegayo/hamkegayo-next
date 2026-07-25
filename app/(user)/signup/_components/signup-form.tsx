@@ -27,7 +27,7 @@ import {
     type SignupType,
 } from "../_lib/schema";
 import { signUpUser, activatePartner } from "../_lib/actions";
-import { PhoneVerificationField } from "./phone-verification-field";
+import { EmailVerificationField } from "./email-verification-field";
 
 const TABS: { type: SignupType; label: string }[] = [
     { type: "user", label: "일반 회원가입" },
@@ -107,6 +107,7 @@ export function SignupForm() {
                       })
                     : await activatePartner({
                           loginId: v.loginId,
+                          email: v.email,
                           password: v.password,
                           name: v.name,
                           phone: v.phone,
@@ -173,28 +174,8 @@ export function SignupForm() {
                 noValidate
                 className="mx-auto mt-10 max-w-md space-y-5"
             >
-                {/* 이메일 / 아이디 */}
-                {type === "user" ? (
-                    <div className="space-y-2">
-                        <Label htmlFor="email">이메일</Label>
-                        <Input
-                            id="email"
-                            type="email"
-                            autoComplete="email"
-                            placeholder="name@example.com"
-                            aria-invalid={!!errors.email}
-                            {...register("email", {
-                                onChange: () =>
-                                    errors.email && clearErrors("email"),
-                            })}
-                        />
-                        {errors.email && (
-                            <p className="text-destructive text-sm">
-                                {errors.email.message}
-                            </p>
-                        )}
-                    </div>
-                ) : (
+                {/* 아이디 (파트너 전용) */}
+                {type === "partner" && (
                     <div className="space-y-2">
                         <Label htmlFor="loginId">아이디</Label>
                         <Input
@@ -215,30 +196,51 @@ export function SignupForm() {
                     </div>
                 )}
 
-                {/* 휴대폰 인증 */}
-                <PhoneVerificationField
+                {/* 이메일 인증 (사용자·파트너 공통) */}
+                <EmailVerificationField
                     key={type}
-                    phoneField={register("phone", {
-                        onChange: (e) => {
-                            setValue(
-                                "phone",
-                                formatPhoneNumber(e.target.value),
-                            );
-                            if (errors.phone) clearErrors("phone");
-                        },
+                    emailField={register("email", {
+                        onChange: () => errors.email && clearErrors("email"),
                     })}
-                    phoneValue={values.phone ?? ""}
-                    verified={values.phoneVerified ?? false}
+                    emailValue={values.email ?? ""}
+                    verified={values.emailVerified ?? false}
                     onVerified={(val) => {
-                        setValue("phoneVerified", val);
-                        if (val) clearErrors("phoneVerified");
+                        setValue("emailVerified", val);
+                        if (val) clearErrors("emailVerified");
                     }}
-                    phoneError={errors.phone?.message}
+                    emailError={errors.email?.message}
                     verifyError={
                         (errors as Record<string, { message?: string }>)
-                            .phoneVerified?.message
+                            .emailVerified?.message
                     }
                 />
+
+                {/* 휴대폰번호 (인증 없이 입력만) */}
+                <div className="space-y-2">
+                    <Label htmlFor="phone">휴대폰번호</Label>
+                    <Input
+                        id="phone"
+                        type="tel"
+                        inputMode="numeric"
+                        autoComplete="tel"
+                        placeholder="휴대폰번호를 입력해 주세요"
+                        aria-invalid={!!errors.phone}
+                        {...register("phone", {
+                            onChange: (e) => {
+                                setValue(
+                                    "phone",
+                                    formatPhoneNumber(e.target.value),
+                                );
+                                if (errors.phone) clearErrors("phone");
+                            },
+                        })}
+                    />
+                    {errors.phone && (
+                        <p className="text-destructive text-sm">
+                            {errors.phone.message}
+                        </p>
+                    )}
+                </div>
 
                 {/* 비밀번호 */}
                 <div className="space-y-2">

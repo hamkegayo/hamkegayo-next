@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -9,10 +10,12 @@ import {
     Home,
     Users,
     Wallet,
+    X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { usePartnerNav } from "./partner-nav-context";
 
 const ITEMS: {
     href: string;
@@ -37,11 +40,12 @@ const ITEMS: {
     { href: "/partner/settlement", label: "정산 관리", icon: Wallet },
 ];
 
-export function PartnerSidebar() {
+/** 네비게이션 항목 + 고객센터 (데스크톱 사이드바 / 모바일 드로워 공용) */
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     const pathname = usePathname();
 
     return (
-        <aside className="border-border bg-background fixed top-16 bottom-0 left-0 z-30 hidden w-56 flex-col overflow-y-auto border-r px-4 py-6 md:flex">
+        <>
             <nav className="flex flex-col gap-1">
                 {ITEMS.map(({ href, label, icon: Icon, badge }) => {
                     // 홈은 정확 일치, 나머지는 하위 경로(상세 등)도 활성 처리
@@ -53,6 +57,7 @@ export function PartnerSidebar() {
                         <Link
                             key={href}
                             href={href}
+                            onClick={onNavigate}
                             className={cn(
                                 "flex items-center gap-2.5 rounded-lg px-4 py-3 text-sm font-semibold transition-colors",
                                 active
@@ -72,7 +77,7 @@ export function PartnerSidebar() {
                 })}
             </nav>
 
-            {/* 파트너 고객센터 — 사이드바(화면) 하단 고정 */}
+            {/* 파트너 고객센터 — 하단 고정 */}
             <div className="border-border bg-background mt-auto rounded-2xl border p-5">
                 <p className="text-foreground flex items-center gap-2 font-bold">
                     <Headphones className="text-brand size-4" />
@@ -85,6 +90,72 @@ export function PartnerSidebar() {
                     평일 09:00 ~ 18:00
                 </p>
             </div>
-        </aside>
+        </>
+    );
+}
+
+export function PartnerSidebar() {
+    const { open, setOpen } = usePartnerNav();
+
+    // 드로워 열림 동안 배경 스크롤 잠금
+    useEffect(() => {
+        if (!open) return;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+            document.body.style.overflow = prev;
+        };
+    }, [open]);
+
+    return (
+        <>
+            {/* 데스크톱 고정 사이드바 */}
+            <aside className="border-border bg-background fixed top-16 bottom-0 left-0 z-30 hidden w-56 flex-col overflow-y-auto border-r px-4 py-6 md:flex">
+                <SidebarContent />
+            </aside>
+
+            {/* 모바일 드로워 (오버레이 + 좌측 슬라이드) */}
+            <div
+                className={cn(
+                    "fixed inset-0 z-50 md:hidden",
+                    open ? "" : "pointer-events-none",
+                )}
+                aria-hidden={!open}
+            >
+                {/* 오버레이 */}
+                <div
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                        "absolute inset-0 bg-black/40 transition-opacity duration-200",
+                        open ? "opacity-100" : "opacity-0",
+                    )}
+                />
+
+                {/* 패널 */}
+                <aside
+                    className={cn(
+                        "border-border bg-background absolute top-0 bottom-0 left-0 flex w-72 max-w-[82%] flex-col overflow-y-auto border-r px-4 py-4 shadow-xl transition-transform duration-200",
+                        open ? "translate-x-0" : "-translate-x-full",
+                    )}
+                >
+                    {/* 상단: 타이틀 + 닫기 */}
+                    <div className="mb-2 flex items-center justify-between px-2">
+                        <span className="text-foreground text-lg font-extrabold">
+                            함께가요 <span className="text-brand">Partner</span>
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setOpen(false)}
+                            aria-label="메뉴 닫기"
+                            className="text-foreground hover:bg-muted flex size-9 items-center justify-center rounded-lg transition-colors"
+                        >
+                            <X className="size-5" />
+                        </button>
+                    </div>
+
+                    <SidebarContent onNavigate={() => setOpen(false)} />
+                </aside>
+            </div>
+        </>
     );
 }

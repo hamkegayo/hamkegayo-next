@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
     Award,
     Check,
-    ChevronRight,
     Eye,
     FileSearch,
     Headphones,
@@ -67,11 +66,11 @@ function Card({
                 className,
             )}
         >
-            <div className="flex items-center justify-between gap-2">
-                <h2 className="text-foreground flex items-center gap-1.5 text-lg font-bold">
-                    {title}
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                <h2 className="text-foreground flex min-w-0 items-center gap-1.5 text-lg font-bold">
+                    <span className="truncate">{title}</span>
                     {hint && (
-                        <span className="text-muted-foreground text-sm font-normal">
+                        <span className="text-muted-foreground shrink-0 text-sm font-normal">
                             {hint}
                         </span>
                     )}
@@ -227,7 +226,7 @@ export default function PartnerProfile() {
             </div>
 
             {/* 상단: 프로필 사진 / 기본 정보 / 인증 정보 */}
-            <div className="mt-6 grid gap-5 lg:grid-cols-12">
+            <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-12">
                 {/* 프로필 사진 + 고객센터 */}
                 <div className="space-y-5 lg:col-span-3">
                     <Card title="프로필 사진">
@@ -353,13 +352,13 @@ export default function PartnerProfile() {
                             {PARTNER_PROFILE.verification.map((row) => (
                                 <div
                                     key={row.label}
-                                    className="flex items-center justify-between gap-3 py-3"
+                                    className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                                 >
-                                    <dt className="text-muted-foreground text-sm">
+                                    <dt className="text-muted-foreground shrink-0 text-sm">
                                         {row.label}
                                     </dt>
-                                    <dd className="flex items-center gap-2">
-                                        <span className="text-foreground font-bold">
+                                    <dd className="flex min-w-0 items-center gap-2">
+                                        <span className="text-foreground font-bold break-keep">
                                             {row.value}
                                         </span>
                                         <VerifiedBadge />
@@ -376,7 +375,7 @@ export default function PartnerProfile() {
                 활동 정보
             </h2>
 
-            <div className="mt-4 grid gap-5 md:grid-cols-3">
+            <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-3">
                 <Card
                     title="활동 지역"
                     hint="(수정 가능)"
@@ -411,7 +410,7 @@ export default function PartnerProfile() {
                 </Card>
             </div>
 
-            <div className="mt-5 grid gap-5 md:grid-cols-3">
+            <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3">
                 <Card title="휠체어/보행 보조 가능 여부" hint="(수정 가능)">
                     <CheckList
                         items={mobility}
@@ -461,54 +460,50 @@ export default function PartnerProfile() {
                 </Card>
             </div>
 
-            <div className="mt-5 grid gap-5 lg:grid-cols-2">
+            <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
                 {/* 근무했던 병원 리스트 */}
                 <Card title="근무했던 병원 리스트" hint="(인증 정보)">
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[440px] text-sm">
-                            <thead>
-                                <tr className="text-muted-foreground text-left">
-                                    <th className="pb-2 font-semibold">
-                                        병원명
-                                    </th>
-                                    <th className="pb-2 font-semibold">
-                                        근무 기간
-                                    </th>
-                                    <th className="pb-2 font-semibold">부서</th>
-                                    <th className="pb-2 font-semibold">
-                                        담당 업무
-                                    </th>
-                                    <th className="pb-2" />
-                                </tr>
-                            </thead>
-                            <tbody className="divide-border divide-y">
-                                {PARTNER_PROFILE.workHistory.map((w) => (
-                                    <tr key={w.hospital} className="align-top">
-                                        <td className="text-foreground py-3 font-bold">
-                                            {w.hospital}
-                                        </td>
-                                        <td className="py-3">
-                                            <p className="text-foreground font-semibold">
-                                                {w.period}
-                                            </p>
-                                            <p className="text-muted-foreground text-xs">
-                                                ({w.duration})
-                                            </p>
-                                        </td>
-                                        <td className="text-foreground py-3">
+                    <ul className="space-y-3">
+                        {PARTNER_PROFILE.workHistory.map((w) => (
+                            <li
+                                key={w.hospital}
+                                className="border-border rounded-xl border p-4"
+                            >
+                                <div className="flex items-start justify-between gap-2">
+                                    <p className="text-foreground font-bold">
+                                        {w.hospital}
+                                    </p>
+                                    <Lock className="text-muted-foreground mt-0.5 size-3.5 shrink-0" />
+                                </div>
+                                <dl className="mt-2 space-y-1 text-xs">
+                                    <div className="flex justify-between gap-3">
+                                        <dt className="text-muted-foreground shrink-0">
+                                            근무 기간
+                                        </dt>
+                                        <dd className="text-foreground text-right font-semibold">
+                                            {w.period} ({w.duration})
+                                        </dd>
+                                    </div>
+                                    <div className="flex justify-between gap-3">
+                                        <dt className="text-muted-foreground shrink-0">
+                                            부서
+                                        </dt>
+                                        <dd className="text-foreground text-right">
                                             {w.dept}
-                                        </td>
-                                        <td className="text-foreground py-3">
+                                        </dd>
+                                    </div>
+                                    <div className="flex justify-between gap-3">
+                                        <dt className="text-muted-foreground shrink-0">
+                                            담당 업무
+                                        </dt>
+                                        <dd className="text-foreground text-right">
                                             {w.role}
-                                        </td>
-                                        <td className="py-3 text-right">
-                                            <Lock className="text-muted-foreground ml-auto size-3.5" />
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                        </dd>
+                                    </div>
+                                </dl>
+                            </li>
+                        ))}
+                    </ul>
                     <p className="text-muted-foreground mt-3 text-xs">
                         * 인증된 정보는 수정이 불가합니다.
                     </p>

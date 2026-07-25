@@ -75,7 +75,7 @@ export default function PartnerReports() {
             </div>
 
             <div className="border-border bg-background mt-5 overflow-hidden rounded-2xl border">
-                {/* 헤더 */}
+                {/* 헤더 (데스크톱) */}
                 <div className="border-border text-muted-foreground hidden items-center gap-4 border-b px-6 py-3.5 text-sm font-semibold md:flex">
                     <span className="min-w-0 flex-1">병원 / 서비스</span>
                     <span className="w-44 shrink-0">이용자</span>
@@ -88,81 +88,139 @@ export default function PartnerReports() {
                 <ul className="divide-border divide-y">
                     {list.map((r) => {
                         const isDone = r.status === "done";
+                        const nameCls = isDone
+                            ? "text-muted-foreground"
+                            : "text-foreground";
+                        const statusBadge = isDone ? (
+                            <span className="bg-muted text-muted-foreground inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold">
+                                <span className="bg-muted-foreground size-1.5 rounded-full" />
+                                작성 완료
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-600 dark:bg-amber-500/15">
+                                <span className="size-1.5 rounded-full bg-amber-500" />
+                                작성 대기
+                            </span>
+                        );
                         return (
                             <li key={r.id}>
                                 <Link
                                     href={`/partner/reports/${r.id}`}
-                                    className="hover:bg-muted/30 flex flex-wrap items-center gap-x-4 gap-y-2 px-6 py-5 transition-colors"
+                                    className="hover:bg-muted/30 block transition-colors"
                                 >
-                                    <div className="min-w-0 flex-1">
-                                        <p
-                                            className={cn(
-                                                "flex items-center gap-2 font-bold",
-                                                isDone
-                                                    ? "text-muted-foreground"
-                                                    : "text-foreground",
-                                            )}
-                                        >
-                                            {r.hospital}
-                                            <span
+                                    {/* 데스크톱: 행 */}
+                                    <div className="hidden items-center gap-4 px-6 py-5 md:flex">
+                                        <div className="min-w-0 flex-1">
+                                            <p
                                                 className={cn(
-                                                    "inline-block rounded-md px-2 py-0.5 text-[11px] font-bold",
-                                                    planBadge(r.plan),
+                                                    "flex items-center gap-2 font-bold",
+                                                    nameCls,
                                                 )}
                                             >
-                                                {r.plan.toUpperCase()}
-                                            </span>
-                                        </p>
-                                        <p className="text-muted-foreground mt-0.5 text-sm">
-                                            {r.type}
-                                        </p>
+                                                {r.hospital}
+                                                <span
+                                                    className={cn(
+                                                        "inline-block rounded-md px-2 py-0.5 text-[11px] font-bold",
+                                                        planBadge(r.plan),
+                                                    )}
+                                                >
+                                                    {r.plan.toUpperCase()}
+                                                </span>
+                                            </p>
+                                            <p className="text-muted-foreground mt-0.5 text-sm">
+                                                {r.type}
+                                            </p>
+                                        </div>
+                                        <div
+                                            className={cn(
+                                                "w-44 shrink-0 font-bold",
+                                                nameCls,
+                                            )}
+                                        >
+                                            {r.customerName} ({r.customerAge} /{" "}
+                                            {r.customerGender})
+                                        </div>
+                                        <div
+                                            className={cn(
+                                                "w-36 shrink-0 font-bold",
+                                                nameCls,
+                                            )}
+                                        >
+                                            {r.serviceDate}
+                                        </div>
+                                        <div className="text-foreground w-36 shrink-0 font-bold">
+                                            {r.code}
+                                        </div>
+                                        <div className="w-28 shrink-0">
+                                            {statusBadge}
+                                        </div>
+                                        <div className="w-6 shrink-0 text-right">
+                                            {!isDone && (
+                                                <ChevronRight className="text-muted-foreground ml-auto size-5" />
+                                            )}
+                                        </div>
                                     </div>
 
-                                    <div
-                                        className={cn(
-                                            "w-44 shrink-0 font-bold",
-                                            isDone
-                                                ? "text-muted-foreground"
-                                                : "text-foreground",
-                                        )}
-                                    >
-                                        {r.customerName} ({r.customerAge} /{" "}
-                                        {r.customerGender})
-                                    </div>
-
-                                    <div
-                                        className={cn(
-                                            "w-36 shrink-0 font-bold",
-                                            isDone
-                                                ? "text-muted-foreground"
-                                                : "text-foreground",
-                                        )}
-                                    >
-                                        {r.serviceDate}
-                                    </div>
-
-                                    <div className="text-foreground w-36 shrink-0 font-bold">
-                                        {r.code}
-                                    </div>
-
-                                    <div className="w-28 shrink-0">
-                                        {isDone ? (
-                                            <span className="bg-muted text-muted-foreground inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold">
-                                                <span className="bg-muted-foreground size-1.5 rounded-full" />
-                                                작성 완료
-                                            </span>
-                                        ) : (
-                                            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-600 dark:bg-amber-500/15">
-                                                <span className="size-1.5 rounded-full bg-amber-500" />
-                                                작성 대기
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    <div className="w-6 shrink-0 text-right">
-                                        {!isDone && (
-                                            <ChevronRight className="text-muted-foreground ml-auto size-5" />
-                                        )}
+                                    {/* 모바일: 카드 */}
+                                    <div className="px-5 py-4 md:hidden">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p
+                                                    className={cn(
+                                                        "flex flex-wrap items-center gap-x-2 gap-y-1 font-bold",
+                                                        nameCls,
+                                                    )}
+                                                >
+                                                    {r.hospital}
+                                                    <span
+                                                        className={cn(
+                                                            "inline-block rounded-md px-2 py-0.5 text-[11px] font-bold",
+                                                            planBadge(r.plan),
+                                                        )}
+                                                    >
+                                                        {r.plan.toUpperCase()}
+                                                    </span>
+                                                </p>
+                                                <p className="text-muted-foreground mt-0.5 text-sm">
+                                                    {r.type}
+                                                </p>
+                                            </div>
+                                            <div className="shrink-0">
+                                                {statusBadge}
+                                            </div>
+                                        </div>
+                                        <dl className="text-muted-foreground mt-3 space-y-1 text-xs">
+                                            <div className="flex justify-between gap-3">
+                                                <dt>이용자</dt>
+                                                <dd
+                                                    className={cn(
+                                                        "font-semibold",
+                                                        nameCls,
+                                                    )}
+                                                >
+                                                    {r.customerName} (
+                                                    {r.customerAge} /{" "}
+                                                    {r.customerGender})
+                                                </dd>
+                                            </div>
+                                            <div className="flex justify-between gap-3">
+                                                <dt>서비스 일자</dt>
+                                                <dd
+                                                    className={cn(
+                                                        "font-semibold",
+                                                        nameCls,
+                                                    )}
+                                                >
+                                                    {r.serviceDate}
+                                                </dd>
+                                            </div>
+                                            <div className="flex justify-between gap-3">
+                                                <dt>예약 번호</dt>
+                                                <dd className="text-foreground font-semibold">
+                                                    {r.code}
+                                                </dd>
+                                            </div>
+                                        </dl>
                                     </div>
                                 </Link>
                             </li>
