@@ -29,11 +29,12 @@ export function Modal({
             if (e.key === "Escape" && dismissible) onClose();
         };
         document.addEventListener("keydown", onKey);
-        const prev = document.body.style.overflow;
+        // 배경 스크롤 잠금. 닫을 때는 이전 값 복원 대신 "" 로 초기화한다.
+        // (base-ui Menu 등 다른 컴포넌트가 걸어둔 일시적 잠금값을 되살리지 않도록)
         document.body.style.overflow = "hidden";
         return () => {
             document.removeEventListener("keydown", onKey);
-            document.body.style.overflow = prev;
+            document.body.style.overflow = "";
         };
     }, [open, dismissible, onClose]);
 
