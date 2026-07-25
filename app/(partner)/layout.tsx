@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { ZoomProvider } from "@/components/providers/zoom-provider";
 import { getPartnerName } from "./_lib/partner";
+import { getPartnerMatchingCount } from "./_lib/requests.server";
 import { PartnerHeader } from "./_components/partner-header";
 import { PartnerSidebar } from "./_components/partner-sidebar";
 import { PartnerNavProvider } from "./_components/partner-nav-context";
@@ -17,7 +18,10 @@ export default async function PartnerLayout({
 }: {
     children: React.ReactNode;
 }) {
-    const name = await getPartnerName();
+    const [name, requestCount] = await Promise.all([
+        getPartnerName(),
+        getPartnerMatchingCount(),
+    ]);
 
     return (
         <ZoomProvider>
@@ -39,7 +43,7 @@ export default async function PartnerLayout({
                     </Suspense>
                     {/* 공유 고정 요소: 헤더(상단) + 사이드바(좌측/모바일 드로워) */}
                     <PartnerHeader name={name} />
-                    <PartnerSidebar />
+                    <PartnerSidebar requestCount={requestCount} />
                     <main className="pt-16 md:pl-56">
                         <div className="mx-auto max-w-6xl px-4 py-8 md:px-8">
                             {children}
