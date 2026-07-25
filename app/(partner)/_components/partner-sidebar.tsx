@@ -44,7 +44,11 @@ export function PartnerSidebar() {
         <aside className="border-border bg-background fixed top-16 bottom-0 left-0 z-30 hidden w-56 flex-col overflow-y-auto border-r px-4 py-6 md:flex">
             <nav className="flex flex-col gap-1">
                 {ITEMS.map(({ href, label, icon: Icon, badge }) => {
-                    const active = pathname === href;
+                    // 홈은 정확 일치, 나머지는 하위 경로(상세 등)도 활성 처리
+                    const active =
+                        pathname === href ||
+                        (href !== "/partner" &&
+                            pathname.startsWith(`${href}/`));
                     return (
                         <Link
                             key={href}
