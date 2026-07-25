@@ -11,20 +11,30 @@ export const VERIFIED_VALID_MS = 30 * 60 * 1000;
 
 /** 6자리 숫자 OTP 생성 */
 export function generateCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
+    return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 /** OTP 해시 (원문 대신 저장/비교용) */
 export function hashCode(code: string): string {
-  return createHash("sha256").update(code).digest("hex");
+    return createHash("sha256").update(code).digest("hex");
 }
 
 /** 휴대폰번호 정규화 — 숫자만 남김 */
 export function normalizePhone(input: string): string {
-  return input.replace(/\D/g, "");
+    return input.replace(/\D/g, "");
 }
 
 /** 국내 휴대폰번호 형식 검증 (010XXXXXXXX) */
 export function isValidPhone(phone: string): boolean {
-  return /^010\d{8}$/.test(phone);
+    return /^010\d{8}$/.test(phone);
+}
+
+/** 이메일 정규화 — 앞뒤 공백 제거 + 소문자화 */
+export function normalizeEmail(input: string): string {
+    return input.trim().toLowerCase();
+}
+
+/** 이메일 형식 검증 */
+export function isValidEmail(email: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
