@@ -13,7 +13,7 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 const NAV_ITEMS = [
     { label: "메인", href: "/" },
     { label: "서비스 소개", href: "/service" },
-    { label: "이용 후기", href: "#" },
+    { label: "이용 후기", href: "/review" },
     { label: "QnA", href: "/faq" },
 ];
 
