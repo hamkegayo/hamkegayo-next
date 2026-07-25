@@ -100,7 +100,9 @@ export function PartnerHeader({ name }: { name: string }) {
                                 >
                                     <Menu.Popup className="border-border bg-popover text-popover-foreground w-52 origin-[var(--transform-origin)] rounded-xl border p-1.5 shadow-lg transition-[transform,opacity] outline-none data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
                                         <Menu.Item
-                                            onClick={notReady}
+                                            onClick={() =>
+                                                router.push("/partner/profile")
+                                            }
                                             className="text-foreground data-[highlighted]:bg-muted flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm outline-none select-none"
                                         >
                                             <UserRound className="size-4" />
