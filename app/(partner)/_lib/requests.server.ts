@@ -60,6 +60,43 @@ function formatListTime(useDate: string, reserveTime: string): string {
 }
 
 /**
+ * 로그인한 파트너의 수락 대기(MATCHING) 건수.
+ *  - 목록과 동일한 제외 규칙(이미 지원한 예약 제외)을 적용한다.
+ *  - 사이드바 뱃지 등 개수만 필요한 곳에서 사용(행 데이터는 읽지 않음).
+ */
+export async function getPartnerMatchingCount(): Promise<number> {
+    try {
+        const supabase = await createClient();
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return 0;
+
+        const { data: applied } = await supabase
+            .from("reservation_applications")
+            .select("reservation_id")
+            .eq("partner_id", user.id);
+
+        const excludeIds = (applied ?? []).map((a) => a.reservation_id);
+
+        let query = supabase
+            .from("reservations")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "MATCHING");
+
+        if (excludeIds.length > 0) {
+            query = query.not("id", "in", `(${excludeIds.join(",")})`);
+        }
+
+        const { count, error } = await query;
+        if (error) return 0;
+        return count ?? 0;
+    } catch {
+        return 0;
+    }
+}
+
+/**
  * 로그인한 파트너에게 내려줄 MATCHING(수락 대기) 예약 목록.
  *  - status = MATCHING 만 조회 (RLS 상 파트너에게 MATCHING 만 노출됨)
  *  - 이 파트너가 이미 지원(수락/거절/대기 등)한 예약은 제외

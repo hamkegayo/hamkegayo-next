@@ -24,7 +24,7 @@ const ITEMS: {
     badge?: number;
 }[] = [
     { href: "/partner", label: "홈", icon: Home },
-    { href: "/partner/requests", label: "서비스 요청", icon: Users, badge: 3 },
+    { href: "/partner/requests", label: "서비스 요청", icon: Users },
     {
         href: "/partner/management",
         label: "진행 관리",
@@ -41,13 +41,23 @@ const ITEMS: {
 ];
 
 /** 네비게이션 항목 + 고객센터 (데스크톱 사이드바 / 모바일 드로워 공용) */
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarContent({
+    onNavigate,
+    requestCount,
+}: {
+    onNavigate?: () => void;
+    requestCount: number;
+}) {
     const pathname = usePathname();
 
     return (
         <>
             <nav className="flex flex-col gap-1">
                 {ITEMS.map(({ href, label, icon: Icon, badge }) => {
+                    // 서비스 요청 뱃지는 실제 수락 대기 건수로 연동(0이면 숨김)
+                    if (href === "/partner/requests") {
+                        badge = requestCount > 0 ? requestCount : undefined;
+                    }
                     // 홈은 정확 일치, 나머지는 하위 경로(상세 등)도 활성 처리
                     const active =
                         pathname === href ||
@@ -94,7 +104,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     );
 }
 
-export function PartnerSidebar() {
+export function PartnerSidebar({ requestCount }: { requestCount: number }) {
     const { open, setOpen } = usePartnerNav();
 
     // 드로워 열림 동안 배경 스크롤 잠금
@@ -111,7 +121,7 @@ export function PartnerSidebar() {
         <>
             {/* 데스크톱 고정 사이드바 */}
             <aside className="border-border bg-background fixed top-16 bottom-0 left-0 z-30 hidden w-56 flex-col overflow-y-auto border-r px-4 py-6 md:flex">
-                <SidebarContent />
+                <SidebarContent requestCount={requestCount} />
             </aside>
 
             {/* 모바일 드로워 (오버레이 + 좌측 슬라이드) */}
@@ -153,7 +163,10 @@ export function PartnerSidebar() {
                         </button>
                     </div>
 
-                    <SidebarContent onNavigate={() => setOpen(false)} />
+                    <SidebarContent
+                        onNavigate={() => setOpen(false)}
+                        requestCount={requestCount}
+                    />
                 </aside>
             </div>
         </>
