@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Inbox } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { PARTNER_REQUESTS } from "../../_lib/requests";
+import { getPartnerMatchingRequests } from "../../_lib/requests.server";
 
 function planBadge(plan: "Basic" | "Plus") {
     return plan === "Basic"
@@ -10,8 +10,9 @@ function planBadge(plan: "Basic" | "Plus") {
         : "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15";
 }
 
-export default function PartnerRequests() {
-    const count = PARTNER_REQUESTS.length;
+export default async function PartnerRequests() {
+    const requests = await getPartnerMatchingRequests();
+    const count = requests.length;
 
     return (
         <div>
@@ -30,46 +31,60 @@ export default function PartnerRequests() {
                 수 있어요.
             </p>
 
-            <div className="divide-border border-border bg-background mt-6 divide-y overflow-hidden rounded-2xl border">
-                {PARTNER_REQUESTS.map((r) => (
-                    <Link
-                        key={r.id}
-                        href={`/partner/requests/${r.id}`}
-                        className="hover:bg-muted/30 flex items-center gap-4 px-6 py-5 transition-colors"
-                    >
-                        <div className="w-28 shrink-0">
-                            <p className="text-foreground font-bold whitespace-nowrap">
-                                {r.listTime}
-                            </p>
-                            <p className="text-muted-foreground text-xs whitespace-nowrap">
-                                {r.duration}
-                            </p>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <p className="text-foreground font-bold">
-                                {r.hospital}
-                            </p>
-                            <p className="text-muted-foreground text-sm">
-                                {r.type}
-                            </p>
-                        </div>
-                        <div className="shrink-0 text-right">
-                            <span
-                                className={cn(
-                                    "inline-block rounded-md px-2 py-0.5 text-xs font-semibold",
-                                    planBadge(r.plan),
-                                )}
-                            >
-                                {r.plan}
-                            </span>
-                            <p className="text-destructive mt-2 text-sm font-bold">
-                                미수락
-                            </p>
-                        </div>
-                        <ChevronRight className="text-muted-foreground size-5 shrink-0" />
-                    </Link>
-                ))}
-            </div>
+            {count === 0 ? (
+                <div className="border-border bg-background mt-6 flex flex-col items-center gap-3 rounded-2xl border px-6 py-16 text-center">
+                    <span className="bg-muted text-muted-foreground flex size-12 items-center justify-center rounded-full">
+                        <Inbox className="size-6" />
+                    </span>
+                    <p className="text-foreground font-bold">
+                        새로운 요청이 없어요
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                        수락 대기 중인 서비스 요청이 들어오면 여기에 표시됩니다.
+                    </p>
+                </div>
+            ) : (
+                <div className="divide-border border-border bg-background mt-6 divide-y overflow-hidden rounded-2xl border">
+                    {requests.map((r) => (
+                        <Link
+                            key={r.id}
+                            href={`/partner/requests/${r.id}`}
+                            className="hover:bg-muted/30 flex items-center gap-4 px-6 py-5 transition-colors"
+                        >
+                            <div className="w-28 shrink-0">
+                                <p className="text-foreground font-bold whitespace-nowrap">
+                                    {r.listTime}
+                                </p>
+                                <p className="text-muted-foreground text-xs whitespace-nowrap">
+                                    {r.duration}
+                                </p>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-foreground truncate font-bold">
+                                    {r.hospital}
+                                </p>
+                                <p className="text-muted-foreground truncate text-sm">
+                                    {r.type}
+                                </p>
+                            </div>
+                            <div className="shrink-0 text-right">
+                                <span
+                                    className={cn(
+                                        "inline-block rounded-md px-2 py-0.5 text-xs font-semibold",
+                                        planBadge(r.plan),
+                                    )}
+                                >
+                                    {r.plan}
+                                </span>
+                                <p className="text-destructive mt-2 text-sm font-bold">
+                                    미수락
+                                </p>
+                            </div>
+                            <ChevronRight className="text-muted-foreground size-5 shrink-0" />
+                        </Link>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
