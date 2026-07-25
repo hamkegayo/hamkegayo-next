@@ -25,7 +25,7 @@ export default async function PartnerHome() {
         <div>
             {/* 인사 */}
             <h1 className="text-foreground text-2xl font-extrabold md:text-3xl">
-                {name}님, 오늘도 함께해요! 👋
+                {name}님, 오늘도 함께해요!
             </h1>
             <p className="text-muted-foreground mt-2">
                 오늘 일정과 새로운 요청을 확인하고, 원활한 동행을 시작해보세요.
@@ -138,31 +138,52 @@ export default async function PartnerHome() {
                             <Link
                                 key={s.time}
                                 href="/partner/management"
-                                className="border-border hover:bg-muted/40 flex items-center gap-3 rounded-xl border p-4 transition-colors"
+                                className="border-border hover:bg-muted/40 block rounded-xl border p-4 transition-colors"
                             >
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-brand font-bold">
-                                        {s.time}
-                                    </p>
-                                    <p className="text-foreground mt-1 font-bold">
+                                {/* 데스크톱/태블릿: 행 */}
+                                <div className="hidden items-center gap-3 sm:flex">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-brand font-bold">
+                                            {s.time}
+                                        </p>
+                                        <p className="text-foreground mt-1 font-bold">
+                                            {s.hospital}
+                                        </p>
+                                        <p className="text-muted-foreground text-sm">
+                                            {s.type}
+                                        </p>
+                                    </div>
+                                    <div className="shrink-0 text-right">
+                                        <span className="inline-block rounded-md bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-600 dark:bg-blue-500/15">
+                                            {s.status}
+                                        </span>
+                                        <p className="text-foreground mt-2 text-sm font-semibold">
+                                            {s.patient}
+                                        </p>
+                                        <p className="text-muted-foreground text-xs">
+                                            {s.plan}
+                                        </p>
+                                    </div>
+                                    <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+                                </div>
+
+                                {/* 모바일: 카드 */}
+                                <div className="sm:hidden">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-brand font-bold">
+                                            {s.time}
+                                        </span>
+                                        <span className="inline-block rounded-md bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-600 dark:bg-blue-500/15">
+                                            {s.status}
+                                        </span>
+                                    </div>
+                                    <p className="text-foreground mt-1.5 font-bold">
                                         {s.hospital}
                                     </p>
-                                    <p className="text-muted-foreground text-sm">
-                                        {s.type}
+                                    <p className="text-muted-foreground mt-0.5 text-sm">
+                                        {s.type} · {s.patient} · {s.plan}
                                     </p>
                                 </div>
-                                <div className="shrink-0 text-right">
-                                    <span className="inline-block rounded-md bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-600 dark:bg-blue-500/15">
-                                        {s.status}
-                                    </span>
-                                    <p className="text-foreground mt-2 text-sm font-semibold">
-                                        {s.patient}
-                                    </p>
-                                    <p className="text-muted-foreground text-xs">
-                                        {s.plan}
-                                    </p>
-                                </div>
-                                <ChevronRight className="text-muted-foreground size-4 shrink-0" />
                             </Link>
                         ))}
                     </div>
@@ -191,38 +212,72 @@ export default async function PartnerHome() {
                             <Link
                                 key={`${r.time}-${r.hospital}`}
                                 href="/partner/requests"
-                                className="hover:bg-muted/30 flex items-center gap-4 py-4 transition-colors"
+                                className="hover:bg-muted/30 block py-4 transition-colors"
                             >
-                                <div className="shrink-0">
-                                    <p className="text-foreground font-bold whitespace-nowrap">
-                                        {r.time}
-                                    </p>
-                                    <p className="text-muted-foreground text-xs whitespace-nowrap">
-                                        {r.duration}
-                                    </p>
+                                {/* 데스크톱/태블릿: 행 */}
+                                <div className="hidden items-center gap-4 sm:flex">
+                                    <div className="shrink-0">
+                                        <p className="text-foreground font-bold whitespace-nowrap">
+                                            {r.time}
+                                        </p>
+                                        <p className="text-muted-foreground text-xs whitespace-nowrap">
+                                            {r.duration}
+                                        </p>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-foreground font-bold">
+                                            {r.hospital}
+                                        </p>
+                                        <p className="text-muted-foreground text-sm">
+                                            {r.type}
+                                        </p>
+                                    </div>
+                                    <div className="shrink-0 text-right">
+                                        <span
+                                            className={cn(
+                                                "inline-block rounded-md px-2 py-0.5 text-xs font-semibold",
+                                                planBadge(r.plan),
+                                            )}
+                                        >
+                                            {r.plan}
+                                        </span>
+                                        <p className="text-destructive mt-2 text-sm font-bold">
+                                            새 요청
+                                        </p>
+                                    </div>
+                                    <ChevronRight className="text-muted-foreground size-4 shrink-0" />
                                 </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-foreground font-bold">
+
+                                {/* 모바일: 카드 */}
+                                <div className="sm:hidden">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-foreground font-bold">
+                                            {r.time}{" "}
+                                            <span className="text-muted-foreground text-xs font-normal">
+                                                {r.duration}
+                                            </span>
+                                        </span>
+                                        <span className="flex items-center gap-2">
+                                            <span
+                                                className={cn(
+                                                    "inline-block rounded-md px-2 py-0.5 text-xs font-semibold",
+                                                    planBadge(r.plan),
+                                                )}
+                                            >
+                                                {r.plan}
+                                            </span>
+                                            <span className="text-destructive text-xs font-bold">
+                                                새 요청
+                                            </span>
+                                        </span>
+                                    </div>
+                                    <p className="text-foreground mt-1.5 font-bold">
                                         {r.hospital}
                                     </p>
-                                    <p className="text-muted-foreground text-sm">
+                                    <p className="text-muted-foreground mt-0.5 text-sm">
                                         {r.type}
                                     </p>
                                 </div>
-                                <div className="shrink-0 text-right">
-                                    <span
-                                        className={cn(
-                                            "inline-block rounded-md px-2 py-0.5 text-xs font-semibold",
-                                            planBadge(r.plan),
-                                        )}
-                                    >
-                                        {r.plan}
-                                    </span>
-                                    <p className="text-destructive mt-2 text-sm font-bold">
-                                        새 요청
-                                    </p>
-                                </div>
-                                <ChevronRight className="text-muted-foreground size-4 shrink-0" />
                             </Link>
                         ))}
                     </div>

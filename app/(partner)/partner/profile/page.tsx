@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
     Award,
     Check,
-    ChevronRight,
     Eye,
     FileSearch,
     Headphones,
@@ -353,13 +352,13 @@ export default function PartnerProfile() {
                             {PARTNER_PROFILE.verification.map((row) => (
                                 <div
                                     key={row.label}
-                                    className="flex items-center justify-between gap-3 py-3"
+                                    className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                                 >
-                                    <dt className="text-muted-foreground text-sm">
+                                    <dt className="text-muted-foreground shrink-0 text-sm">
                                         {row.label}
                                     </dt>
-                                    <dd className="flex items-center gap-2">
-                                        <span className="text-foreground font-bold">
+                                    <dd className="flex min-w-0 items-center gap-2">
+                                        <span className="text-foreground font-bold break-keep">
                                             {row.value}
                                         </span>
                                         <VerifiedBadge />

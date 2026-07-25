@@ -10,6 +10,7 @@ import {
     Bell,
     ChevronDown,
     LogOut,
+    Menu as MenuIcon,
     UserRound,
     ZoomIn,
 } from "lucide-react";
@@ -18,10 +19,12 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ConfirmModal } from "@/components/ui/modal";
 import { useZoom } from "@/components/providers/zoom-provider";
+import { usePartnerNav } from "./partner-nav-context";
 import { logout } from "@/app/(user)/_actions/auth";
 
 export function PartnerHeader({ name }: { name: string }) {
     const { enlarged, toggle } = useZoom();
+    const { setOpen } = usePartnerNav();
     const router = useRouter();
     const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -36,9 +39,19 @@ export function PartnerHeader({ name }: { name: string }) {
     return (
         <>
             <header className="border-border bg-background fixed inset-x-0 top-0 z-40 h-16 border-b">
-                <div className="flex h-16 items-center justify-between gap-4 px-6">
+                <div className="flex h-16 items-center justify-between gap-2 px-4 md:gap-4 md:px-6">
                     {/* 로고 + 크게보기 */}
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 md:gap-4">
+                        {/* 모바일 메뉴(드로워) 열기 */}
+                        <button
+                            type="button"
+                            onClick={() => setOpen(true)}
+                            aria-label="메뉴 열기"
+                            className="text-foreground hover:bg-muted -ml-1 flex size-9 items-center justify-center rounded-lg transition-colors md:hidden"
+                        >
+                            <MenuIcon className="size-5" />
+                        </button>
+
                         <Link
                             href="/partner"
                             className="flex items-center gap-2"
@@ -61,14 +74,16 @@ export function PartnerHeader({ name }: { name: string }) {
                             onClick={toggle}
                             aria-pressed={enlarged}
                             className={cn(
-                                "border-brand inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors",
+                                "border-brand inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-sm font-semibold transition-colors sm:px-3",
                                 enlarged
                                     ? "bg-brand text-brand-foreground hover:bg-brand/90"
                                     : "bg-background text-brand hover:bg-brand/5",
                             )}
                         >
                             <ZoomIn className="size-4" />
-                            {enlarged ? "작게보기" : "크게보기"}
+                            <span className="hidden sm:inline">
+                                {enlarged ? "작게보기" : "크게보기"}
+                            </span>
                         </button>
                     </div>
 
@@ -89,7 +104,9 @@ export function PartnerHeader({ name }: { name: string }) {
                         <Menu.Root>
                             <Menu.Trigger className="text-foreground hover:bg-muted data-[popup-open]:bg-muted inline-flex items-center gap-2 rounded-full px-1.5 py-1 text-sm font-semibold transition-colors">
                                 <span className="bg-muted size-7 rounded-full" />
-                                {name}님
+                                <span className="hidden sm:inline">
+                                    {name}님
+                                </span>
                                 <ChevronDown className="text-muted-foreground size-4" />
                             </Menu.Trigger>
                             <Menu.Portal>
