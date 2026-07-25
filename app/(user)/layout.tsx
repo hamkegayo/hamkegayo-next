@@ -1,6 +1,9 @@
+import { Suspense } from "react";
+
 import { ZoomProvider } from "@/components/providers/zoom-provider";
 import { UserHeader, type HeaderMember } from "@/components/layout/user-header";
 import { UserFooter } from "@/components/layout/user-footer";
+import { BlockedModal } from "@/components/layout/blocked-modal";
 import { createClient } from "@/utils/supabase/server";
 
 /**
@@ -8,45 +11,52 @@ import { createClient } from "@/utils/supabase/server";
  * 파트너 서비스는 별도 레이아웃을 사용한다.
  */
 export default async function UserLayout({
-  children,
+    children,
 }: {
-  children: React.ReactNode;
+    children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    const supabase = await createClient();
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
 
-  // 로그인 시에만 회원 정보를 구성 (헤더 회원메뉴 표시용)
-  let member: HeaderMember = null;
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("name, role")
-      .eq("id", user.id)
-      .maybeSingle();
+    // 로그인 시에만 회원 정보를 구성 (헤더 회원메뉴 표시용)
+    let member: HeaderMember = null;
+    if (user) {
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("name, role")
+            .eq("id", user.id)
+            .maybeSingle();
 
-    let subText = user.email ?? "";
-    // 파트너는 합성 이메일 대신 발급 아이디를 표시
-    if (profile?.role === "PARTNER") {
-      const { data: pa } = await supabase
-        .from("partner_accounts")
-        .select("login_id")
-        .eq("profile_id", user.id)
-        .maybeSingle();
-      if (pa?.login_id) subText = `아이디: ${pa.login_id}`;
+        let subText = user.email ?? "";
+        // 파트너는 합성 이메일 대신 발급 아이디를 표시
+        if (profile?.role === "PARTNER") {
+            const { data: pa } = await supabase
+                .from("partner_accounts")
+                .select("login_id")
+                .eq("profile_id", user.id)
+                .maybeSingle();
+            if (pa?.login_id) subText = `아이디: ${pa.login_id}`;
+        }
+
+        member = { name: profile?.name ?? "회원", subText };
     }
 
-    member = { name: profile?.name ?? "회원", subText };
-  }
-
-  return (
-    <ZoomProvider>
-      <div className="flex min-h-screen flex-col">
-        <UserHeader member={member} />
-        <main className="flex flex-1 flex-col">{children}</main>
-        <UserFooter />
-      </div>
-    </ZoomProvider>
-  );
+    return (
+        <ZoomProvider>
+            <div className="flex min-h-screen flex-col">
+                <Suspense fallback={null}>
+                    <BlockedModal
+                        flag="partner"
+                        title="파트너 전용 페이지예요"
+                        description="해당 페이지는 파트너 계정만 이용할 수 있어요."
+                    />
+                </Suspense>
+                <UserHeader member={member} />
+                <main className="flex flex-1 flex-col">{children}</main>
+                <UserFooter />
+            </div>
+        </ZoomProvider>
+    );
 }

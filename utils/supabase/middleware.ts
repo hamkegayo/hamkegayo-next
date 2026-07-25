@@ -48,9 +48,10 @@ export async function updateSession(request: NextRequest) {
     const { pathname } = request.nextUrl;
     const role = user?.app_metadata?.role as "USER" | "PARTNER" | undefined;
 
-    const redirect = (to: string) => {
+    const redirect = (to: string, search = "") => {
         const url = request.nextUrl.clone();
         url.pathname = to;
+        url.search = search;
         return NextResponse.redirect(url);
     };
 
@@ -74,12 +75,12 @@ export async function updateSession(request: NextRequest) {
         if (role === "PARTNER") {
             // 파트너는 파트너 영역(/partner) 밖 = 사용자 영역 전체 접근 차단
             if (!matches(pathname, PARTNER_PREFIXES)) {
-                return redirect(PARTNER_HOME);
+                return redirect(PARTNER_HOME, "?blocked=user");
             }
         } else {
             // 사용자(또는 역할 미지정)는 파트너 영역 접근 차단
             if (matches(pathname, PARTNER_PREFIXES)) {
-                return redirect("/");
+                return redirect("/", "?blocked=partner");
             }
             // USER 전용 라우트인데 역할이 USER가 아니면 차단
             if (role !== "USER" && matches(pathname, USER_PREFIXES)) {
