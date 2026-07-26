@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Car, Check, CheckCircle2, ChevronLeft, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -60,10 +60,13 @@ function InfoRow({
     );
 }
 
-export default function ReservationDetailPage() {
-    const params = useParams<{ id: string }>();
+/**
+ * 예약 상세 (목업). 실제 예약(UUID)로 조회되지 않는 경우의 데모용 폴백.
+ *  - 실데이터 전면 전환은 별도(태스크 1) 범위.
+ */
+export function MockReservationDetail({ id }: { id: string }) {
     const router = useRouter();
-    const d = getReservationDetail(params.id);
+    const d = getReservationDetail(id);
 
     const [cancelOpen, setCancelOpen] = useState(false);
     const [agreed, setAgreed] = useState(false);
