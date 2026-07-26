@@ -91,29 +91,8 @@ export const useReservationStore = create<ReservationState>((set) => ({
     goStep: (step) => set({ step: Math.min(Math.max(step, 1), TOTAL_STEPS) }),
 }));
 
-/** 플랜 표시용 라벨 / 가격 (베이직 20,000 / 플러스 25,000 통일) */
-export const PLAN_INFO: Record<
-    Exclude<Plan, "">,
-    {
-        short: string;
-        label: string;
-        badge: string;
-        price: number;
-        extra: number;
-    }
-> = {
-    basic: {
-        short: "베이직",
-        label: "베이직 서비스 (병원에서 만남 + 진료 동행)",
-        badge: "[베이직] 병원 동행 서비스",
-        price: 20000,
-        extra: 10000,
-    },
-    plus: {
-        short: "플러스",
-        label: "플러스 서비스 (자택 픽업 + 병원 동행)",
-        badge: "[플러스] 병원 동행 서비스",
-        price: 25000,
-        extra: 12500,
-    },
-};
+/**
+ * 플랜 표시용 라벨 / 가격은 공용 단일 소스로 이동(#20).
+ *  기존 import 경로 호환을 위해 여기서 재-export 한다.
+ */
+export { PLAN_INFO } from "@/lib/reservation";

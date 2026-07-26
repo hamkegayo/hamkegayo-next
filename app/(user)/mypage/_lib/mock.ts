@@ -1,5 +1,7 @@
 /** 마이페이지 목업 예약 데이터 (실제 연동 전 데모용) */
 
+import { RESERVATION_STATUS_LABEL } from "@/lib/reservation";
+
 export type CurrentReservation = {
     statusLabel: string;
     hospital: string;
@@ -17,7 +19,7 @@ export type RecentReservation = {
 };
 
 export const CURRENT_RESERVATION: CurrentReservation = {
-    statusLabel: "매칭 대기중",
+    statusLabel: RESERVATION_STATUS_LABEL.MATCHING,
     hospital: "서울대학교 병원",
     datetime: "2026.06.10 (화) 오전 10:00",
     plan: "플러스 서비스 (자택 방문 + 병원 동행 + 귀가 지원)",
@@ -97,7 +99,7 @@ export const RECENT_RESERVATIONS: RecentReservation[] = [
         hospital: "서울대학교 병원",
         datetime: "2026.06.10 (화) 오전 10:00",
         plan: "베이직 서비스 (병원 내 동행)",
-        statusLabel: "서비스 완료",
+        statusLabel: RESERVATION_STATUS_LABEL.COMPLETED,
         review: "write",
     },
     {
@@ -105,7 +107,7 @@ export const RECENT_RESERVATIONS: RecentReservation[] = [
         hospital: "삼성서울병원",
         datetime: "2026.05.03 (화) 오전 10:00",
         plan: "플러스 서비스 (자택 방문 + 병원 동행 + 귀가 지원)",
-        statusLabel: "서비스 완료",
+        statusLabel: RESERVATION_STATUS_LABEL.COMPLETED,
         review: "view",
     },
 ];

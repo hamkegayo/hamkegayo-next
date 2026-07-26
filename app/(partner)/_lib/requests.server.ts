@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { planDisplay, planPrice, type PlanCode } from "@/lib/reservation";
 
 /** 수락 대기 목록(파트너 화면)에 표시할 최소 필드 */
 export type PartnerMatchingItem = {
@@ -25,9 +26,9 @@ type MatchingRow = {
     duration: string;
 };
 
-/** basic/plus → Basic/Plus */
+/** basic/plus → Basic/Plus (공용 헬퍼 래핑, 알 수 없는 값은 Basic) */
 function planLabel(plan: string): "Basic" | "Plus" {
-    return plan === "plus" ? "Plus" : "Basic";
+    return planDisplay(plan === "plus" ? "plus" : "basic");
 }
 
 /** "HH:mm:ss"/"HH:mm" → "HH:mm" (그 외 형태면 원본 유지) */
@@ -155,16 +156,6 @@ export async function getPartnerMatchingRequests(): Promise<
 // 상세 조회 (수락/거절 화면)
 // =============================================================
 
-/**
- * 플랜별 예상 정산 금액(원).
- *  - 클라이언트 스토어 PLAN_INFO(베이직 20,000 / 플러스 25,000)와 동일 값.
- *  - 가격 단일화는 #20 에서 공용 상수로 통합 예정.
- */
-const PLAN_AMOUNT: Record<"Basic" | "Plus", number> = {
-    Basic: 20_000,
-    Plus: 25_000,
-};
-
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 export type PartnerRequestDetail = {
@@ -282,7 +273,8 @@ export async function getPartnerRequestDetail(
             .eq("partner_id", user.id)
             .maybeSingle();
 
-        const plan = planLabel(data.plan);
+        const planCode: PlanCode = data.plan === "plus" ? "plus" : "basic";
+        const plan = planDisplay(planCode);
 
         return {
             id: data.id,
@@ -297,7 +289,7 @@ export async function getPartnerRequestDetail(
             arriveDate: formatDate(data.use_date),
             arriveTime: toHhmm(data.arrive_time),
             estDuration: data.duration,
-            amount: PLAN_AMOUNT[plan],
+            amount: planPrice(planCode),
             departure: data.depart_address,
             customer: {
                 name: data.patient_name,
