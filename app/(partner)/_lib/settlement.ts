@@ -1,8 +1,12 @@
 /** 파트너 정산 관리 목업 데이터 */
 
-export type SettlementStatus = "paid" | "pending";
+import { type SettlementStatus } from "@/lib/reservation";
+
+// 상태 타입은 공용 단일 소스로 이동(#20). 기존 import 경로 호환을 위해 재-export.
+export type { SettlementStatus };
 
 export type Settlement = {
+    /** 정산 식별자 (ST-{yymm}-{seq}). 예약번호(code)와 별개의 정산 ID. */
     id: string;
     /** 서비스 일자 (2025.05.30 (금)) */
     serviceDate: string;

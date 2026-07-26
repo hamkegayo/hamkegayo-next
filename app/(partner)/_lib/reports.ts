@@ -1,6 +1,9 @@
 /** 파트너 리포트 작성 목업 데이터 */
 
-export type ReportStatus = "pending" | "done";
+import { type ReportStatus } from "@/lib/reservation";
+
+// 상태 타입은 공용 단일 소스로 이동(#20). 기존 import 경로 호환을 위해 재-export.
+export type { ReportStatus };
 
 export type ReportAttachment = {
     id: string;
@@ -21,7 +24,7 @@ export type ReportItem = {
     customerGender: string;
     /** 서비스 일자 (2025.06.17 (화)) */
     serviceDate: string;
-    /** 예약 번호 (R250617-0012) */
+    /** 예약 번호 (R20250617-0012, DB code 포맷) */
     code: string;
     status: ReportStatus;
     partnerName: string;
@@ -67,7 +70,7 @@ export const REPORT_ITEMS: ReportItem[] = [
         customerAge: "82세",
         customerGender: "여성",
         serviceDate: "2025.06.17 (화)",
-        code: "R250617-0012",
+        code: "R20250617-0012",
         status: "pending",
         partnerName: "김서현 파트너",
         attachments: defaultAttachments("홍길동", "20250617"),
@@ -81,7 +84,7 @@ export const REPORT_ITEMS: ReportItem[] = [
         customerAge: "78세",
         customerGender: "여성",
         serviceDate: "2025.06.16 (월)",
-        code: "R250616-0034",
+        code: "R20250616-0034",
         status: "pending",
         partnerName: "김서현 파트너",
         attachments: defaultAttachments("김영자", "20250616"),
@@ -95,7 +98,7 @@ export const REPORT_ITEMS: ReportItem[] = [
         customerAge: "74세",
         customerGender: "남성",
         serviceDate: "2025.06.16 (월)",
-        code: "R250616-0021",
+        code: "R20250616-0021",
         status: "pending",
         partnerName: "김서현 파트너",
         attachments: defaultAttachments("박철수", "20250616"),
@@ -109,7 +112,7 @@ export const REPORT_ITEMS: ReportItem[] = [
         customerAge: "81세",
         customerGender: "여성",
         serviceDate: "2025.06.14 (토)",
-        code: "R250614-0009",
+        code: "R20250614-0009",
         status: "done",
         partnerName: "김서현 파트너",
         attachments: defaultAttachments("최순옥", "20250614"),
@@ -123,7 +126,7 @@ export const REPORT_ITEMS: ReportItem[] = [
         customerAge: "69세",
         customerGender: "남성",
         serviceDate: "2025.06.12 (목)",
-        code: "R250612-0040",
+        code: "R20250612-0040",
         status: "done",
         partnerName: "김서현 파트너",
         attachments: defaultAttachments("정만호", "20250612"),

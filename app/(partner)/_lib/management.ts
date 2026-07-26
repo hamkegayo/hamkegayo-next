@@ -1,6 +1,10 @@
 /** 파트너 진행 관리(수락한 서비스) 목업 데이터 */
 
-export type ServiceStatus = "scheduled" | "in_progress" | "completed";
+import { SERVICE_STATUS_META, type ServiceStatus } from "@/lib/reservation";
+
+// 상태 타입/메타는 공용 단일 소스로 이동(#20). 기존 import 경로 호환을 위해 재-export.
+export { SERVICE_STATUS_META as STATUS_META };
+export type { ServiceStatus };
 
 export type ManagementItem = {
     id: string;
@@ -16,32 +20,11 @@ export type ManagementItem = {
     timeLabel: string;
     amount: number;
     status: ServiceStatus;
-    /** 예약 번호 (A20250528-1430) */
+    /** 예약 번호 (R20250528-1430, DB code 포맷) */
     code: string;
     /** 시작/종료 기록 시 표시할 시각 (목업 고정값) */
     startTime: string;
     endTime: string;
-};
-
-export const STATUS_META: Record<
-    ServiceStatus,
-    { label: string; badge: string; dot: string }
-> = {
-    in_progress: {
-        label: "진행중",
-        badge: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15",
-        dot: "bg-emerald-500",
-    },
-    scheduled: {
-        label: "진행 예정",
-        badge: "bg-blue-100 text-blue-600 dark:bg-blue-500/15",
-        dot: "bg-blue-500",
-    },
-    completed: {
-        label: "귀가완료",
-        badge: "bg-muted text-muted-foreground",
-        dot: "bg-muted-foreground",
-    },
 };
 
 export const MANAGEMENT_ITEMS: ManagementItem[] = [
@@ -56,7 +39,7 @@ export const MANAGEMENT_ITEMS: ManagementItem[] = [
         timeLabel: "14:30",
         amount: 25000,
         status: "in_progress",
-        code: "A20250528-1430",
+        code: "R20250528-1430",
         startTime: "14:30",
         endTime: "16:30",
     },
@@ -71,7 +54,7 @@ export const MANAGEMENT_ITEMS: ManagementItem[] = [
         timeLabel: "16:00",
         amount: 20000,
         status: "scheduled",
-        code: "A20250528-1600",
+        code: "R20250528-1600",
         startTime: "16:00",
         endTime: "18:00",
     },
@@ -86,7 +69,7 @@ export const MANAGEMENT_ITEMS: ManagementItem[] = [
         timeLabel: "13:00",
         amount: 25000,
         status: "completed",
-        code: "A20250527-1300",
+        code: "R20250527-1300",
         startTime: "13:00",
         endTime: "15:00",
     },
@@ -101,7 +84,7 @@ export const MANAGEMENT_ITEMS: ManagementItem[] = [
         timeLabel: "10:30",
         amount: 25000,
         status: "completed",
-        code: "A20250526-1030",
+        code: "R20250526-1030",
         startTime: "10:30",
         endTime: "12:30",
     },

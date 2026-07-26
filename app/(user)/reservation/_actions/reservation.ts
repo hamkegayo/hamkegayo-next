@@ -1,19 +1,12 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
+import { generateReservationCode } from "@/lib/reservation";
 import { reservationServerSchema } from "../_lib/schema";
 
 export type CreateReservationResult =
     | { ok: true; code: string; id: string }
     | { ok: false; reason: "auth" | "validation" | "error"; message: string };
-
-/** 예약번호 생성 — R{yyyymmdd}-{4자리} */
-function generateCode(): string {
-    const now = new Date();
-    const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-    const rand = String(Math.floor(1000 + Math.random() * 9000));
-    return `R${ymd}-${rand}`;
-}
 
 /**
  * 예약 등록 (STEP4 매칭 신청 시점).
@@ -69,7 +62,7 @@ export async function createReservation(
 
     // 예약번호 충돌(23505) 시 최대 5회 재시도
     for (let attempt = 0; attempt < 5; attempt++) {
-        const code = generateCode();
+        const code = generateReservationCode();
         const { data, error } = await supabase
             .from("reservations")
             .insert({ ...row, code })
