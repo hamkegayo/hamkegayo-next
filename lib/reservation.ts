@@ -85,28 +85,32 @@ export const RESERVATION_STATUS_LABEL: Record<ReservationStatus, string> = {
 };
 
 /**
- * 서비스 진행 상태 (파트너 진행 관리 화면용, UI 상태).
- *  - 아직 DB 테이블 없음(#22에서 신설 예정).
- *  - 향후 매핑(안): scheduled→CONFIRMED, in_progress→(진행 중), completed→COMPLETED.
+ * 서비스 진행 상태 (DB service_status enum 정본, #22).
+ *  SCHEDULED(진행 예정) → IN_PROGRESS(진행중) → ENDED(귀가 대기) → COMPLETED(완료)
  */
-export type ServiceStatus = "scheduled" | "in_progress" | "completed";
+export type ServiceState = "SCHEDULED" | "IN_PROGRESS" | "ENDED" | "COMPLETED";
 
-export const SERVICE_STATUS_META: Record<
-    ServiceStatus,
+export const SERVICE_STATE_META: Record<
+    ServiceState,
     { label: string; badge: string; dot: string }
 > = {
-    in_progress: {
-        label: "진행중",
-        badge: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15",
-        dot: "bg-emerald-500",
-    },
-    scheduled: {
+    SCHEDULED: {
         label: "진행 예정",
         badge: "bg-blue-100 text-blue-600 dark:bg-blue-500/15",
         dot: "bg-blue-500",
     },
-    completed: {
-        label: "귀가완료",
+    IN_PROGRESS: {
+        label: "진행중",
+        badge: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15",
+        dot: "bg-emerald-500",
+    },
+    ENDED: {
+        label: "귀가 대기",
+        badge: "bg-amber-100 text-amber-600 dark:bg-amber-500/15",
+        dot: "bg-amber-500",
+    },
+    COMPLETED: {
+        label: "완료",
         badge: "bg-muted text-muted-foreground",
         dot: "bg-muted-foreground",
     },
