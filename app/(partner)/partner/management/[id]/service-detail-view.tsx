@@ -173,16 +173,12 @@ export function ServiceDetailView({
                         >
                             진행 관리로
                         </Link>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                toast.info("리포트 작성은 준비 중입니다.");
-                                router.push("/partner/reports");
-                            }}
+                        <Link
+                            href={`/partner/reports/${service.id}`}
                             className="bg-brand text-brand-foreground hover:bg-brand/90 flex-1 rounded-xl px-4 py-3.5 text-center text-sm font-bold transition-colors"
                         >
                             리포트 쓰러가기
-                        </button>
+                        </Link>
                     </div>
                 </div>
             </div>
