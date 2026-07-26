@@ -150,3 +150,166 @@ export async function getPartnerMatchingRequests(): Promise<
         return [];
     }
 }
+
+// =============================================================
+// 상세 조회 (수락/거절 화면)
+// =============================================================
+
+/**
+ * 플랜별 예상 정산 금액(원).
+ *  - 클라이언트 스토어 PLAN_INFO(베이직 20,000 / 플러스 25,000)와 동일 값.
+ *  - 가격 단일화는 #20 에서 공용 상수로 통합 예정.
+ */
+const PLAN_AMOUNT: Record<"Basic" | "Plus", number> = {
+    Basic: 20_000,
+    Plus: 25_000,
+};
+
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+export type PartnerRequestDetail = {
+    id: string;
+    code: string;
+    plan: "Basic" | "Plus";
+    /** "베이직 서비스" / "플러스 서비스" */
+    serviceType: string;
+    /** 원본 예약 상태(MATCHING/CONFIRMED/...) */
+    status: string;
+    /** 수락/거절 가능 여부 = MATCHING 이면서 아직 미지원 */
+    canAct: boolean;
+    /** 병원 표시명 — 주소를 그대로 노출(스키마에 병원명 컬럼 없음) */
+    hospital: string;
+    hospitalDate: string;
+    hospitalTime: string;
+    arriveDate: string;
+    arriveTime: string;
+    estDuration: string;
+    amount: number;
+    departure: string;
+    customer: {
+        name: string;
+        age: string;
+        gender: string;
+        treatment: string;
+        purpose: string;
+        cautions: string[];
+        requests: string[];
+    };
+};
+
+type DetailRow = {
+    id: string;
+    code: string;
+    status: string;
+    plan: string;
+    patient_name: string;
+    patient_birth: string;
+    patient_gender: string;
+    treatment: string;
+    purpose: string;
+    cautions: string | null;
+    other_requests: string | null;
+    use_date: string;
+    arrive_time: string;
+    reserve_time: string;
+    duration: string;
+    depart_address: string;
+    hospital_address: string;
+};
+
+/** "YYYY-MM-DD" → "YYYY.MM.DD (요일)" */
+function formatDate(useDate: string): string {
+    const [y, mo, d] = useDate.split("-").map((n) => Number(n));
+    if (!y || !mo || !d) return useDate;
+    const weekday = WEEKDAYS[new Date(y, mo - 1, d).getDay()] ?? "";
+    const mm = String(mo).padStart(2, "0");
+    const dd = String(d).padStart(2, "0");
+    return `${y}.${mm}.${dd} (${weekday})`;
+}
+
+/** patient_birth("YYYY-MM-DD") → "N세" (만 나이) */
+function ageLabel(birth: string): string {
+    const [y, mo, d] = birth.split("-").map((n) => Number(n));
+    if (!y) return "";
+    const now = new Date();
+    let age = now.getFullYear() - y;
+    const beforeBirthday =
+        now.getMonth() + 1 < mo ||
+        (now.getMonth() + 1 === mo && now.getDate() < d);
+    if (beforeBirthday) age -= 1;
+    return `${age}세`;
+}
+
+/** 여러 줄 텍스트 → 빈 줄 제거한 항목 배열 */
+function toLines(text: string | null): string[] {
+    if (!text) return [];
+    return text
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+}
+
+/**
+ * 상세(수락/거절) 화면용 단건 예약 조회.
+ *  - RLS 상 파트너는 MATCHING 또는 본인이 ACCEPTED 지원한 예약만 SELECT 가능.
+ *  - 조회 실패/권한 없음/비로그인 시 null 을 반환(화면은 "찾을 수 없음" 처리).
+ */
+export async function getPartnerRequestDetail(
+    reservationId: string,
+): Promise<PartnerRequestDetail | null> {
+    try {
+        const supabase = await createClient();
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return null;
+
+        const { data, error } = await supabase
+            .from("reservations")
+            .select(
+                "id, code, status, plan, patient_name, patient_birth, patient_gender, treatment, purpose, cautions, other_requests, use_date, arrive_time, reserve_time, duration, depart_address, hospital_address",
+            )
+            .eq("id", reservationId)
+            .maybeSingle<DetailRow>();
+
+        if (error || !data) return null;
+
+        // 이미 이 예약에 지원(수락/거절 등)했는지 → 버튼 노출 판단
+        const { data: applied } = await supabase
+            .from("reservation_applications")
+            .select("id")
+            .eq("reservation_id", reservationId)
+            .eq("partner_id", user.id)
+            .maybeSingle();
+
+        const plan = planLabel(data.plan);
+
+        return {
+            id: data.id,
+            code: data.code,
+            plan,
+            serviceType: plan === "Plus" ? "플러스 서비스" : "베이직 서비스",
+            status: data.status,
+            canAct: data.status === "MATCHING" && !applied,
+            hospital: data.hospital_address,
+            hospitalDate: formatDate(data.use_date),
+            hospitalTime: toHhmm(data.reserve_time),
+            arriveDate: formatDate(data.use_date),
+            arriveTime: toHhmm(data.arrive_time),
+            estDuration: data.duration,
+            amount: PLAN_AMOUNT[plan],
+            departure: data.depart_address,
+            customer: {
+                name: data.patient_name,
+                age: ageLabel(data.patient_birth),
+                gender: data.patient_gender === "male" ? "남성" : "여성",
+                treatment: data.treatment,
+                purpose: data.purpose,
+                cautions: toLines(data.cautions),
+                requests: toLines(data.other_requests),
+            },
+        };
+    } catch {
+        return null;
+    }
+}
