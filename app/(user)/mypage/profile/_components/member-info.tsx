@@ -2,11 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard } from "lucide-react";
+import { CreditCard, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
+import { ConfirmModal } from "@/components/ui/modal";
 import { updateProfileName } from "../../_actions/profile";
+import { deleteCareRecipient } from "../../_actions/care";
+import type { CareRecipient } from "../../_lib/care.server";
+import { CareRecipientModal } from "./care-recipient-modal";
 
 type Basic = {
     name: string;
@@ -61,12 +65,49 @@ const AGREEMENTS = [
     { label: "결제 이용 동의", required: true },
 ];
 
-export function MemberInfo({ basic }: { basic: Basic }) {
+export function MemberInfo({
+    basic,
+    recipients,
+}: {
+    basic: Basic;
+    recipients: CareRecipient[];
+}) {
     const router = useRouter();
     const [marketing, setMarketing] = useState(false);
     const [editingName, setEditingName] = useState(false);
     const [nameInput, setNameInput] = useState(basic.name);
     const [pending, startTransition] = useTransition();
+
+    // 환자 정보 관리 상태
+    const [careOpen, setCareOpen] = useState(false);
+    const [editingCare, setEditingCare] = useState<CareRecipient | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<CareRecipient | null>(
+        null,
+    );
+    const [careDeleting, startCareDelete] = useTransition();
+
+    const openAddCare = () => {
+        setEditingCare(null);
+        setCareOpen(true);
+    };
+    const openEditCare = (r: CareRecipient) => {
+        setEditingCare(r);
+        setCareOpen(true);
+    };
+    const onDeleteCare = () => {
+        if (!deleteTarget) return;
+        const id = deleteTarget.id;
+        startCareDelete(async () => {
+            const res = await deleteCareRecipient(id);
+            setDeleteTarget(null);
+            if (res.ok) {
+                toast.success("환자 정보를 삭제했습니다.");
+                router.refresh();
+            } else {
+                toast.error(res.message);
+            }
+        });
+    };
 
     const onSaveName = () => {
         startTransition(async () => {
@@ -210,25 +251,65 @@ export function MemberInfo({ basic }: { basic: Basic }) {
                 {/* 환자 정보 관리 */}
                 <Card
                     title="환자 정보 관리"
-                    action={<OutlineButton>환자 추가하기</OutlineButton>}
+                    action={
+                        <OutlineButton onClick={openAddCare}>
+                            환자 추가하기
+                        </OutlineButton>
+                    }
                 >
-                    <div className="bg-muted/40 flex items-center gap-3 rounded-xl p-4">
-                        <div className="bg-muted size-11 shrink-0 rounded-full" />
-                        <div className="min-w-0 flex-1 text-sm">
-                            <span className="text-foreground font-bold">
-                                김영희
-                            </span>
-                            <span className="text-muted-foreground">
-                                {" "}
-                                &nbsp;|&nbsp; 어머니 &nbsp;|&nbsp; 70세
-                                &nbsp;|&nbsp; 여성
-                            </span>
+                    {recipients.length === 0 ? (
+                        <div className="text-muted-foreground rounded-xl border border-dashed px-6 py-10 text-center text-sm">
+                            등록된 환자가 없어요. &lsquo;환자 추가하기&rsquo;로
+                            자주 동행하는 분을 저장해 두세요.
                         </div>
-                        <div className="flex shrink-0 gap-2">
-                            <OutlineButton>수정</OutlineButton>
-                            <OutlineButton>삭제</OutlineButton>
+                    ) : (
+                        <div className="space-y-3">
+                            {recipients.map((r) => {
+                                const detail = [
+                                    r.relation,
+                                    r.ageLabel,
+                                    r.genderLabel,
+                                ]
+                                    .filter(Boolean)
+                                    .join(" | ");
+                                return (
+                                    <div
+                                        key={r.id}
+                                        className="bg-muted/40 flex items-center gap-3 rounded-xl p-4"
+                                    >
+                                        <div className="bg-muted text-muted-foreground flex size-11 shrink-0 items-center justify-center rounded-full">
+                                            <UserRound className="size-5" />
+                                        </div>
+                                        <div className="min-w-0 flex-1 text-sm">
+                                            <span className="text-foreground font-bold">
+                                                {r.name}
+                                            </span>
+                                            {detail && (
+                                                <span className="text-muted-foreground">
+                                                    {" "}
+                                                    &nbsp;|&nbsp; {detail}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="flex shrink-0 gap-2">
+                                            <OutlineButton
+                                                onClick={() => openEditCare(r)}
+                                            >
+                                                수정
+                                            </OutlineButton>
+                                            <OutlineButton
+                                                onClick={() =>
+                                                    setDeleteTarget(r)
+                                                }
+                                            >
+                                                삭제
+                                            </OutlineButton>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
-                    </div>
+                    )}
                 </Card>
 
                 {/* 약관 동의 관리 */}
@@ -292,6 +373,33 @@ export function MemberInfo({ basic }: { basic: Basic }) {
                     </div>
                 </Card>
             </div>
+
+            {/* 환자 추가/수정 모달 (열 때마다 새로 마운트 → 프리필 초기화) */}
+            {careOpen && (
+                <CareRecipientModal
+                    open
+                    onClose={() => setCareOpen(false)}
+                    editing={editingCare}
+                />
+            )}
+
+            {/* 환자 삭제 확인 */}
+            <ConfirmModal
+                open={deleteTarget !== null}
+                onClose={() => setDeleteTarget(null)}
+                onConfirm={onDeleteCare}
+                title="환자 정보를 삭제할까요?"
+                cancelLabel="취소"
+                confirmLabel="삭제"
+                confirmDisabled={careDeleting}
+            >
+                <p className="text-muted-foreground mt-3 text-left text-sm leading-relaxed">
+                    <span className="text-foreground font-bold">
+                        {deleteTarget?.name}
+                    </span>{" "}
+                    님의 정보를 삭제합니다. 되돌릴 수 없습니다.
+                </p>
+            </ConfirmModal>
         </div>
     );
 }

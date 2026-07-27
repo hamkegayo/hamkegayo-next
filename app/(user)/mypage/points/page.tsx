@@ -1,37 +1,6 @@
-"use client";
-
-import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, CreditCard, UserRound } from "lucide-react";
-import { toast } from "sonner";
+import { CreditCard, UserRound } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-
-type PointType = "적립" | "사용" | "소멸";
-type PointRow = {
-    date: string;
-    type: PointType;
-    amount: number;
-    balance: number;
-};
-
-const HISTORY: PointRow[] = [
-    { date: "2026.05.01", type: "적립", amount: 2500, balance: 12500 },
-    { date: "2026.04.18", type: "사용", amount: -3000, balance: 10000 },
-    { date: "2026.04.02", type: "적립", amount: 2500, balance: 13000 },
-    { date: "2026.03.15", type: "적립", amount: 1200, balance: 10500 },
-    { date: "2026.03.01", type: "소멸", amount: -500, balance: 9300 },
-    { date: "2026.02.20", type: "적립", amount: 2000, balance: 9800 },
-    { date: "2026.02.05", type: "사용", amount: -1500, balance: 7800 },
-    { date: "2026.01.22", type: "적립", amount: 3000, balance: 9300 },
-    { date: "2026.01.10", type: "적립", amount: 1000, balance: 6300 },
-    { date: "2025.12.28", type: "사용", amount: -2000, balance: 5300 },
-    { date: "2025.12.15", type: "적립", amount: 2500, balance: 7300 },
-    { date: "2025.12.01", type: "소멸", amount: -1000, balance: 4800 },
-    { date: "2025.11.20", type: "적립", amount: 1800, balance: 5800 },
-];
-
-const TABS = ["전체", "적립", "사용", "소멸"] as const;
-const PAGE_SIZE = 5;
 
 function PCoin({ className }: { className?: string }) {
     return (
@@ -46,29 +15,12 @@ function PCoin({ className }: { className?: string }) {
     );
 }
 
-function signed(amount: number) {
-    return `${amount > 0 ? "+" : "-"}${Math.abs(amount).toLocaleString()} P`;
-}
+// 포인트 적립/사용 로직은 결제·완료 연동 시 도입 예정. 현재는 실제 보유 0P.
+const BALANCE = 0;
+const PENDING = 0;
+const EXPIRING = 0;
 
 export default function MypagePoints() {
-    const [tab, setTab] = useState<(typeof TABS)[number]>("전체");
-    const [page, setPage] = useState(1);
-
-    const filtered = useMemo(
-        () =>
-            tab === "전체" ? HISTORY : HISTORY.filter((h) => h.type === tab),
-        [tab],
-    );
-    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-    const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-    const changeTab = (t: (typeof TABS)[number]) => {
-        setTab(t);
-        setPage(1);
-    };
-
-    const notReady = () => toast.info("준비 중인 기능입니다.");
-
     return (
         <div>
             <h1 className="text-foreground text-2xl font-extrabold md:text-3xl">
@@ -87,7 +39,8 @@ export default function MypagePoints() {
                             사용 가능한 포인트
                         </p>
                         <p className="text-3xl font-extrabold text-amber-500">
-                            12,500 <span className="text-lg">P</span>
+                            {BALANCE.toLocaleString()}{" "}
+                            <span className="text-lg">P</span>
                         </p>
                     </div>
                 </div>
@@ -97,14 +50,16 @@ export default function MypagePoints() {
                             적립예정 포인트
                         </span>
                         <span className="text-foreground font-bold">
-                            1,200 P
+                            {PENDING.toLocaleString()} P
                         </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">
                             소멸예정 포인트
                         </span>
-                        <span className="text-foreground font-bold">0 P</span>
+                        <span className="text-foreground font-bold">
+                            {EXPIRING.toLocaleString()} P
+                        </span>
                     </div>
                 </div>
             </div>
@@ -115,132 +70,14 @@ export default function MypagePoints() {
                     <h2 className="text-foreground text-lg font-bold">
                         포인트 내역
                     </h2>
-
-                    {/* 탭 */}
-                    <div className="border-border mt-4 flex gap-5 border-b">
-                        {TABS.map((t) => (
-                            <button
-                                key={t}
-                                type="button"
-                                onClick={() => changeTab(t)}
-                                className={cn(
-                                    "-mb-px border-b-2 pb-2 text-sm font-semibold transition-colors",
-                                    tab === t
-                                        ? "border-brand text-foreground"
-                                        : "text-muted-foreground hover:text-foreground border-transparent",
-                                )}
-                            >
-                                {t}
-                            </button>
-                        ))}
+                    <div className="text-muted-foreground mt-4 rounded-xl border border-dashed px-6 py-14 text-center text-sm">
+                        아직 포인트 적립/사용 내역이 없어요.
+                        <br />
+                        서비스를 이용하면 내역이 표시됩니다.
                     </div>
-
-                    {/* 표 */}
-                    <div className="mt-4 overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-border text-muted-foreground border-b text-left">
-                                    <th className="py-2.5 pr-3 font-semibold">
-                                        날짜
-                                    </th>
-                                    <th className="py-2.5 pr-3 font-semibold">
-                                        구분
-                                    </th>
-                                    <th className="py-2.5 pr-3 text-right font-semibold">
-                                        포인트
-                                    </th>
-                                    <th className="py-2.5 text-right font-semibold">
-                                        잔액
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {rows.length === 0 ? (
-                                    <tr>
-                                        <td
-                                            colSpan={4}
-                                            className="text-muted-foreground py-10 text-center"
-                                        >
-                                            내역이 없습니다.
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    rows.map((r, i) => (
-                                        <tr
-                                            key={`${r.date}-${i}`}
-                                            className="border-border border-b"
-                                        >
-                                            <td className="text-foreground py-3.5 pr-3">
-                                                {r.date}
-                                            </td>
-                                            <td className="text-muted-foreground py-3.5 pr-3">
-                                                {r.type}
-                                            </td>
-                                            <td
-                                                className={cn(
-                                                    "py-3.5 pr-3 text-right font-bold",
-                                                    r.amount > 0
-                                                        ? "text-emerald-600"
-                                                        : "text-destructive",
-                                                )}
-                                            >
-                                                {signed(r.amount)}
-                                            </td>
-                                            <td className="text-foreground py-3.5 text-right font-semibold">
-                                                {r.balance.toLocaleString()} P
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* 페이지네이션 */}
-                    {totalPages > 1 && (
-                        <div className="mt-4 flex items-center justify-center gap-1.5">
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    setPage((p) => Math.max(1, p - 1))
-                                }
-                                disabled={page === 1}
-                                className="border-border text-muted-foreground hover:bg-muted flex size-8 items-center justify-center rounded-md border transition-colors disabled:opacity-40"
-                                aria-label="이전 페이지"
-                            >
-                                <ChevronLeft className="size-4" />
-                            </button>
-                            {Array.from({ length: totalPages }).map((_, i) => (
-                                <button
-                                    key={i}
-                                    type="button"
-                                    onClick={() => setPage(i + 1)}
-                                    className={cn(
-                                        "flex size-8 items-center justify-center rounded-md text-sm font-semibold transition-colors",
-                                        page === i + 1
-                                            ? "bg-brand text-brand-foreground"
-                                            : "border-border text-foreground hover:bg-muted border",
-                                    )}
-                                >
-                                    {i + 1}
-                                </button>
-                            ))}
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    setPage((p) => Math.min(totalPages, p + 1))
-                                }
-                                disabled={page === totalPages}
-                                className="border-border text-muted-foreground hover:bg-muted flex size-8 items-center justify-center rounded-md border transition-colors disabled:opacity-40"
-                                aria-label="다음 페이지"
-                            >
-                                <ChevronRight className="size-4" />
-                            </button>
-                        </div>
-                    )}
                 </div>
 
-                {/* 우측: 안내 + 소멸 예정 */}
+                {/* 우측: 안내 */}
                 <div className="space-y-5">
                     <div className="border-border bg-background rounded-2xl border p-6 md:p-7">
                         <h2 className="text-foreground flex items-center gap-2 text-lg font-bold">
@@ -270,14 +107,6 @@ export default function MypagePoints() {
                                 </ul>
                             </div>
                         </div>
-
-                        <button
-                            type="button"
-                            onClick={notReady}
-                            className="border-border bg-background text-foreground hover:bg-muted mt-6 w-full rounded-lg border py-2.5 text-sm font-bold transition-colors"
-                        >
-                            자세히 보기
-                        </button>
                     </div>
 
                     <div className="border-border bg-background rounded-2xl border p-6 md:p-7">
