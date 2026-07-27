@@ -1,45 +1,50 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Check, Clock, Search, Send } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Bell, Check, Search, Send, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { Section } from "@/app/(user)/_components/home/section";
 import { useReservationStore } from "../_store/reservation-store";
-import { RECOMMENDED_PARTNER } from "../_lib/partners";
+import {
+    cancelReservation,
+    getReservationApplicantsDetailed,
+    type DetailedApplicant,
+} from "../_actions/matching";
 import { StepBand } from "./step-band";
 
-const REQUESTED = 18;
-const SECONDS_START = 152; // 02:32
-const ACCEPT_DELAY = 4000; // 4초 뒤 파트너 1명 수락 (시뮬레이션)
-
-function mmss(sec: number) {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
+const POLL_MS = 5000;
 
 export function StepMatching() {
-    const { next, goStep } = useReservationStore();
-    const [secondsLeft, setSecondsLeft] = useState(SECONDS_START);
-    const [accepted, setAccepted] = useState(0);
+    const { data, next } = useReservationStore();
+    const reservationId = data.reservationId;
 
-    // 남은 시간 카운트다운
+    const [applicants, setApplicants] = useState<DetailedApplicant[]>([]);
+    const [cancelling, setCancelling] = useState(false);
+    const router = useRouter();
+
+    const accepted = applicants.length;
+
+    // 실제 지원자 폴링 (즉시 1회 + 주기)
     useEffect(() => {
+        if (!reservationId) return;
+        let active = true;
+        const run = async () => {
+            const list = await getReservationApplicantsDetailed(reservationId);
+            if (active) setApplicants(list);
+        };
+        run();
         const id = setInterval(() => {
-            setSecondsLeft((s) => (s <= 1 ? 0 : s - 1));
-        }, 1000);
-        return () => clearInterval(id);
-    }, []);
-
-    // 일정 시간 후 파트너 1명 수락 (시뮬레이션)
-    useEffect(() => {
-        const id = setTimeout(() => setAccepted(1), ACCEPT_DELAY);
-        return () => clearTimeout(id);
-    }, []);
+            if (document.visibilityState === "visible") run();
+        }, POLL_MS);
+        return () => {
+            active = false;
+            clearInterval(id);
+        };
+    }, [reservationId]);
 
     const progress = accepted > 0 ? 60 : 25;
-    const p = RECOMMENDED_PARTNER;
 
     const onNext = () => {
         if (accepted < 1) {
@@ -49,13 +54,29 @@ export function StepMatching() {
         next();
     };
 
+    const onCancel = async () => {
+        if (cancelling || !reservationId) return;
+        setCancelling(true);
+        try {
+            const res = await cancelReservation(reservationId);
+            if (res.ok) {
+                toast.success("매칭 요청을 취소했습니다.");
+                router.push("/");
+            } else {
+                toast.error(res.message);
+            }
+        } finally {
+            setCancelling(false);
+        }
+    };
+
     return (
         <>
             <StepBand
                 index={5}
                 title="파트너를 찾고 있습니다."
                 subtitles={[
-                    "입력하신 조건에 맞는 파트너를 찾고 있어요.",
+                    "입력하신 조건에 맞는 파트너에게 요청을 전달했어요.",
                     "수락한 파트너가 있으면 바로 선택하거나, 더 기다릴 수 있습니다.",
                 ]}
             />
@@ -79,24 +100,19 @@ export function StepMatching() {
                             </div>
                         </div>
 
-                        {/* 통계 3칸 */}
-                        <div className="mt-6 grid grid-cols-3 gap-3">
+                        {/* 통계 2칸 */}
+                        <div className="mt-6 grid grid-cols-2 gap-3">
                             {[
                                 {
                                     icon: Send,
                                     label: "매칭 요청",
-                                    value: `${REQUESTED}명`,
+                                    value: "전송 완료",
                                 },
                                 {
                                     icon: Check,
                                     label: "수락한 파트너",
-                                    value: `${accepted} 명`,
+                                    value: `${accepted}명`,
                                     isNew: accepted > 0,
-                                },
-                                {
-                                    icon: Clock,
-                                    label: "남은 시간",
-                                    value: mmss(secondsLeft),
                                 },
                             ].map(({ icon: Icon, label, value, isNew }) => (
                                 <div
@@ -166,31 +182,46 @@ export function StepMatching() {
                         </p>
 
                         {accepted > 0 ? (
-                            <div className="border-border bg-background mt-4 flex items-center gap-4 rounded-xl border p-4">
-                                <div className="bg-muted size-14 shrink-0 rounded-full" />
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-foreground flex items-center gap-1.5 font-bold">
-                                        {p.name}
-                                        <span className="text-muted-foreground text-sm font-semibold">
-                                            ★ {p.rating} ({p.reviewCount})
+                            <ul className="mt-4 space-y-3">
+                                {applicants.map((a) => (
+                                    <li
+                                        key={a.partnerId}
+                                        className="border-border bg-background flex items-center gap-4 rounded-xl border p-4"
+                                    >
+                                        <div className="bg-muted flex size-12 shrink-0 items-center justify-center rounded-full">
+                                            <UserRound className="text-muted-foreground size-6" />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-foreground flex items-center gap-1.5 font-bold">
+                                                {a.name}
+                                                {a.rating !== null && (
+                                                    <span className="text-muted-foreground text-sm font-semibold">
+                                                        ★ {a.rating.toFixed(1)}{" "}
+                                                        ({a.reviewCount})
+                                                    </span>
+                                                )}
+                                            </p>
+                                            {a.qualifications.length > 0 && (
+                                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                    {a.qualifications.map(
+                                                        (q, i) => (
+                                                            <span
+                                                                key={`${a.partnerId}-${i}`}
+                                                                className="bg-muted text-foreground rounded-md px-2 py-0.5 text-xs"
+                                                            >
+                                                                {q.type}
+                                                            </span>
+                                                        ),
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <span className="text-muted-foreground shrink-0 self-start text-xs">
+                                            {a.appliedAtLabel} 수락
                                         </span>
-                                    </p>
-                                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                        <span className="bg-muted text-foreground rounded-md px-2 py-0.5 text-xs">
-                                            {p.career}
-                                        </span>
-                                        <span className="bg-muted text-foreground rounded-md px-2 py-0.5 text-xs">
-                                            {p.region}
-                                        </span>
-                                    </div>
-                                    <p className="text-muted-foreground mt-1.5 text-xs">
-                                        {p.specialties}
-                                    </p>
-                                </div>
-                                <span className="text-brand shrink-0 self-start text-xs font-semibold">
-                                    1분 전 수락
-                                </span>
-                            </div>
+                                    </li>
+                                ))}
+                            </ul>
                         ) : (
                             <div className="border-border bg-background text-muted-foreground mt-4 rounded-xl border border-dashed p-8 text-center text-sm">
                                 아직 수락한 파트너가 없습니다. 잠시만 기다려
@@ -203,32 +234,28 @@ export function StepMatching() {
                     <div className="flex flex-wrap justify-center gap-3 pt-4">
                         <button
                             type="button"
-                            onClick={() => {
-                                toast.info("매칭 요청을 취소했습니다.");
-                                goStep(3);
-                            }}
-                            className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-6 py-3 text-sm font-bold transition-colors"
+                            onClick={onCancel}
+                            disabled={cancelling}
+                            className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-6 py-3 text-sm font-bold transition-colors disabled:opacity-60"
                         >
                             취소 요청
                         </button>
                         <button
                             type="button"
-                            onClick={() => {
-                                setSecondsLeft(SECONDS_START);
-                                toast.info("계속해서 파트너를 찾고 있어요.");
-                            }}
-                            className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-6 py-3 text-sm font-bold transition-colors"
-                        >
-                            더 기다리기
-                        </button>
-                        <button
-                            type="button"
                             onClick={onNext}
-                            className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-6 py-3 text-sm font-bold transition-colors"
+                            disabled={accepted < 1}
+                            className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-6 py-3 text-sm font-bold transition-colors disabled:opacity-50"
                         >
                             다음 단계로 이동
                         </button>
                     </div>
+
+                    {/* 안내 */}
+                    <p className="text-muted-foreground mt-3 text-center text-xs">
+                        파트너가 수락하면 이 화면에서 바로 선택할 수 있어요.
+                        진료일이 지나도록 확정하지 않으면 예약은 자동
+                        취소됩니다.
+                    </p>
                 </div>
             </Section>
         </>

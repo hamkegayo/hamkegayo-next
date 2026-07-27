@@ -1,193 +1,63 @@
 "use client";
 
-import { useState } from "react";
-import { Check } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
+import { Clock, ShieldCheck, UserRound } from "lucide-react";
+import { toast } from "sonner";
 
-import { cn } from "@/lib/utils";
 import { Section } from "@/app/(user)/_components/home/section";
+import { ConfirmModal } from "@/components/ui/modal";
+import { confirmPartner } from "@/app/(user)/mypage/_actions/matching";
 import { useReservationStore } from "../_store/reservation-store";
-import { PARTNERS, getPartner, type Partner } from "../_lib/partners";
-import { StepBand, StepNav } from "./step-band";
+import {
+    getReservationApplicantsDetailed,
+    type DetailedApplicant,
+} from "../_actions/matching";
+import { StepBand } from "./step-band";
 
-function StatusBadge({ status }: { status: Partner["status"] }) {
-    return (
-        <span
-            className={cn(
-                "rounded-md px-2 py-0.5 text-xs font-semibold",
-                status === "accepted"
-                    ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15"
-                    : "bg-amber-100 text-amber-600 dark:bg-amber-500/15",
-            )}
-        >
-            {status === "accepted" ? "수락완료" : "수락대기"}
-        </span>
-    );
-}
-
-function PartnerListCard({
-    partner,
-    active,
-    onSelect,
-}: {
-    partner: Partner;
-    active: boolean;
-    onSelect: () => void;
-}) {
-    return (
-        <div
-            onClick={onSelect}
-            className={cn(
-                "cursor-pointer rounded-2xl border-2 p-5 transition-colors",
-                active
-                    ? "border-brand bg-background"
-                    : "bg-muted/30 border-transparent",
-            )}
-        >
-            <div className="flex gap-4">
-                <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap gap-1.5">
-                        <span className="bg-muted text-foreground rounded-md px-2 py-0.5 text-xs font-semibold">
-                            {partner.license}
-                        </span>
-                        <span className="bg-brand/10 text-brand rounded-md px-2 py-0.5 text-xs font-semibold">
-                            {partner.recommendType}
-                        </span>
-                        <StatusBadge status={partner.status} />
-                    </div>
-                    <p className="text-foreground mt-3 text-lg font-extrabold">
-                        {partner.name}
-                    </p>
-                    <p className="text-muted-foreground mt-1 text-xs">
-                        {partner.region} {partner.distance} 평점{" "}
-                        {partner.rating}
-                    </p>
-                    <p className="text-muted-foreground mt-2 line-clamp-4 text-sm leading-relaxed">
-                        {partner.intro}
-                    </p>
-                </div>
-                <div className="flex w-20 shrink-0 flex-col items-center gap-2">
-                    <div className="bg-muted size-16 rounded-full" />
-                    <p className="text-foreground text-sm font-bold">
-                        <span className="text-amber-500">★</span>{" "}
-                        {partner.rating}
-                        <span className="text-muted-foreground text-xs font-normal">
-                            /5.0
-                        </span>
-                    </p>
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onSelect();
-                        }}
-                        className={cn(
-                            "rounded-lg px-3 py-1.5 text-xs font-bold transition-colors",
-                            active
-                                ? "bg-foreground text-background"
-                                : "border-border bg-background text-foreground hover:bg-muted border",
-                        )}
-                    >
-                        더보기
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function ChipRow({ title, items }: { title: string; items: string[] }) {
-    return (
-        <div>
-            <p className="text-foreground text-sm font-bold">{title}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-                {items.map((it) => (
-                    <span
-                        key={it}
-                        className="bg-muted text-foreground rounded-lg px-3 py-1.5 text-xs font-medium"
-                    >
-                        {it}
-                    </span>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-function PartnerDetail({ partner }: { partner: Partner }) {
-    return (
-        <div className="bg-muted/30 rounded-2xl p-6 md:p-8">
-            <div className="bg-muted mx-auto size-24 rounded-full" />
-            <p className="text-foreground mt-4 text-center text-xl font-extrabold">
-                {partner.name}
-            </p>
-            <p className="text-foreground mt-1 text-center text-sm font-semibold">
-                <span className="text-amber-500">★</span> {partner.rating}{" "}
-                <span className="text-muted-foreground font-normal">
-                    (후기 {partner.reviewCount}개)
-                </span>
-            </p>
-            <p className="text-muted-foreground mx-auto mt-3 max-w-sm text-center text-sm leading-relaxed">
-                {partner.experience}
-            </p>
-
-            <div className="mt-6 space-y-5">
-                <ChipRow title="추천 사유" items={partner.recommendReasons} />
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                    {partner.intro}
-                </p>
-                <div>
-                    <p className="text-foreground text-sm font-bold">
-                        검증 배지
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                        {partner.badges.map((b) => (
-                            <span
-                                key={b}
-                                className="border-border bg-background text-foreground rounded-lg border px-3 py-1.5 text-xs font-medium"
-                            >
-                                {b}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-                <div>
-                    <p className="text-foreground text-sm font-bold">
-                        운영 지표
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                        {partner.metrics.map((m) => (
-                            <span
-                                key={m.label}
-                                className="bg-muted text-foreground rounded-lg px-3 py-1.5 text-xs font-medium"
-                            >
-                                {m.label} {m.value}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-                <ChipRow
-                    title="사후 리포트 구조"
-                    items={partner.reportStructure}
-                />
-            </div>
-
-            <div className="bg-brand text-brand-foreground mt-6 flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-3 text-sm font-bold">
-                선택됨 <Check className="size-4" strokeWidth={3} />
-            </div>
-        </div>
-    );
-}
+const POLL_MS = 5000;
 
 export function StepPartnerSelect() {
     const { data, patch, next, prev } = useReservationStore();
-    const [selectedId, setSelectedId] = useState(
-        data.partnerId || PARTNERS[0].id,
-    );
-    const selected = getPartner(selectedId) ?? PARTNERS[0];
+    const reservationId = data.reservationId;
 
-    const onNext = () => {
-        patch({ partnerId: selectedId });
-        next();
+    const [applicants, setApplicants] = useState<DetailedApplicant[]>([]);
+    const [selected, setSelected] = useState<DetailedApplicant | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    useEffect(() => {
+        if (!reservationId) return;
+        let active = true;
+        const run = async () => {
+            const list = await getReservationApplicantsDetailed(reservationId);
+            if (active) setApplicants(list);
+        };
+        run();
+        const id = setInterval(() => {
+            if (document.visibilityState === "visible") run();
+        }, POLL_MS);
+        return () => {
+            active = false;
+            clearInterval(id);
+        };
+    }, [reservationId]);
+
+    const onConfirm = () => {
+        if (!selected || !reservationId) return;
+        const partner = selected;
+        startTransition(async () => {
+            const res = await confirmPartner(reservationId, partner.partnerId);
+            setSelected(null);
+            if (res.ok) {
+                patch({
+                    partnerId: partner.partnerId,
+                    confirmedPartnerName: partner.name,
+                });
+                toast.success("파트너를 확정했습니다.");
+                next();
+            } else {
+                toast.error(res.message);
+            }
+        });
     };
 
     return (
@@ -196,33 +66,128 @@ export function StepPartnerSelect() {
                 index={6}
                 title="원하시는 파트너를 선택해주세요."
                 subtitles={[
-                    "경력, 자격, 후기, 거리 등을 확인하고",
+                    "수락한 파트너의 평점과 자격을 확인하고",
                     "이용자에게 가장 적합한 파트너를 선택할 수 있습니다.",
                 ]}
             />
 
             <Section>
-                <div className="grid gap-6 lg:grid-cols-2">
-                    {/* 좌측 목록 */}
-                    <div className="space-y-4">
-                        {PARTNERS.map((p) => (
-                            <PartnerListCard
-                                key={p.id}
-                                partner={p}
-                                active={p.id === selectedId}
-                                onSelect={() => setSelectedId(p.id)}
-                            />
-                        ))}
-                    </div>
+                <div className="mx-auto max-w-3xl">
+                    <h3 className="text-foreground text-lg font-bold">
+                        수락한 파트너
+                        <span className="text-brand ml-2">
+                            {applicants.length}
+                        </span>
+                    </h3>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                        한 분을 선택하면 예약이 확정되고, 다른 지원 파트너는
+                        자동으로 마감됩니다.
+                    </p>
 
-                    {/* 우측 상세 */}
-                    <div className="lg:sticky lg:top-24 lg:self-start">
-                        <PartnerDetail partner={selected} />
+                    {applicants.length === 0 ? (
+                        <div className="border-border bg-background mt-6 flex flex-col items-center gap-3 rounded-2xl border px-6 py-16 text-center">
+                            <span className="bg-muted text-muted-foreground flex size-12 items-center justify-center rounded-full">
+                                <UserRound className="size-6" />
+                            </span>
+                            <p className="text-foreground font-bold">
+                                아직 수락한 파트너가 없어요
+                            </p>
+                            <p className="text-muted-foreground text-sm">
+                                파트너가 요청을 수락하면 여기에 표시됩니다.
+                            </p>
+                        </div>
+                    ) : (
+                        <ul className="mt-6 space-y-3">
+                            {applicants.map((a) => (
+                                <li
+                                    key={a.partnerId}
+                                    className="border-border bg-background flex flex-col gap-4 rounded-2xl border p-5 sm:flex-row sm:items-center"
+                                >
+                                    <div className="bg-muted flex size-14 shrink-0 items-center justify-center rounded-full">
+                                        <UserRound className="text-muted-foreground size-7" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-foreground flex items-center gap-2 text-lg font-extrabold">
+                                            {a.name}
+                                            {a.rating !== null ? (
+                                                <span className="text-muted-foreground text-sm font-semibold">
+                                                    <span className="text-amber-500">
+                                                        ★
+                                                    </span>{" "}
+                                                    {a.rating.toFixed(1)} (후기{" "}
+                                                    {a.reviewCount})
+                                                </span>
+                                            ) : (
+                                                <span className="text-muted-foreground text-xs font-medium">
+                                                    후기 없음
+                                                </span>
+                                            )}
+                                        </p>
+                                        {a.qualifications.length > 0 && (
+                                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                                {a.qualifications.map(
+                                                    (q, i) => (
+                                                        <span
+                                                            key={`${a.partnerId}-${i}`}
+                                                            className="bg-brand/10 text-brand inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold"
+                                                        >
+                                                            <ShieldCheck className="size-3" />
+                                                            {q.type}
+                                                            {q.issuer
+                                                                ? ` · ${q.issuer}`
+                                                                : ""}
+                                                        </span>
+                                                    ),
+                                                )}
+                                            </div>
+                                        )}
+                                        <p className="text-muted-foreground mt-2 flex items-center gap-1 text-xs">
+                                            <Clock className="size-3.5" />
+                                            {a.appliedAtLabel} 수락
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelected(a)}
+                                        disabled={pending}
+                                        className="bg-brand text-brand-foreground hover:bg-brand/90 shrink-0 rounded-lg px-5 py-2.5 text-sm font-bold transition-colors disabled:opacity-60"
+                                    >
+                                        이 파트너로 선택
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+
+                    <div className="flex justify-center pt-6">
+                        <button
+                            type="button"
+                            onClick={prev}
+                            className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-6 py-3 text-sm font-bold transition-colors"
+                        >
+                            이전
+                        </button>
                     </div>
                 </div>
-
-                <StepNav onPrev={prev} nextType="button" onNext={onNext} />
             </Section>
+
+            <ConfirmModal
+                open={selected !== null}
+                onClose={() => setSelected(null)}
+                onConfirm={onConfirm}
+                title="이 파트너로 확정할까요?"
+                cancelLabel="돌아가기"
+                confirmLabel="파트너 확정"
+                confirmDisabled={pending}
+            >
+                <p className="text-muted-foreground mt-3 text-left text-sm leading-relaxed">
+                    <span className="text-foreground font-bold">
+                        {selected?.name}
+                    </span>{" "}
+                    님으로 예약이 확정되며, 다른 지원 파트너는 자동으로
+                    마감됩니다. 확정 후에는 변경할 수 없습니다.
+                </p>
+            </ConfirmModal>
         </>
     );
 }

@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { expirePastMatchings } from "@/lib/expire-matchings";
 import { planDisplay, planPrice, type PlanCode } from "@/lib/reservation";
 
 /** 수락 대기 목록(파트너 화면)에 표시할 최소 필드 */
@@ -73,6 +74,8 @@ export async function getPartnerMatchingCount(): Promise<number> {
         } = await supabase.auth.getUser();
         if (!user) return 0;
 
+        await expirePastMatchings();
+
         const { data: applied } = await supabase
             .from("reservation_applications")
             .select("reservation_id")
@@ -114,6 +117,8 @@ export async function getPartnerMatchingRequests(): Promise<
             data: { user },
         } = await supabase.auth.getUser();
         if (!user) return [];
+
+        await expirePastMatchings();
 
         // 이 파트너가 이미 지원한 예약 id(중복 노출 방지)
         const { data: applied } = await supabase
