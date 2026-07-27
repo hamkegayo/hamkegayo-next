@@ -130,6 +130,15 @@ export async function getPartnerReports(): Promise<ReportListItem[]> {
     }
 }
 
+/**
+ * 리포트 작성 뱃지용 카운트 — 완료된 서비스 중 아직 제출되지 않은 리포트 수.
+ * 목록과 동일 기준(getPartnerReports)을 재사용한다.
+ */
+export async function getPartnerPendingReportCount(): Promise<number> {
+    const list = await getPartnerReports();
+    return list.filter((r) => r.status === "pending").length;
+}
+
 type ContextRow = {
     id: string;
     partner_id: string;
