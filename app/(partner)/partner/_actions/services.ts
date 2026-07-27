@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/utils/supabase/server";
+import { createNotification } from "@/lib/notifications";
 
 export type ServiceActionResult = { ok: true } | { ok: false; message: string };
 
@@ -70,5 +71,27 @@ export async function endService(
 export async function completeService(
     serviceId: string,
 ): Promise<ServiceActionResult> {
-    return callRpc("complete_service", { p_service_id: serviceId }, serviceId);
+    const res = await callRpc(
+        "complete_service",
+        { p_service_id: serviceId },
+        serviceId,
+    );
+    if (res.ok) {
+        const supabase = await createClient();
+        const { data } = await supabase
+            .from("services")
+            .select("reservations!inner(customer_id)")
+            .eq("id", serviceId)
+            .maybeSingle<{ reservations: { customer_id: string } | null }>();
+        const customerId = data?.reservations?.customer_id;
+        if (customerId) {
+            await createNotification(customerId, {
+                type: "SERVICE_COMPLETED",
+                title: "서비스가 완료되었어요",
+                body: "동행이 안전하게 마무리됐어요. 이용 후기를 남겨주세요.",
+                link: "/review/write",
+            });
+        }
+    }
+    return res;
 }

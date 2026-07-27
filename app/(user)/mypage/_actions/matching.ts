@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/utils/supabase/server";
+import { createNotification } from "@/lib/notifications";
 
 export type ConfirmPartnerResult =
     { ok: true } | { ok: false; message: string };
@@ -48,6 +49,13 @@ export async function confirmPartner(
                 : "선택에 실패했습니다. 잠시 후 다시 시도해 주세요.",
         };
     }
+
+    await createNotification(partnerId, {
+        type: "RESERVATION_CONFIRMED",
+        title: "예약이 확정되었어요",
+        body: "고객이 회원님을 파트너로 선택했습니다. 진행 관리에서 확인해 주세요.",
+        link: "/partner/management",
+    });
 
     revalidatePath(`/mypage/reservations/${reservationId}`);
     revalidatePath("/mypage");
