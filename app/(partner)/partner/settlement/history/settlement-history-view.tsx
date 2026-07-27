@@ -6,8 +6,6 @@ import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
-    calcFee,
-    FEE_RATE,
     type Settlement,
     type SettlementStatus,
     type SettlementSummary,
@@ -72,8 +70,6 @@ export function SettlementHistoryView({
             ? settlements
             : settlements.filter((x) => x.status === tab);
 
-    const pct = `${(FEE_RATE * 100).toFixed(1)}%`;
-
     return (
         <div>
             {/* 헤더 */}
@@ -133,21 +129,11 @@ export function SettlementHistoryView({
             </div>
 
             {/* 요약 */}
-            <div className="border-border bg-background mt-6 grid grid-cols-2 gap-x-6 gap-y-4 rounded-2xl border p-6 md:grid-cols-5 md:p-7">
+            <div className="border-border bg-background mt-6 grid grid-cols-2 gap-x-6 gap-y-4 rounded-2xl border p-6 md:grid-cols-3 md:p-7">
                 <StatCol
                     label="총 정산 금액"
                     value={`${s.totalAmount.toLocaleString()}원`}
                     sub={`${s.serviceCount}건`}
-                    valueClass="text-brand"
-                />
-                <StatCol
-                    label="원천징수/수수료"
-                    value={`${s.totalWithholding.toLocaleString()}원`}
-                    sub={pct}
-                />
-                <StatCol
-                    label="실수령 총액"
-                    value={`${s.totalNet.toLocaleString()}원`}
                     valueClass="text-brand"
                 />
                 <StatCol label="정산 완료 건수" value={`${s.serviceCount}건`} />
@@ -206,12 +192,6 @@ export function SettlementHistoryView({
                                 <th className="px-4 py-4 text-right font-semibold">
                                     정산 금액
                                 </th>
-                                <th className="px-4 py-4 text-right font-semibold">
-                                    원천징수/수수료
-                                </th>
-                                <th className="px-4 py-4 text-right font-semibold">
-                                    실수령 금액
-                                </th>
                                 <th className="px-4 py-4 font-semibold">
                                     정산 상태
                                 </th>
@@ -222,7 +202,6 @@ export function SettlementHistoryView({
                         </thead>
                         <tbody className="divide-border divide-y">
                             {list.map((r) => {
-                                const fee = r.amount ? calcFee(r.amount) : null;
                                 const isPaid = r.status === "paid";
                                 return (
                                     <tr
@@ -242,16 +221,6 @@ export function SettlementHistoryView({
                                         <td className="text-foreground px-4 py-4 text-right font-bold">
                                             {r.amount
                                                 ? `${r.amount.toLocaleString()}원`
-                                                : "-"}
-                                        </td>
-                                        <td className="text-muted-foreground px-4 py-4 text-right">
-                                            {fee
-                                                ? `${fee.withholding.toLocaleString()}원 (${pct})`
-                                                : "-"}
-                                        </td>
-                                        <td className="text-brand px-4 py-4 text-right font-bold">
-                                            {fee
-                                                ? `${fee.net.toLocaleString()}원`
                                                 : "-"}
                                         </td>
                                         <td className="px-4 py-4">
@@ -281,7 +250,6 @@ export function SettlementHistoryView({
                 {/* 모바일: 카드 리스트 */}
                 <ul className="divide-border divide-y md:hidden">
                     {list.map((r) => {
-                        const fee = r.amount ? calcFee(r.amount) : null;
                         const isPaid = r.status === "paid";
                         return (
                             <li key={r.id}>
@@ -313,25 +281,9 @@ export function SettlementHistoryView({
                                     <dl className="text-muted-foreground mt-3 space-y-1 text-xs">
                                         <div className="flex justify-between gap-3">
                                             <dt>정산 금액</dt>
-                                            <dd className="text-foreground font-bold">
+                                            <dd className="text-brand font-bold">
                                                 {r.amount
                                                     ? `${r.amount.toLocaleString()}원`
-                                                    : "-"}
-                                            </dd>
-                                        </div>
-                                        <div className="flex justify-between gap-3">
-                                            <dt>원천징수/수수료</dt>
-                                            <dd>
-                                                {fee
-                                                    ? `${fee.withholding.toLocaleString()}원 (${pct})`
-                                                    : "-"}
-                                            </dd>
-                                        </div>
-                                        <div className="flex justify-between gap-3">
-                                            <dt>실수령 금액</dt>
-                                            <dd className="text-brand font-bold">
-                                                {fee
-                                                    ? `${fee.net.toLocaleString()}원`
                                                     : "-"}
                                             </dd>
                                         </div>

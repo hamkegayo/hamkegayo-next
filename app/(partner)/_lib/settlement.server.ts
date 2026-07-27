@@ -5,8 +5,6 @@ import type { Settlement, SettlementSummary } from "./settlement";
 type ServiceRow = {
     id: string;
     amount: number;
-    fee: number;
-    net: number;
     status: "PENDING" | "PAID";
     settled_at: string | null;
     services: {
@@ -64,8 +62,6 @@ export async function getPartnerSettlements(): Promise<{
 }> {
     const empty: SettlementSummary = {
         totalAmount: 0,
-        totalWithholding: 0,
-        totalNet: 0,
         serviceCount: 0,
         paidCount: 0,
         pendingCount: 0,
@@ -80,7 +76,7 @@ export async function getPartnerSettlements(): Promise<{
         const { data, error } = await supabase
             .from("settlements")
             .select(
-                "id, amount, fee, net, status, settled_at, services!inner(reservations!inner(plan, hospital_address, use_date))",
+                "id, amount, status, settled_at, services!inner(reservations!inner(plan, hospital_address, use_date))",
             )
             .eq("partner_id", user.id)
             .order("created_at", { ascending: false })
@@ -91,8 +87,6 @@ export async function getPartnerSettlements(): Promise<{
         const settlements = data.map(toView);
         const summary: SettlementSummary = {
             totalAmount: data.reduce((s, r) => s + r.amount, 0),
-            totalWithholding: data.reduce((s, r) => s + r.fee, 0),
-            totalNet: data.reduce((s, r) => s + r.net, 0),
             serviceCount: data.length,
             paidCount: data.filter((r) => r.status === "PAID").length,
             pendingCount: data.filter((r) => r.status === "PENDING").length,
