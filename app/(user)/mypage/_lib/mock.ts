@@ -1,29 +1,4 @@
-/** 마이페이지 목업 예약 데이터 (실제 연동 전 데모용) */
-
-import { RESERVATION_STATUS_LABEL } from "@/lib/reservation";
-
-export type CurrentReservation = {
-    statusLabel: string;
-    hospital: string;
-    datetime: string;
-    plan: string;
-};
-
-export type RecentReservation = {
-    id: string;
-    hospital: string;
-    datetime: string;
-    plan: string;
-    statusLabel: string;
-    review: "write" | "view";
-};
-
-export const CURRENT_RESERVATION: CurrentReservation = {
-    statusLabel: RESERVATION_STATUS_LABEL.MATCHING,
-    hospital: "서울대학교 병원",
-    datetime: "2026.06.10 (화) 오전 10:00",
-    plan: "플러스 서비스 (자택 방문 + 병원 동행 + 귀가 지원)",
-};
+/** 마이페이지 예약 상세 목업 (실데이터 폴백용 데모 데이터) */
 
 export type ReservationDetail = {
     shortCode: string;
@@ -92,22 +67,3 @@ export function getReservationDetail(_id: string): ReservationDetail {
         ],
     };
 }
-
-export const RECENT_RESERVATIONS: RecentReservation[] = [
-    {
-        id: "r1",
-        hospital: "서울대학교 병원",
-        datetime: "2026.06.10 (화) 오전 10:00",
-        plan: "베이직 서비스 (병원 내 동행)",
-        statusLabel: RESERVATION_STATUS_LABEL.COMPLETED,
-        review: "write",
-    },
-    {
-        id: "r2",
-        hospital: "삼성서울병원",
-        datetime: "2026.05.03 (화) 오전 10:00",
-        plan: "플러스 서비스 (자택 방문 + 병원 동행 + 귀가 지원)",
-        statusLabel: RESERVATION_STATUS_LABEL.COMPLETED,
-        review: "view",
-    },
-];
