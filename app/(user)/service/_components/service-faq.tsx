@@ -114,9 +114,12 @@ function BookingCta() {
                 언제든 24시간, 필요한 순간에 함께가요가 곁에 있습니다.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
-                <ComingSoonButton className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-6 py-3 text-sm font-bold transition-colors">
+                <Link
+                    href="/reservation"
+                    className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-6 py-3 text-sm font-bold transition-colors"
+                >
                     동행 예약하기
-                </ComingSoonButton>
+                </Link>
                 <ComingSoonButton className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-6 py-3 text-sm font-bold transition-colors">
                     전화 상담 받기
                 </ComingSoonButton>
