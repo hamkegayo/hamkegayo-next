@@ -1,11 +1,8 @@
-"use client";
-
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { ChevronLeft, MessageSquare } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { getReview, getAdjacent, type ReviewPlan } from "../_lib/reviews";
+import { getReviewWithAdjacent, type ReviewPlan } from "../_lib/reviews.server";
 import { Stars } from "../_components/stars";
 
 function planBadge(plan: ReviewPlan) {
@@ -14,10 +11,13 @@ function planBadge(plan: ReviewPlan) {
         : "bg-muted text-muted-foreground";
 }
 
-export default function ReviewDetailPage() {
-    const params = useParams<{ id: string }>();
-    const id = Number(params.id);
-    const review = getReview(id);
+export default async function ReviewDetailPage({
+    params,
+}: {
+    params: Promise<{ id: string }>;
+}) {
+    const { id } = await params;
+    const { review, prev, next } = await getReviewWithAdjacent(id);
 
     if (!review) {
         return (
@@ -34,8 +34,6 @@ export default function ReviewDetailPage() {
             </div>
         );
     }
-
-    const { prev, next } = getAdjacent(id);
 
     return (
         <div className="mx-auto max-w-4xl px-4 py-10 md:py-14">

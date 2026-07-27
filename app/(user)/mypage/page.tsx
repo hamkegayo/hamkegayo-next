@@ -3,7 +3,6 @@ import { Building2, Car, Check, ChevronRight, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { ComingSoonButton } from "@/app/(user)/_components/home/coming-soon-button";
 import { getSessionProfile } from "./_lib/profile";
 import { getMyReservations } from "./_lib/reservations.server";
 
@@ -162,9 +161,12 @@ export default async function MypageHome() {
                                     {r.statusLabel}
                                 </span>
                                 {r.status === "COMPLETED" && (
-                                    <ComingSoonButton className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-4 py-2 text-sm font-bold transition-colors">
+                                    <Link
+                                        href="/review/write"
+                                        className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-4 py-2 text-sm font-bold transition-colors"
+                                    >
                                         후기 작성
-                                    </ComingSoonButton>
+                                    </Link>
                                 )}
                                 <Link
                                     href={`/mypage/reservations/${r.id}`}
