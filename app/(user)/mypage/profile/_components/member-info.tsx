@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { CreditCard } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
+import { updateProfileName } from "../../_actions/profile";
 
 type Basic = {
     name: string;
@@ -60,10 +62,31 @@ const AGREEMENTS = [
 ];
 
 export function MemberInfo({ basic }: { basic: Basic }) {
+    const router = useRouter();
     const [marketing, setMarketing] = useState(false);
+    const [editingName, setEditingName] = useState(false);
+    const [nameInput, setNameInput] = useState(basic.name);
+    const [pending, startTransition] = useTransition();
+
+    const onSaveName = () => {
+        startTransition(async () => {
+            const res = await updateProfileName(nameInput);
+            if (res.ok) {
+                setEditingName(false);
+                toast.success("이름이 수정되었습니다.");
+                router.refresh();
+            } else {
+                toast.error(res.message);
+            }
+        });
+    };
+
+    const onCancelName = () => {
+        setNameInput(basic.name);
+        setEditingName(false);
+    };
 
     const infoRows = [
-        { label: "이름", value: basic.name },
         { label: "이메일", value: basic.email },
         { label: "휴대폰번호", value: basic.phone, phone: true },
         { label: "비밀번호", value: "**********" },
@@ -79,9 +102,56 @@ export function MemberInfo({ basic }: { basic: Basic }) {
                 {/* 기본 정보 */}
                 <Card
                     title="기본 정보"
-                    action={<OutlineButton>수정하기</OutlineButton>}
+                    action={
+                        editingName ? (
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={onSaveName}
+                                    disabled={pending}
+                                    className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-3.5 py-2 text-sm font-bold transition-colors disabled:opacity-60"
+                                >
+                                    저장
+                                </button>
+                                <OutlineButton onClick={onCancelName}>
+                                    취소
+                                </OutlineButton>
+                            </div>
+                        ) : (
+                            <OutlineButton
+                                onClick={() => {
+                                    setNameInput(basic.name);
+                                    setEditingName(true);
+                                }}
+                            >
+                                수정하기
+                            </OutlineButton>
+                        )
+                    }
                 >
                     <dl className="space-y-3">
+                        {/* 이름 (편집 가능) */}
+                        <div className="flex items-center gap-4 text-sm">
+                            <dt className="text-muted-foreground w-24 shrink-0 font-semibold">
+                                이름
+                            </dt>
+                            <dd className="text-foreground flex-1 font-medium">
+                                {editingName ? (
+                                    <input
+                                        type="text"
+                                        value={nameInput}
+                                        onChange={(e) =>
+                                            setNameInput(e.target.value)
+                                        }
+                                        maxLength={20}
+                                        autoFocus
+                                        className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/40 w-full max-w-xs rounded-lg border px-3 py-1.5 text-sm outline-none focus-visible:ring-[3px]"
+                                    />
+                                ) : (
+                                    basic.name
+                                )}
+                            </dd>
+                        </div>
                         {infoRows.map((r) => (
                             <div
                                 key={r.label}
