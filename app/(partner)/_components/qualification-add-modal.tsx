@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, X } from "lucide-react";
-import { toast } from "sonner";
+import { useRef, useState } from "react";
+import { ChevronDown, Upload, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Modal } from "@/components/ui/modal";
@@ -12,7 +11,6 @@ export type QualificationInput = {
     regNo: string;
     date: string;
     issuer: string;
-    proof: string;
 };
 
 const inputCls =
@@ -23,32 +21,35 @@ export function QualificationAddModal({
     onClose,
     onAdd,
     types,
+    pending = false,
 }: {
     open: boolean;
     onClose: () => void;
-    onAdd: (v: QualificationInput) => void;
+    onAdd: (v: QualificationInput, file: File) => void;
     types: string[];
+    pending?: boolean;
 }) {
     const [type, setType] = useState(types[0] ?? "");
     const [regNo, setRegNo] = useState("");
     const [date, setDate] = useState("");
     const [issuer, setIssuer] = useState("");
-    const [proof, setProof] = useState("");
+    const [file, setFile] = useState<File | null>(null);
+    const fileRef = useRef<HTMLInputElement>(null);
 
     const close = () => {
         setType(types[0] ?? "");
         setRegNo("");
         setDate("");
         setIssuer("");
-        setProof("");
+        setFile(null);
         onClose();
     };
 
+    const canSubmit = Boolean(type && file);
+
     const submit = () => {
-        if (!type) return;
-        onAdd({ type, regNo, date, issuer, proof });
-        toast.info("추가한 자격은 관리자 심사 후 인증됩니다.");
-        close();
+        if (!type || !file) return;
+        onAdd({ type, regNo, date, issuer }, file);
     };
 
     return (
@@ -133,15 +134,32 @@ export function QualificationAddModal({
 
             <div className="mt-4">
                 <label className="text-foreground text-sm font-bold">
-                    증빙 자료
+                    증빙 파일
                 </label>
                 <input
-                    type="text"
-                    value={proof}
-                    onChange={(e) => setProof(e.target.value)}
-                    placeholder="증빙 서류명 또는 발급번호를 입력하세요"
-                    className={inputCls}
+                    ref={fileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,application/pdf"
+                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    className="hidden"
                 />
+                <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    className="border-input bg-background hover:bg-muted/40 mt-1.5 flex w-full items-center gap-2 rounded-lg border border-dashed px-3.5 py-2.5 text-left text-sm transition-colors"
+                >
+                    <Upload className="text-muted-foreground size-4 shrink-0" />
+                    <span
+                        className={cn(
+                            "truncate",
+                            file
+                                ? "text-foreground"
+                                : "text-muted-foreground/70",
+                        )}
+                    >
+                        {file ? file.name : "JPG, PNG, PDF (최대 5MB)"}
+                    </span>
+                </button>
             </div>
 
             <div className="mt-6 flex gap-3">
@@ -155,9 +173,10 @@ export function QualificationAddModal({
                 <button
                     type="button"
                     onClick={submit}
+                    disabled={!canSubmit || pending}
                     className={cn(
                         "flex-1 rounded-lg px-4 py-3 text-sm font-bold transition-colors",
-                        type
+                        canSubmit && !pending
                             ? "bg-brand text-brand-foreground hover:bg-brand/90"
                             : "bg-muted text-muted-foreground cursor-not-allowed",
                     )}
