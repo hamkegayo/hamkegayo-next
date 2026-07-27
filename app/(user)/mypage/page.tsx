@@ -3,6 +3,7 @@ import { Building2, Car, Check, ChevronRight, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { getSessionProfile } from "./_lib/profile";
 import { getMyReservations } from "./_lib/reservations.server";
 
@@ -19,11 +20,12 @@ export default async function MypageHome() {
     ]);
     const name = profile?.name ?? "회원";
 
-    // 진행 단계 인덱스: 확정 전(매칭중)은 -1, 파트너 확정=0 (서비스 진행/완료는 후속 슬라이스)
-    const currentStep = current?.step === "confirmed" ? 0 : -1;
+    // 진행 단계 인덱스(실제 서비스 상태 기반): 0=파트너 확정, 1=서비스 진행, 2=서비스 완료
+    const currentStep = current?.stepIndex ?? 0;
 
     return (
         <div>
+            <AutoRefresh />
             <h1 className="text-foreground text-2xl font-extrabold md:text-3xl">
                 안녕하세요, {name}님
             </h1>
@@ -39,7 +41,7 @@ export default async function MypageHome() {
                 <div className="border-border bg-background mt-4 grid overflow-hidden rounded-2xl border md:grid-cols-2">
                     {/* 예약 정보 */}
                     <div className="border-border border-b p-6 md:border-r md:border-b-0 md:p-8">
-                        <span className="inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-600 dark:bg-amber-500/15">
+                        <span className="bg-brand/10 text-brand inline-block rounded-full px-3 py-1 text-xs font-bold">
                             {current.statusLabel}
                         </span>
                         <h3 className="text-foreground mt-4 text-xl font-extrabold">
@@ -63,6 +65,7 @@ export default async function MypageHome() {
                     <div className="flex items-start justify-between p-6 md:p-8">
                         {STEPS.map((s, i) => {
                             const Icon = s.icon;
+                            const done = i <= currentStep;
                             const active = i === currentStep;
                             return (
                                 <div
@@ -73,7 +76,7 @@ export default async function MypageHome() {
                                         <div
                                             className={cn(
                                                 "flex size-11 items-center justify-center rounded-full",
-                                                active
+                                                done
                                                     ? "bg-brand text-brand-foreground"
                                                     : "bg-muted text-muted-foreground",
                                             )}
@@ -83,7 +86,7 @@ export default async function MypageHome() {
                                         <span
                                             className={cn(
                                                 "text-sm font-semibold",
-                                                active
+                                                done
                                                     ? "text-foreground"
                                                     : "text-muted-foreground",
                                             )}
@@ -98,7 +101,11 @@ export default async function MypageHome() {
                                                     : "text-muted-foreground",
                                             )}
                                         >
-                                            {active ? "현재 단계" : "예정"}
+                                            {active
+                                                ? "현재 단계"
+                                                : done
+                                                  ? "완료"
+                                                  : "예정"}
                                         </span>
                                     </div>
                                     {i < STEPS.length - 1 && (

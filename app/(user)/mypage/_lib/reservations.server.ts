@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { expirePastMatchings } from "@/lib/expire-matchings";
 import {
     PLAN_INFO,
     RESERVATION_STATUS_LABEL,
@@ -6,7 +7,7 @@ import {
     type ReservationStatus,
 } from "@/lib/reservation";
 
-/** 현재 진행 중(매칭/확정) 예약 요약 */
+/** 현재 진행 중(확정~완료) 예약 요약 */
 export type CurrentReservationView = {
     id: string;
     hospital: string;
@@ -14,8 +15,8 @@ export type CurrentReservationView = {
     planLabel: string;
     status: ReservationStatus;
     statusLabel: string;
-    /** 진행 단계 인디케이터: 매칭 대기중 → 파트너 확정 (서비스 진행/완료는 후속 슬라이스) */
-    step: "matching" | "confirmed";
+    /** 진행 단계: 0=파트너 확정, 1=서비스 진행, 2=서비스 완료 (실제 서비스 상태 기반) */
+    stepIndex: number;
 };
 
 /** 최근 예약 내역(완료/취소) */
@@ -79,6 +80,9 @@ export async function getMyReservations(): Promise<{
         } = await supabase.auth.getUser();
         if (!user) return { current: null, recent: [] };
 
+        // 진료일시가 지난 미확정(MATCHING) 예약을 먼저 만료 처리(lazy)
+        await expirePastMatchings();
+
         const { data, error } = await supabase
             .from("reservations")
             .select(
@@ -90,9 +94,31 @@ export async function getMyReservations(): Promise<{
 
         if (error || !data) return { current: null, recent: [] };
 
+        // '현재 진행 중'에는 확정~완료(CONFIRMED/COMPLETED) 최신 1건을 노출.
+        // 매칭 대기(MATCHING)는 예약 플로우에서 선택하며 목록에는 띄우지 않는다.
         const activeRow = data.find(
-            (r) => r.status === "MATCHING" || r.status === "CONFIRMED",
+            (r) => r.status === "CONFIRMED" || r.status === "COMPLETED",
         );
+
+        // 스텝퍼는 실제 서비스 상태로 구동 (SCHEDULED→확정, 진행/귀가대기→진행, 완료→완료)
+        let stepIndex = 0;
+        if (activeRow) {
+            if (activeRow.status === "COMPLETED") {
+                stepIndex = 2;
+            } else {
+                const { data: svc } = await supabase
+                    .from("services")
+                    .select("status")
+                    .eq("reservation_id", activeRow.id)
+                    .maybeSingle<{ status: string }>();
+                stepIndex =
+                    svc?.status === "IN_PROGRESS" || svc?.status === "ENDED"
+                        ? 1
+                        : svc?.status === "COMPLETED"
+                          ? 2
+                          : 0;
+            }
+        }
 
         const current: CurrentReservationView | null = activeRow
             ? {
@@ -107,15 +133,16 @@ export async function getMyReservations(): Promise<{
                   statusLabel:
                       RESERVATION_STATUS_LABEL[activeRow.status] ??
                       activeRow.status,
-                  step:
-                      activeRow.status === "CONFIRMED"
-                          ? "confirmed"
-                          : "matching",
+                  stepIndex,
               }
             : null;
 
         const recent: RecentReservationView[] = data
-            .filter((r) => r.status === "COMPLETED" || r.status === "CANCELLED")
+            .filter(
+                (r) =>
+                    (r.status === "COMPLETED" || r.status === "CANCELLED") &&
+                    r.id !== activeRow?.id,
+            )
             .slice(0, 10)
             .map((r) => ({
                 id: r.id,

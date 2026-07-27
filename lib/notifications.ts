@@ -4,6 +4,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 export type NotificationType =
     | "PARTNER_APPLIED"
     | "RESERVATION_CONFIRMED"
+    | "RESERVATION_CANCELLED"
     | "SERVICE_COMPLETED"
     | "REPORT_READY";
 
