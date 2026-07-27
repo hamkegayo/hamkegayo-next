@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+    Bell,
     CalendarDays,
     CircleDollarSign,
     HelpCircle,
@@ -18,6 +19,7 @@ import { logout } from "@/app/(user)/_actions/auth";
 
 const ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
     { href: "/mypage", label: "예약 현황", icon: CalendarDays },
+    { href: "/mypage/notifications", label: "알림", icon: Bell },
     { href: "/mypage/profile", label: "회원 정보", icon: UserRound },
     { href: "/mypage/points", label: "내 포인트", icon: CircleDollarSign },
     { href: "/mypage/support", label: "고객센터", icon: HelpCircle },

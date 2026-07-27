@@ -4,6 +4,7 @@ import { ZoomProvider } from "@/components/providers/zoom-provider";
 import { UserHeader, type HeaderMember } from "@/components/layout/user-header";
 import { UserFooter } from "@/components/layout/user-footer";
 import { BlockedModal } from "@/components/layout/blocked-modal";
+import { LoginRequiredModal } from "@/components/layout/login-required-modal";
 import { createClient } from "@/utils/supabase/server";
 
 /**
@@ -52,6 +53,7 @@ export default async function UserLayout({
                         title="파트너 전용 페이지예요"
                         description="해당 페이지는 파트너 계정만 이용할 수 있어요."
                     />
+                    <LoginRequiredModal />
                 </Suspense>
                 <UserHeader member={member} />
                 <main className="flex flex-1 flex-col">{children}</main>

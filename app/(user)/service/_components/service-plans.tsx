@@ -8,8 +8,9 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+import Link from "next/link";
+
 import { Section } from "@/app/(user)/_components/home/section";
-import { ComingSoonButton } from "@/app/(user)/_components/home/coming-soon-button";
 
 type Step = { icon: LucideIcon; label: string };
 
@@ -106,9 +107,12 @@ function PlanCard({ plan }: { plan: Plan }) {
                 </span>
             </p>
 
-            <ComingSoonButton className="bg-brand text-brand-foreground hover:bg-brand/90 mt-5 w-full rounded-xl px-4 py-3 text-sm font-bold transition-colors">
+            <Link
+                href="/reservation"
+                className="bg-brand text-brand-foreground hover:bg-brand/90 mt-5 block w-full rounded-xl px-4 py-3 text-center text-sm font-bold transition-colors"
+            >
                 {plan.cta}
-            </ComingSoonButton>
+            </Link>
         </div>
     );
 }

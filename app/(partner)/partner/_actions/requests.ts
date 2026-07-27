@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/utils/supabase/server";
+import { createNotification } from "@/lib/notifications";
 
 export type RequestActionResult = { ok: true } | { ok: false; message: string };
 
@@ -36,7 +37,7 @@ async function applyToReservation(
     // 예약 상태 재검증 — RLS 상 파트너에게는 MATCHING(또는 본인 ACCEPTED)만 조회됨
     const { data: reservation } = await supabase
         .from("reservations")
-        .select("id, status")
+        .select("id, status, customer_id")
         .eq("id", reservationId)
         .maybeSingle();
 
@@ -63,6 +64,16 @@ async function applyToReservation(
             ok: false,
             message: "처리에 실패했습니다. 잠시 후 다시 시도해 주세요.",
         };
+    }
+
+    // 수락 시 고객에게 알림(지원 파트너 발생 → 최종 선택 유도)
+    if (payload.status === "ACCEPTED" && reservation.customer_id) {
+        await createNotification(reservation.customer_id, {
+            type: "PARTNER_APPLIED",
+            title: "파트너가 요청을 수락했어요",
+            body: "지원한 파트너를 확인하고 최종 선택해 주세요.",
+            link: `/mypage/reservations/${reservationId}`,
+        });
     }
 
     // 목록/뱃지는 서버 컴포넌트이므로 재검증 시 해당 건이 제외되어 사라짐

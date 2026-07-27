@@ -22,8 +22,6 @@ export type Settlement = {
 /** 정산 요약(대시보드/내역 상단) */
 export type SettlementSummary = {
     totalAmount: number;
-    totalWithholding: number;
-    totalNet: number;
     /** 완료된 서비스(정산 생성) 건수 */
     serviceCount: number;
     /** 지급 완료 건수 */
@@ -31,11 +29,3 @@ export type SettlementSummary = {
     /** 지급 예정 건수 */
     pendingCount: number;
 };
-
-export const FEE_RATE = 0.033;
-
-/** 원천징수/수수료 및 실수령액 계산 */
-export function calcFee(amount: number) {
-    const withholding = Math.round(amount * FEE_RATE);
-    return { withholding, net: amount - withholding };
-}

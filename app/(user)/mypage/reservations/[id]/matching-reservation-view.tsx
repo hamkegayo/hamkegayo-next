@@ -8,6 +8,7 @@ import {
     ChevronLeft,
     Clock,
     UserRound,
+    XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,6 +19,7 @@ import type {
     ReservationApplicant,
 } from "../../_lib/matching.server";
 import { confirmPartner } from "../../_actions/matching";
+import { cancelReservation } from "@/app/(user)/reservation/_actions/matching";
 
 function statusBadge(status: CustomerReservation["status"]) {
     switch (status) {
@@ -41,6 +43,7 @@ export function MatchingReservationView({
 }) {
     const router = useRouter();
     const [selected, setSelected] = useState<ReservationApplicant | null>(null);
+    const [cancelOpen, setCancelOpen] = useState(false);
     const [pending, startTransition] = useTransition();
 
     const isMatching = reservation.status === "MATCHING";
@@ -56,6 +59,20 @@ export function MatchingReservationView({
             setSelected(null);
             if (res.ok) {
                 toast.success("파트너를 확정했습니다.");
+                router.refresh();
+            } else {
+                toast.error(res.message);
+            }
+        });
+    };
+
+    const onCancel = () => {
+        startTransition(async () => {
+            const res = await cancelReservation(reservation.id);
+            setCancelOpen(false);
+            if (res.ok) {
+                toast.success("예약을 취소했습니다.");
+                router.push("/mypage");
                 router.refresh();
             } else {
                 toast.error(res.message);
@@ -96,6 +113,20 @@ export function MatchingReservationView({
                     {reservation.dateLabel} {reservation.timeLabel} ·{" "}
                     {reservation.plan}
                 </p>
+
+                {isMatching && (
+                    <div className="border-border mt-5 flex justify-end border-t pt-4">
+                        <button
+                            type="button"
+                            onClick={() => setCancelOpen(true)}
+                            disabled={pending}
+                            className="text-destructive hover:bg-destructive/5 inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold transition-colors disabled:opacity-60"
+                        >
+                            <XCircle className="size-4" />
+                            예약 취소
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* 파트너 선택 / 확정 결과 */}
@@ -200,6 +231,21 @@ export function MatchingReservationView({
                     </span>{" "}
                     님으로 예약이 확정되며, 다른 지원 파트너는 자동으로
                     마감됩니다. 확정 후에는 변경할 수 없습니다.
+                </p>
+            </ConfirmModal>
+
+            <ConfirmModal
+                open={cancelOpen}
+                onClose={() => setCancelOpen(false)}
+                onConfirm={onCancel}
+                title="예약을 취소할까요?"
+                cancelLabel="돌아가기"
+                confirmLabel="예약 취소"
+                confirmDisabled={pending}
+            >
+                <p className="text-muted-foreground mt-3 text-left text-sm leading-relaxed">
+                    취소하면 파트너에게 전달된 매칭 요청이 종료되며, 되돌릴 수
+                    없습니다. 다시 이용하시려면 새로 예약해 주세요.
                 </p>
             </ConfirmModal>
         </div>

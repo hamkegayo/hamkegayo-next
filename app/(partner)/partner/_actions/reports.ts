@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/utils/supabase/server";
+import { createNotification } from "@/lib/notifications";
 
 const BUCKET = "report-attachments";
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
@@ -111,6 +112,24 @@ export async function saveReport(
             ok: false,
             message: "저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",
         };
+    }
+
+    // 제출(SUBMITTED) 시 고객에게 리포트 도착 알림
+    if (submit) {
+        const { data: svc } = await supabase
+            .from("services")
+            .select("reservations!inner(customer_id)")
+            .eq("id", serviceId)
+            .maybeSingle<{ reservations: { customer_id: string } | null }>();
+        const customerId = svc?.reservations?.customer_id;
+        if (customerId) {
+            await createNotification(customerId, {
+                type: "REPORT_READY",
+                title: "보호자 리포트가 도착했어요",
+                body: "완료된 동행의 보호자 리포트를 확인해 주세요.",
+                link: "/mypage",
+            });
+        }
     }
 
     revalidatePath("/partner/reports");

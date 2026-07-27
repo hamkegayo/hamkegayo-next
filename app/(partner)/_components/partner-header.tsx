@@ -22,7 +22,13 @@ import { useZoom } from "@/components/providers/zoom-provider";
 import { usePartnerNav } from "./partner-nav-context";
 import { logout } from "@/app/(user)/_actions/auth";
 
-export function PartnerHeader({ name }: { name: string }) {
+export function PartnerHeader({
+    name,
+    unreadCount = 0,
+}: {
+    name: string;
+    unreadCount?: number;
+}) {
     const { enlarged, toggle } = useZoom();
     const { setOpen } = usePartnerNav();
     const router = useRouter();
@@ -89,17 +95,18 @@ export function PartnerHeader({ name }: { name: string }) {
 
                     {/* 알림 + 프로필 */}
                     <div className="flex items-center gap-3">
-                        <button
-                            type="button"
-                            onClick={notReady}
+                        <Link
+                            href="/partner/notifications"
                             aria-label="알림"
                             className="text-foreground hover:bg-muted relative flex size-9 items-center justify-center rounded-lg transition-colors"
                         >
                             <Bell className="size-5" />
-                            <span className="bg-destructive absolute top-1 right-1 flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white">
-                                3
-                            </span>
-                        </button>
+                            {unreadCount > 0 && (
+                                <span className="bg-destructive absolute top-1 right-1 flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white">
+                                    {unreadCount > 99 ? "99+" : unreadCount}
+                                </span>
+                            )}
+                        </Link>
 
                         <Menu.Root>
                             <Menu.Trigger className="text-foreground hover:bg-muted data-[popup-open]:bg-muted inline-flex items-center gap-2 rounded-full px-1.5 py-1 text-sm font-semibold transition-colors">

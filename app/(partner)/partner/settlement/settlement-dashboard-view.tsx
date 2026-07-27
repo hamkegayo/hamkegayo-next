@@ -149,10 +149,10 @@ export function SettlementDashboardView({
                     </div>
                     <div className="bg-brand/5 mt-5 flex items-center justify-between rounded-xl px-4 py-3.5">
                         <span className="text-brand text-sm font-bold">
-                            실수령 예정액
+                            정산 예정 금액
                         </span>
                         <span className="text-brand text-xl font-extrabold">
-                            {s.totalNet.toLocaleString()}원
+                            {s.totalAmount.toLocaleString()}원
                         </span>
                     </div>
                 </section>

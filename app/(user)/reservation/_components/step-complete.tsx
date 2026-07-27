@@ -12,11 +12,9 @@ import {
     UserRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { toast } from "sonner";
 
 import { Section } from "@/app/(user)/_components/home/section";
 import { useReservationStore, PLAN_INFO } from "../_store/reservation-store";
-import { getPartner } from "../_lib/partners";
 import { StepBand } from "./step-band";
 
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
@@ -35,8 +33,8 @@ function formatVisit(dateStr: string, time: string) {
 const NEXT_STEPS: { icon: LucideIcon; title: string; desc: string }[] = [
     {
         icon: MessageSquare,
-        title: "1. 예약 확정 문자 발송",
-        desc: "예약 확정 및 세부 일정이 문자로 발송됩니다.",
+        title: "1. 예약 확정 안내",
+        desc: "예약 확정 및 세부 일정이 안내됩니다.",
     },
     {
         icon: Phone,
@@ -68,8 +66,8 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
 
 export function StepComplete() {
     const { data } = useReservationStore();
-    const partner = getPartner(data.partnerId);
     const plan = PLAN_INFO[data.plan || "basic"];
+    const partnerName = data.confirmedPartnerName;
 
     // 서버가 발급한 예약번호 사용 (없으면 표시용 임시 생성)
     const [reservationNo] = useState(() => {
@@ -80,15 +78,17 @@ export function StepComplete() {
         return `R${ymd}-${rand}`;
     });
 
-    const notReady = () => toast.info("준비 중인 기능입니다.");
+    const statusHref = data.reservationId
+        ? `/mypage/reservations/${data.reservationId}`
+        : "/mypage";
 
     return (
         <>
             <StepBand
                 index={7}
-                title="예약이 완료되었습니다."
+                title="예약이 확정되었습니다."
                 subtitles={[
-                    "선택한 파트너와의 매칭이 확정되었습니다.",
+                    "선택하신 파트너와의 매칭이 확정되었습니다.",
                     "예약 정보와 다음 일정을 안내해드립니다.",
                 ]}
             />
@@ -101,7 +101,7 @@ export function StepComplete() {
                             <Check className="size-8" strokeWidth={3} />
                         </div>
                         <h2 className="text-foreground mt-4 text-2xl font-extrabold">
-                            예약이 완료되었습니다!
+                            예약이 확정되었습니다!
                         </h2>
                         <p className="text-muted-foreground mt-2">
                             이용해주셔서 감사합니다.
@@ -121,45 +121,25 @@ export function StepComplete() {
                         </p>
                     </div>
 
-                    {/* 매칭된 파트너 */}
-                    {partner && (
+                    {/* 확정 파트너 */}
+                    {partnerName && (
                         <div className="border-border bg-background mt-4 rounded-2xl border p-6">
                             <p className="text-foreground flex items-center gap-2 font-bold">
                                 <UserRound className="text-muted-foreground size-5" />
-                                매칭된 파트너
+                                확정 파트너
                             </p>
                             <div className="mt-4 flex items-center gap-4">
-                                <div className="bg-muted size-16 shrink-0 rounded-full" />
+                                <div className="bg-brand/10 text-brand flex size-14 shrink-0 items-center justify-center rounded-full">
+                                    <UserRound className="size-7" />
+                                </div>
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-foreground font-bold">
-                                        {partner.name}{" "}
-                                        <span className="text-muted-foreground text-sm font-semibold">
-                                            <span className="text-amber-500">
-                                                ★
-                                            </span>{" "}
-                                            {partner.rating} (
-                                            {partner.reviewCount})
-                                        </span>
+                                    <p className="text-foreground text-lg font-bold">
+                                        {partnerName}
                                     </p>
-                                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                        <span className="bg-muted text-foreground rounded-md px-2 py-0.5 text-xs">
-                                            {partner.career}
-                                        </span>
-                                        <span className="bg-muted text-foreground rounded-md px-2 py-0.5 text-xs">
-                                            {partner.region}
-                                        </span>
-                                    </div>
-                                    <p className="text-muted-foreground mt-1.5 text-xs">
-                                        {partner.specialties}
+                                    <p className="text-muted-foreground mt-0.5 text-sm">
+                                        예약이 확정되었습니다.
                                     </p>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={notReady}
-                                    className="border-border bg-background text-brand hover:bg-muted shrink-0 self-start rounded-lg border px-3 py-2 text-xs font-bold transition-colors"
-                                >
-                                    파트너 상세 보기
-                                </button>
                             </div>
                         </div>
                     )}
@@ -217,18 +197,17 @@ export function StepComplete() {
 
                     {/* 버튼 */}
                     <div className="mt-8 flex justify-center gap-3">
-                        <button
-                            type="button"
-                            onClick={notReady}
-                            className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-6 py-3 text-sm font-bold transition-colors"
-                        >
-                            예약 현황 보기
-                        </button>
                         <Link
                             href="/"
-                            className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-6 py-3 text-sm font-bold transition-colors"
+                            className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-6 py-3 text-sm font-bold transition-colors"
                         >
                             홈으로 이동
+                        </Link>
+                        <Link
+                            href={statusHref}
+                            className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-6 py-3 text-sm font-bold transition-colors"
+                        >
+                            예약 현황 보기
                         </Link>
                     </div>
                 </div>

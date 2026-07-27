@@ -5,6 +5,8 @@ import { NextResponse, type NextRequest } from "next/server";
 // 여기에 프리픽스만 등록하면 미들웨어가 자동으로 가드한다.
 const USER_PREFIXES = ["/mypage"];
 const PARTNER_PREFIXES = ["/partner"];
+// 로그인이 필요한(비로그인 접근 불가) 라우트 — 역할 무관
+const LOGIN_REQUIRED = ["/mypage", "/partner", "/reservation", "/review/write"];
 // 로그인 상태에서 접근 시 홈으로 돌려보낼 라우트
 const AUTH_PAGES = ["/login", "/signup"];
 
@@ -55,13 +57,9 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url);
     };
 
-    // 미로그인 상태로 보호 라우트 접근 → 로그인으로
-    if (
-        !user &&
-        (matches(pathname, USER_PREFIXES) ||
-            matches(pathname, PARTNER_PREFIXES))
-    ) {
-        return redirect("/login");
+    // 미로그인 상태로 로그인 필요 라우트 접근 → 홈으로(로그인 안내 모달 표시)
+    if (!user && matches(pathname, LOGIN_REQUIRED)) {
+        return redirect("/", "?blocked=auth");
     }
 
     if (user) {

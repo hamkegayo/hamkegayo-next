@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Modal } from "@/components/ui/modal";
-import { calcFee, FEE_RATE, type Settlement } from "../_lib/settlement";
+import { type Settlement } from "../_lib/settlement";
 
 function Row({
     label,
@@ -37,8 +37,6 @@ export function SettlementDetailModal({
     if (!settlement) return null;
 
     const isPaid = settlement.status === "paid";
-    const fee = settlement.amount ? calcFee(settlement.amount) : null;
-    const pct = `${(FEE_RATE * 100).toFixed(1)}%`;
 
     return (
         <Modal open={open} onClose={onClose} className="max-w-md">
@@ -93,17 +91,6 @@ export function SettlementDetailModal({
                             ? `${settlement.amount.toLocaleString()}원`
                             : "-"
                     }
-                />
-                <Row
-                    label={`원천징수/수수료 (${pct})`}
-                    value={
-                        fee ? `- ${fee.withholding.toLocaleString()}원` : "-"
-                    }
-                    valueClass="font-bold text-destructive"
-                />
-                <Row
-                    label="실수령 금액"
-                    value={fee ? `${fee.net.toLocaleString()}원` : "-"}
                     valueClass="text-base font-extrabold text-brand"
                 />
             </div>

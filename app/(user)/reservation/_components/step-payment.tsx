@@ -6,7 +6,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
-import { cn } from "@/lib/utils";
 import { formatCardNumber, digitsOnly } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -188,6 +187,13 @@ export function StepPayment() {
                                 <h2 className="text-foreground text-lg font-bold">
                                     결제 내역
                                 </h2>
+                                <p className="bg-brand/5 text-muted-foreground mt-3 rounded-lg px-3 py-2 text-xs leading-relaxed">
+                                    데모 환경으로,{" "}
+                                    <span className="text-brand font-semibold">
+                                        실제 결제가 발생하지 않는 가상 결제
+                                    </span>
+                                    입니다. 예약 요청만 등록됩니다.
+                                </p>
                                 <div className="border-border mt-4 flex items-center justify-between border-b pb-4">
                                     <span className="text-foreground font-semibold">
                                         예상비용

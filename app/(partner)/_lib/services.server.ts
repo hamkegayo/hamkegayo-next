@@ -130,6 +130,66 @@ export async function getPartnerServices(): Promise<PartnerServiceView[]> {
     }
 }
 
+/** 로컬 기준 오늘 날짜(YYYY-MM-DD) */
+function localToday(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * 진행 관리 뱃지용 카운트 — 아직 완료되지 않은(진행 예정/진행중) 서비스 수.
+ * 비로그인/조회 실패 시 0.
+ */
+export async function getPartnerActiveCount(): Promise<number> {
+    try {
+        const supabase = await createClient();
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return 0;
+
+        const { count, error } = await supabase
+            .from("services")
+            .select("id", { count: "exact", head: true })
+            .eq("partner_id", user.id)
+            .in("status", ["SCHEDULED", "IN_PROGRESS"]);
+
+        if (error) return 0;
+        return count ?? 0;
+    } catch {
+        return 0;
+    }
+}
+
+/**
+ * 오늘(use_date=오늘) 진행 예정/진행중 서비스 — 파트너 홈 "오늘 일정"용.
+ * 시간(HH:mm) 오름차순 정렬.
+ */
+export async function getPartnerTodayServices(): Promise<PartnerServiceView[]> {
+    try {
+        const supabase = await createClient();
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return [];
+
+        const { data, error } = await supabase
+            .from("services")
+            .select(SELECT)
+            .eq("partner_id", user.id)
+            .in("status", ["SCHEDULED", "IN_PROGRESS"])
+            .eq("reservations.use_date", localToday())
+            .returns<ServiceRow[]>();
+
+        if (error || !data) return [];
+        return data
+            .map(toView)
+            .sort((a, b) => a.timeLabel.localeCompare(b.timeLabel));
+    } catch {
+        return [];
+    }
+}
+
 /** 서비스 단건(진행 관리 상세) */
 export async function getPartnerService(
     serviceId: string,
