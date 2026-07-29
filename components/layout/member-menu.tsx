@@ -6,7 +6,7 @@ import { Menu } from "@base-ui/react/menu";
 import { ChevronDown, LogOut, UserRound } from "lucide-react";
 
 import { ConfirmModal } from "@/components/ui/modal";
-import { logout } from "@/app/(user)/_actions/auth";
+import { useLogout } from "@/hooks/use-logout";
 
 type Props = {
     /** 표시 이름 */
@@ -18,12 +18,7 @@ type Props = {
 export function MemberMenu({ name, subText }: Props) {
     const router = useRouter();
     const [confirmOpen, setConfirmOpen] = useState(false);
-
-    const onLogout = async () => {
-        await logout();
-        router.push("/login");
-        router.refresh();
-    };
+    const { logout: onLogout, pending } = useLogout();
 
     return (
         <>
@@ -79,6 +74,7 @@ export function MemberMenu({ name, subText }: Props) {
                 description="로그아웃 하시겠어요?"
                 cancelLabel="취소"
                 confirmLabel="로그아웃"
+                confirmDisabled={pending}
             />
         </>
     );

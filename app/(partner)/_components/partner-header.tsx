@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { ConfirmModal } from "@/components/ui/modal";
 import { useZoom } from "@/components/providers/zoom-provider";
 import { usePartnerNav } from "./partner-nav-context";
-import { logout } from "@/app/(user)/_actions/auth";
+import { useLogout } from "@/hooks/use-logout";
 
 export function PartnerHeader({
     name,
@@ -33,12 +33,7 @@ export function PartnerHeader({
     const { setOpen } = usePartnerNav();
     const router = useRouter();
     const [confirmOpen, setConfirmOpen] = useState(false);
-
-    const onLogout = async () => {
-        await logout();
-        router.push("/login");
-        router.refresh();
-    };
+    const { logout: onLogout, pending } = useLogout();
 
     const notReady = () => toast.info("준비 중인 기능입니다.");
 
@@ -163,6 +158,7 @@ export function PartnerHeader({
                 description="로그아웃 하시겠어요?"
                 cancelLabel="취소"
                 confirmLabel="로그아웃"
+                confirmDisabled={pending}
             />
         </>
     );
