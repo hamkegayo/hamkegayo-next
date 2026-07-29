@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
     Bell,
     CalendarDays,
@@ -15,7 +15,7 @@ import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { ConfirmModal } from "@/components/ui/modal";
-import { logout } from "@/app/(user)/_actions/auth";
+import { useLogout } from "@/hooks/use-logout";
 
 const ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
     { href: "/mypage", label: "예약 현황", icon: CalendarDays },
@@ -27,14 +27,8 @@ const ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
 
 export function MypageSidebar() {
     const pathname = usePathname();
-    const router = useRouter();
     const [confirmOpen, setConfirmOpen] = useState(false);
-
-    const onLogout = async () => {
-        await logout();
-        router.push("/login");
-        router.refresh();
-    };
+    const { logout: onLogout, pending } = useLogout();
 
     return (
         <aside>
@@ -80,6 +74,7 @@ export function MypageSidebar() {
                 description="로그아웃 하시겠어요?"
                 cancelLabel="취소"
                 confirmLabel="로그아웃"
+                confirmDisabled={pending}
             />
         </aside>
     );
