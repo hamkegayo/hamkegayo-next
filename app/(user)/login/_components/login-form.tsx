@@ -72,7 +72,7 @@ export function LoginForm() {
         setSubmitting(true);
         try {
             const res =
-                typeRef.current === "user"
+                type === "user"
                     ? await loginUser({ email: v.email, password: v.password })
                     : await loginPartner({
                           loginId: v.loginId,
@@ -82,11 +82,18 @@ export function LoginForm() {
             if (!res.ok) {
                 if (res.tone === "info") toast.info(res.message);
                 else toast.error(res.message);
+                setSubmitting(false);
                 return;
             }
+            // 성공: 이동이 끝나 이 컴포넌트가 언마운트될 때까지 로딩 상태를 유지한다.
+            // (finally 에서 즉시 해제하면 네비게이션 지연(RSC 로드) 동안 스피너가 사라지고
+            //  버튼이 다시 활성화됐다가 뒤늦게 이동하는 깜빡임이 생긴다.)
             router.push(res.redirectTo);
             router.refresh();
-        } finally {
+        } catch {
+            toast.error(
+                "로그인 처리 중 오류가 발생했습니다. 다시 시도해 주세요.",
+            );
             setSubmitting(false);
         }
     };
