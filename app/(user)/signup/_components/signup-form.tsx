@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm, useWatch, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, Eye, EyeOff } from "lucide-react";
+import { Check, Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
@@ -378,9 +378,13 @@ export function SignupForm() {
                 <button
                     type="submit"
                     disabled={submitting}
-                    className="bg-brand text-brand-foreground hover:bg-brand/90 h-12 w-full rounded-lg text-base font-bold transition-colors disabled:opacity-60"
+                    aria-busy={submitting}
+                    className="bg-brand text-brand-foreground hover:bg-brand/90 flex h-12 w-full items-center justify-center gap-2 rounded-lg text-base font-bold transition-colors disabled:opacity-60"
                 >
-                    회원가입
+                    {submitting && (
+                        <Loader2 aria-hidden className="size-5 animate-spin" />
+                    )}
+                    {submitting ? "처리 중…" : "회원가입"}
                 </button>
 
                 {/* 로그인 링크 */}
