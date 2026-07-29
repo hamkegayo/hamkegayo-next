@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { UseFormRegisterReturn } from "react-hook-form";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Input } from "@/components/ui/input";
@@ -125,9 +126,13 @@ export function EmailVerificationField({
                     type="button"
                     onClick={handleRequest}
                     disabled={verified || requesting}
-                    className="bg-brand/10 text-brand hover:bg-brand/20 shrink-0 rounded-lg px-4 text-sm font-bold transition-colors disabled:opacity-50"
+                    aria-busy={requesting}
+                    className="bg-brand/10 text-brand hover:bg-brand/20 inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg px-4 text-sm font-bold transition-colors disabled:opacity-50"
                 >
-                    인증요청
+                    {requesting && (
+                        <Loader2 aria-hidden className="size-4 animate-spin" />
+                    )}
+                    {requesting ? "발송 중…" : "인증요청"}
                 </button>
             </div>
             {emailError && (
@@ -156,10 +161,14 @@ export function EmailVerificationField({
                 <button
                     type="button"
                     onClick={handleVerify}
-                    disabled={verified || !sent || !code}
-                    className="bg-brand/10 text-brand hover:bg-brand/20 shrink-0 rounded-lg px-4 text-sm font-bold transition-colors disabled:opacity-50"
+                    disabled={verified || !sent || !code || verifying}
+                    aria-busy={verifying}
+                    className="bg-brand/10 text-brand hover:bg-brand/20 inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg px-4 text-sm font-bold transition-colors disabled:opacity-50"
                 >
-                    인증확인
+                    {verifying && (
+                        <Loader2 aria-hidden className="size-4 animate-spin" />
+                    )}
+                    {verifying ? "확인 중…" : "인증확인"}
                 </button>
             </div>
             {verified ? (
