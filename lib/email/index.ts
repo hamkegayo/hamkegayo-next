@@ -42,12 +42,12 @@ let sender: EmailSender | null = null;
 
 /**
  * 이메일 발송기를 반환. RESEND_API_KEY 가 설정되어 있으면 Resend, 아니면 Mock.
- * EMAIL_FROM 미설정 시 Resend 기본 발신주소를 사용한다.
+ * EMAIL_FROM 미설정 시 hamkegayo.kr 기본 발신주소(no-reply@hamkegayo.kr)를 사용한다.
  */
 export function getEmailSender(): EmailSender {
     if (sender) return sender;
     const apiKey = process.env.RESEND_API_KEY;
-    const from = process.env.EMAIL_FROM ?? "함께가요 <onboarding@resend.dev>";
+    const from = process.env.EMAIL_FROM ?? "함께가요 <no-reply@hamkegayo.kr>";
     sender = apiKey
         ? new ResendEmailSender(apiKey, from)
         : new MockEmailSender();
