@@ -30,6 +30,8 @@ export const metadata: Metadata = {
     verification: {
         other: {
             "facebook-domain-verification": "n3yqbvbmchcw7638lspvpe2vtlu2ch",
+            "naver-site-verification":
+                "484abb8b304c4ee671d6488c562af0f9b71025df",
         },
     },
 };
