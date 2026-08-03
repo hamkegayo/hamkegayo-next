@@ -32,7 +32,10 @@ export function HomeHero() {
                         >
                             서비스 예약하기
                         </Link>
-                        <ComingSoonButton className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-6 py-3 text-sm font-bold transition-colors">
+                        <ComingSoonButton
+                            contact="phone"
+                            className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-6 py-3 text-sm font-bold transition-colors"
+                        >
                             전화 상담하기
                         </ComingSoonButton>
                     </div>

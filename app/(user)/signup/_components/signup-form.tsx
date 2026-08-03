@@ -27,6 +27,7 @@ import {
     type SignupType,
 } from "../_lib/schema";
 import { signUpUser, activatePartner } from "../_lib/actions";
+import { trackSignUp } from "@/lib/analytics";
 import { EmailVerificationField } from "./email-verification-field";
 
 const TABS: { type: SignupType; label: string }[] = [
@@ -123,6 +124,7 @@ export function SignupForm() {
                 else toast.error(res.message);
                 return;
             }
+            trackSignUp();
             setSuccessOpen(true);
         } finally {
             setSubmitting(false);
