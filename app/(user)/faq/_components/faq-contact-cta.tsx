@@ -21,7 +21,10 @@ export function FaqContactCta() {
                         </p>
                     </div>
                 </div>
-                <ComingSoonButton className="border-border bg-background text-foreground hover:bg-muted inline-flex w-full items-center justify-center gap-1.5 rounded-lg border px-5 py-3 text-sm font-bold whitespace-nowrap transition-colors md:w-auto">
+                <ComingSoonButton
+                    contact="support"
+                    className="border-border bg-background text-foreground hover:bg-muted inline-flex w-full items-center justify-center gap-1.5 rounded-lg border px-5 py-3 text-sm font-bold whitespace-nowrap transition-colors md:w-auto"
+                >
                     고객센터 바로가기
                     <ArrowRight className="size-4" />
                 </ComingSoonButton>

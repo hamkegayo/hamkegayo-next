@@ -14,6 +14,7 @@ import { useReservationStore, PLAN_INFO } from "../_store/reservation-store";
 import { step4Schema, type Step4Values } from "../_lib/schema";
 import { CARD_COMPANIES, INSTALLMENTS, PAY_METHODS } from "../_lib/options";
 import { createReservation } from "../_actions/reservation";
+import { trackReservationSubmit } from "@/lib/analytics";
 import { StepBand, StepNav } from "./step-band";
 import { FieldError, FieldLabel, NativeSelect } from "./fields";
 
@@ -87,6 +88,7 @@ export function StepPayment() {
                 return;
             }
             patch({ reservationCode: res.code, reservationId: res.id });
+            trackReservationSubmit();
             next();
         } finally {
             setSubmitting(false);

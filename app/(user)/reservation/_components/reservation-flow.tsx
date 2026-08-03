@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
+
+import { trackReservationStart } from "@/lib/analytics";
 import { useReservationStore } from "../_store/reservation-store";
 import { IntroModal } from "./intro-modal";
 import { StepUserInfo } from "./step-user-info";
@@ -14,6 +17,11 @@ import { StepComplete } from "./step-complete";
 export function ReservationFlow() {
     const step = useReservationStore((s) => s.step);
     const introConfirmed = useReservationStore((s) => s.introConfirmed);
+
+    // 예약 플로우 진입 시 1회 "예약 시작" 이벤트 전송
+    useEffect(() => {
+        trackReservationStart();
+    }, []);
 
     return (
         <div>
