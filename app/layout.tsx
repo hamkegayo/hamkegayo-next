@@ -26,6 +26,12 @@ export const metadata: Metadata = {
     icons: {
         icon: "/favicon.ico", // public 폴더에 본인 로고 favicon 넣고 주석 해제할 것
     },
+    // Meta(페이스북) 도메인 인증
+    verification: {
+        other: {
+            "facebook-domain-verification": "n3yqbvbmchcw7638lspvpe2vtlu2ch",
+        },
+    },
 };
 
 export default function RootLayout({
