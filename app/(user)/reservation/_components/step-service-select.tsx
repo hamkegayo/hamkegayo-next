@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { Section } from "@/app/(user)/_components/home/section";
+import { trackAddToCart } from "@/lib/analytics";
 import { useReservationStore, type Plan } from "../_store/reservation-store";
 import { StepBand, StepNav } from "./step-band";
 
@@ -142,9 +143,10 @@ export function StepServiceSelect() {
 
                                     <button
                                         type="button"
-                                        onClick={() =>
-                                            patch({ plan: plan.value })
-                                        }
+                                        onClick={() => {
+                                            patch({ plan: plan.value });
+                                            trackAddToCart(plan.value);
+                                        }}
                                         aria-pressed={active}
                                         className={cn(
                                             "mt-5 w-full rounded-lg px-4 py-3 text-sm font-bold transition-colors",

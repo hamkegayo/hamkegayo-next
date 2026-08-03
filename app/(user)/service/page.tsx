@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { ServiceViewTracker } from "@/components/analytics/service-view-tracker";
 import { ServiceHero } from "./_components/service-hero";
 import { ServicePlans } from "./_components/service-plans";
 import { TrustReasons } from "./_components/trust-reasons";
@@ -14,6 +15,7 @@ export const metadata: Metadata = {
 export default function ServicePage() {
     return (
         <>
+            <ServiceViewTracker />
             <ServiceHero />
             <ServicePlans />
             <TrustReasons />

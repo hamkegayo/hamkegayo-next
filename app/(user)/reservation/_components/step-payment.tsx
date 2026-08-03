@@ -14,7 +14,7 @@ import { useReservationStore, PLAN_INFO } from "../_store/reservation-store";
 import { step4Schema, type Step4Values } from "../_lib/schema";
 import { CARD_COMPANIES, INSTALLMENTS, PAY_METHODS } from "../_lib/options";
 import { createReservation } from "../_actions/reservation";
-import { trackReservationSubmit } from "@/lib/analytics";
+import { trackReservationComplete } from "@/lib/analytics";
 import { StepBand, StepNav } from "./step-band";
 import { FieldError, FieldLabel, NativeSelect } from "./fields";
 
@@ -88,7 +88,8 @@ export function StepPayment() {
                 return;
             }
             patch({ reservationCode: res.code, reservationId: res.id });
-            trackReservationSubmit();
+            // 서버가 성공을 반환한 직후에만 예약 신청 완료 이벤트 전송
+            if (data.plan) trackReservationComplete(data.plan);
             next();
         } finally {
             setSubmitting(false);
