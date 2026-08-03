@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
+import { trackInitiateCheckout } from "@/lib/analytics";
 import { useReservationStore } from "../_store/reservation-store";
 
 const LIMITS = [
@@ -64,7 +65,10 @@ export function IntroModal() {
                 <button
                     type="button"
                     disabled={!agreed}
-                    onClick={confirmIntro}
+                    onClick={() => {
+                        trackInitiateCheckout();
+                        confirmIntro();
+                    }}
                     className={cn(
                         "mt-4 h-12 w-full rounded-lg text-base font-bold transition-colors",
                         agreed
