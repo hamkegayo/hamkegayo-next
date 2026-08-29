@@ -230,11 +230,16 @@ export function ReviewWriteView({
                 <label className="text-foreground mt-2 block text-sm font-bold">
                     내용 <span className="text-destructive">*</span>
                 </label>
+                {/* 후기는 비로그인 이용자에게도 공개되므로 건강 관련 정보 기재를 막는다. */}
+                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                    후기는 모든 방문자에게 공개됩니다. 질환명·수술명·병원명 등
+                    건강 관련 정보는 작성하지 말아 주세요.
+                </p>
                 <textarea
                     value={content}
                     onChange={(e) => setContent(e.target.value.slice(0, 600))}
                     maxLength={600}
-                    placeholder="동행 파트너와의 경험, 만족했던 점, 개선되었으면 하는 점 등을 자유롭게 적어주세요."
+                    placeholder="동행 파트너와의 경험, 만족했던 점, 개선되었으면 하는 점 등을 자유롭게 적어주세요. (질환명·수술명·병원명 제외)"
                     className="border-input bg-background placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-ring/40 mt-2 min-h-40 w-full resize-y rounded-lg border px-3.5 py-2.5 text-sm outline-none focus-visible:ring-[3px]"
                 />
                 <p className="text-muted-foreground mt-1 text-right text-xs">
