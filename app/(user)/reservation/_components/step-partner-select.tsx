@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { Section } from "@/app/(user)/_components/home/section";
 import { ConfirmModal } from "@/components/ui/modal";
+import { Avatar } from "@/components/ui/avatar";
 import { confirmPartner } from "@/app/(user)/mypage/_actions/matching";
 import { useReservationStore } from "../_store/reservation-store";
 import {
@@ -103,9 +104,12 @@ export function StepPartnerSelect() {
                                     key={a.partnerId}
                                     className="border-border bg-background flex flex-col gap-4 rounded-2xl border p-5 sm:flex-row sm:items-center"
                                 >
-                                    <div className="bg-muted flex size-14 shrink-0 items-center justify-center rounded-full">
-                                        <UserRound className="text-muted-foreground size-7" />
-                                    </div>
+                                    <Avatar
+                                        src={a.avatarUrl}
+                                        alt={`${a.name} 파트너 프로필 사진`}
+                                        className="bg-muted size-14"
+                                        iconClassName="text-muted-foreground"
+                                    />
                                     <div className="min-w-0 flex-1">
                                         <p className="text-foreground flex items-center gap-2 text-lg font-extrabold">
                                             {a.name}

@@ -21,6 +21,7 @@ import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Avatar } from "@/components/ui/avatar";
 import {
     PARTNER_PROFILE,
     type Qualification,
@@ -31,6 +32,11 @@ import {
     addQualification,
     deleteQualification,
 } from "../_actions/qualifications";
+import {
+    deleteProfilePhoto,
+    uploadProfilePhoto,
+} from "../_actions/profile-photo";
+import { ProfilePhotoModal } from "../../_components/profile-photo-modal";
 import { SimpleAddModal } from "../../_components/simple-add-modal";
 import { VerifyChangeModal } from "../../_components/verify-change-modal";
 import {
@@ -129,8 +135,10 @@ function CheckList({
 
 export function PartnerProfileView({
     initialQuals,
+    initialPhotoUrl,
 }: {
     initialQuals: QualificationView[];
+    initialPhotoUrl: string | null;
 }) {
     const [phone, setPhone] = useState("");
     const [email, setEmail] = useState("");
@@ -152,10 +160,14 @@ export function PartnerProfileView({
     const [quals, setQuals] = useState<QualItem[]>(initialQuals);
     const [qualPending, startQualTransition] = useTransition();
 
+    const [photoUrl, setPhotoUrl] = useState<string | null>(initialPhotoUrl);
+    const [photoPending, startPhotoTransition] = useTransition();
+
     // 모달 상태
     const [contactOpen, setContactOpen] = useState(false);
     const [emailOpen, setEmailOpen] = useState(false);
     const [previewOpen, setPreviewOpen] = useState(false);
+    const [photoOpen, setPhotoOpen] = useState(false);
     const [regionAddOpen, setRegionAddOpen] = useState(false);
     const [timeAddOpen, setTimeAddOpen] = useState(false);
     const [hospitalAddOpen, setHospitalAddOpen] = useState(false);
@@ -209,6 +221,34 @@ export function PartnerProfileView({
         });
     };
 
+    const savePhoto = (file: File) => {
+        const fd = new FormData();
+        fd.append("file", file);
+        startPhotoTransition(async () => {
+            const res = await uploadProfilePhoto(fd);
+            if (res.ok) {
+                setPhotoUrl(res.url || null);
+                setPhotoOpen(false);
+                toast.success("프로필 사진이 변경되었습니다.");
+            } else {
+                toast.error(res.message);
+            }
+        });
+    };
+
+    const removePhoto = () => {
+        startPhotoTransition(async () => {
+            const res = await deleteProfilePhoto();
+            if (res.ok) {
+                setPhotoUrl(null);
+                setPhotoOpen(false);
+                toast.success("프로필 사진을 삭제했습니다.");
+            } else {
+                toast.error(res.message);
+            }
+        });
+    };
+
     const roleLine = `${PARTNER_PROFILE.role} · 병원 동행 경력 ${PARTNER_PROFILE.companionYears}년`;
 
     return (
@@ -250,19 +290,22 @@ export function PartnerProfileView({
                 <div className="space-y-5 lg:col-span-3">
                     <Card title="프로필 사진">
                         <div className="flex flex-col items-center">
-                            <span className="bg-muted size-32 rounded-full" />
+                            <Avatar
+                                src={photoUrl}
+                                alt="내 프로필 사진"
+                                className="bg-muted size-32"
+                                iconClassName="text-muted-foreground"
+                            />
                             <button
                                 type="button"
-                                onClick={() =>
-                                    toast.info("사진 변경은 준비 중입니다.")
-                                }
+                                onClick={() => setPhotoOpen(true)}
                                 className="border-border bg-background text-foreground hover:bg-muted mt-4 inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-bold transition-colors"
                             >
                                 <Upload className="size-4" />
                                 사진 변경
                             </button>
                             <p className="text-muted-foreground mt-2 text-xs">
-                                JPG, PNG (최대 5MB)
+                                JPG, PNG (최대 2MB)
                             </p>
                         </div>
                     </Card>
@@ -650,9 +693,18 @@ export function PartnerProfileView({
                 onAdd={addQual}
                 types={PARTNER_PROFILE.qualificationTypes}
             />
+            <ProfilePhotoModal
+                open={photoOpen}
+                onClose={() => setPhotoOpen(false)}
+                currentUrl={photoUrl}
+                pending={photoPending}
+                onSave={savePhoto}
+                onDelete={removePhoto}
+            />
             <ProfilePreviewModal
                 open={previewOpen}
                 onClose={() => setPreviewOpen(false)}
+                photoUrl={photoUrl}
                 name={PARTNER_PROFILE.name}
                 roleLine={roleLine}
                 intro={intro}
