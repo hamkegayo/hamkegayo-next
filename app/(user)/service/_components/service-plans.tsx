@@ -4,7 +4,7 @@ import {
     FileText,
     House,
     Pill,
-    Users,
+    Stethoscope,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -31,7 +31,7 @@ const PLANS: Plan[] = [
         desc: "병원에서 파트너를 만나 접수, 대기, 수납, 약국까지 함께 진행합니다. 병원 이동은 직접 가능하지만 원내 절차에 도움이 필요한 분께 추천합니다.",
         steps: [
             { icon: FileText, label: "접수 지원" },
-            { icon: Users, label: "원내 동행" },
+            { icon: Stethoscope, label: "원내 동행" },
             { icon: Pill, label: "약국 동행" },
             { icon: ClipboardPlus, label: "동행 리포트" },
         ],
@@ -46,7 +46,7 @@ const PLANS: Plan[] = [
         steps: [
             { icon: House, label: "픽업 지원" },
             { icon: FileText, label: "접수 지원" },
-            { icon: Users, label: "원내 동행" },
+            { icon: Stethoscope, label: "원내 동행" },
             { icon: Pill, label: "약국 동행" },
             { icon: ClipboardPlus, label: "동행 리포트" },
             { icon: House, label: "귀가 지원" },

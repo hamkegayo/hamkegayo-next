@@ -1,16 +1,16 @@
-import { Car, House, Pill, Users } from "lucide-react";
+import { Ambulance, House, Pill, Stethoscope } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { Section } from "./section";
 
 const SERVICES: { icon: LucideIcon; title: string; desc: string }[] = [
     {
-        icon: Car,
+        icon: Ambulance,
         title: "병원 이동 동행",
         desc: "병원까지 안전하게 동행해드립니다.",
     },
     {
-        icon: Users,
+        icon: Stethoscope,
         title: "원내 동행",
         desc: "접수·수납 및 안내를 도와드립니다.",
     },
