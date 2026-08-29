@@ -31,7 +31,7 @@ const STEPS: { icon: LucideIcon; title: string; desc: string }[] = [
     {
         icon: ClipboardList,
         title: "리포트 확인",
-        desc: "진료 내용과 특이사항이 포함된 리포트를 확인하세요.",
+        desc: "동행 내용과 특이사항이 포함된 리포트를 확인하세요.",
     },
     {
         icon: CreditCard,

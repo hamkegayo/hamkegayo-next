@@ -22,7 +22,16 @@ export const metadata: Metadata = {
         template: "%s | 함께가요", // 하위 페이지에서 title을 넣으면 자동으로 치환됨
         default: "함께가요", // 메인 페이지용 디폴트 타이틀
     },
-    description: "병원동행서비스 함께가요", // 메인 페이지용 디폴트 설명
+    // 의료 서비스로 오인되지 않도록 "진료·처방" 계열 표현을 쓰지 않는다.
+    description: "함께가요 - 병원 방문 이동과 절차를 돕는 동행 지원 서비스", // 메인 페이지용 디폴트 설명
+    openGraph: {
+        type: "website",
+        locale: "ko_KR",
+        siteName: "함께가요",
+        title: "함께가요",
+        description: "함께가요 - 병원 방문 이동과 절차를 돕는 동행 지원 서비스",
+        url: "https://www.hamkegayo.kr",
+    },
     icons: {
         icon: "/favicon.ico", // public 폴더에 본인 로고 favicon 넣고 주석 해제할 것
     },

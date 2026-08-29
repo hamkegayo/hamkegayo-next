@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { ServiceViewTracker } from "@/components/analytics/service-view-tracker";
+import { NonMedicalNotice } from "@/components/non-medical-notice";
 import { ServiceHero } from "./_components/service-hero";
 import { ServicePlans } from "./_components/service-plans";
 import { TrustReasons } from "./_components/trust-reasons";
@@ -17,6 +18,9 @@ export default function ServicePage() {
         <>
             <ServiceViewTracker />
             <ServiceHero />
+            <div className="mx-auto w-full max-w-6xl px-4">
+                <NonMedicalNotice className="border-border bg-muted/40 rounded-xl border px-4 py-3" />
+            </div>
             <ServicePlans />
             <TrustReasons />
             <ServiceFaq />

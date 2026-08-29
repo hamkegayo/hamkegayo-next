@@ -4,7 +4,7 @@ import {
     FileText,
     House,
     Pill,
-    Stethoscope,
+    Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -28,12 +28,12 @@ const PLANS: Plan[] = [
     {
         name: "베이직",
         scope: "병원 내 동행",
-        desc: "병원에서 파트너를 만나 접수, 진료, 수납, 약 수령까지 함께 진행합니다. 병원 이동은 직접 가능하지만 진료 과정에 도움이 필요한 분께 추천합니다.",
+        desc: "병원에서 파트너를 만나 접수, 대기, 수납, 약국까지 함께 진행합니다. 병원 이동은 직접 가능하지만 원내 절차에 도움이 필요한 분께 추천합니다.",
         steps: [
             { icon: FileText, label: "접수 지원" },
-            { icon: Stethoscope, label: "진료 동행" },
+            { icon: Users, label: "원내 동행" },
             { icon: Pill, label: "약국 동행" },
-            { icon: ClipboardPlus, label: "진료리포트" },
+            { icon: ClipboardPlus, label: "동행 리포트" },
         ],
         price: "1시간당 20,000원",
         priceNote: "(30분 추가 시 10,000원)",
@@ -42,13 +42,13 @@ const PLANS: Plan[] = [
     {
         name: "플러스",
         scope: "픽업 포함 동행",
-        desc: "자택에서 파트너를 만나 병원 이동, 접수, 진료, 수납, 약 수령, 귀가까지 함께합니다. 보호자가 동행하기 어렵거나 이동이 불편한 분께 추천합니다.",
+        desc: "자택에서 파트너를 만나 병원 이동, 접수, 대기, 수납, 약국, 귀가까지 함께합니다. 보호자가 동행하기 어렵거나 이동이 불편한 분께 추천합니다.",
         steps: [
             { icon: House, label: "픽업 지원" },
             { icon: FileText, label: "접수 지원" },
-            { icon: Stethoscope, label: "진료 동행" },
+            { icon: Users, label: "원내 동행" },
             { icon: Pill, label: "약국 동행" },
-            { icon: ClipboardPlus, label: "진료리포트" },
+            { icon: ClipboardPlus, label: "동행 리포트" },
             { icon: House, label: "귀가 지원" },
         ],
         price: "1시간당 25,000원",

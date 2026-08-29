@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { NonMedicalNotice } from "@/components/non-medical-notice";
 import { ComingSoonButton } from "./coming-soon-button";
 import { Section } from "./section";
 
@@ -21,7 +22,7 @@ export function HomeHero() {
                         <span className="text-brand">함께가요</span>
                     </h1>
                     <p className="text-muted-foreground mt-5 leading-relaxed">
-                        병원까지 이동, 병원 접수, 진료, 귀가까지
+                        병원까지 이동, 접수, 대기, 귀가까지
                         <br />
                         전문 동행 파트너가 끝까지 함께합니다.
                     </p>
@@ -39,6 +40,7 @@ export function HomeHero() {
                             전화 상담하기
                         </ComingSoonButton>
                     </div>
+                    <NonMedicalNotice className="mt-6 max-w-md" />
                 </div>
 
                 {/* 이미지 */}
