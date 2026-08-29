@@ -8,21 +8,30 @@ import { useConsent } from "@/hooks/use-consent";
 const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 
-// 기본은 프로덕션에서만 로드. 로컬/미러링에서 GA DebugView·Meta Pixel Helper 로
-// 검증하려면 .env.local 에 NEXT_PUBLIC_ANALYTICS_DEBUG=true 를 설정한다.
-// (미설정 시 자동 off 라 지울 테스트 코드가 없다.)
+// 운영 서비스 도메인에서만 로드한다.
+//  - Vercel 은 프리뷰 배포에서도 NODE_ENV=production 이므로 NODE_ENV 로는 프리뷰가
+//    걸러지지 않고, 프로덕션 배포도 *.vercel.app 도메인으로 접근할 수 있다.
+//    두 경우 모두 운영 데이터셋을 오염시키므로 호스트를 기준으로 판단한다.
+//  - 로컬/프리뷰에서 GA DebugView·Meta Pixel Helper 로 검증할 때만
+//    .env.local 에 NEXT_PUBLIC_ANALYTICS_DEBUG=true 를 설정한다(확인 후 되돌릴 것).
 const DEBUG = process.env.NEXT_PUBLIC_ANALYTICS_DEBUG === "true";
-const ENABLED = process.env.NODE_ENV === "production" || DEBUG;
+const PRODUCTION_HOSTS = ["hamkegayo.kr", "www.hamkegayo.kr"];
+
+function isProductionHost(): boolean {
+    if (typeof window === "undefined") return false;
+    return PRODUCTION_HOSTS.includes(window.location.hostname);
+}
 
 /**
  * GA4 + Meta Pixel 스크립트 로더.
- * 프로덕션(또는 디버그) + 동의(granted) + ID 존재 시에만 스크립트를 삽입한다.
+ * 운영 도메인(또는 디버그) + 동의(granted) + ID 존재 시에만 스크립트를 삽입한다.
  * 동의 전/거부 시에는 아무 스크립트도 로드하지 않는다.
  */
 export function AnalyticsScripts() {
     const { granted } = useConsent();
 
-    if (!ENABLED || !granted) return null;
+    const enabled = DEBUG || isProductionHost();
+    if (!enabled || !granted) return null;
 
     return (
         <>
