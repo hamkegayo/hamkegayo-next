@@ -1,6 +1,7 @@
 "use client";
 
 import { Modal } from "@/components/ui/modal";
+import { Avatar } from "@/components/ui/avatar";
 
 function Chips({ items }: { items: string[] }) {
     return (
@@ -41,6 +42,7 @@ export function ProfilePreviewModal({
     regions,
     times,
     preferredHospitals,
+    photoUrl = null,
 }: {
     open: boolean;
     onClose: () => void;
@@ -50,12 +52,18 @@ export function ProfilePreviewModal({
     regions: string[];
     times: string[];
     preferredHospitals: string[];
+    /** 프로필 사진 URL (없으면 기본 아이콘) */
+    photoUrl?: string | null;
 }) {
     return (
         <Modal open={open} onClose={onClose} className="max-w-lg p-0">
             {/* 헤더 */}
             <div className="bg-brand text-brand-foreground flex items-center gap-4 rounded-t-2xl px-6 py-5">
-                <span className="size-14 shrink-0 rounded-full bg-white/25" />
+                <Avatar
+                    src={photoUrl}
+                    alt={`${name} 파트너 프로필 사진`}
+                    className="size-14 bg-white/25"
+                />
                 <div>
                     <p className="text-xl font-extrabold">{name} 파트너</p>
                     <p className="mt-0.5 text-sm opacity-90">{roleLine}</p>
