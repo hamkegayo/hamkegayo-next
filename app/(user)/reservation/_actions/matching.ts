@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
+import {
+    PROFILE_PHOTO_BUCKET,
+    PROFILE_PHOTO_URL_TTL,
+} from "@/lib/profile-photo";
 
 export type ApplicantQualification = { type: string; issuer: string | null };
 
@@ -17,6 +21,8 @@ export type DetailedApplicant = {
     reviewCount: number;
     /** 검증된(VERIFIED) 자격/면허 */
     qualifications: ApplicantQualification[];
+    /** 프로필 사진 signed URL (미등록·발급 실패 시 null) */
+    avatarUrl: string | null;
 };
 
 /** 지원 시각 라벨 (MM.DD HH:mm) */
@@ -31,10 +37,52 @@ function formatAppliedAt(iso: string): string {
 }
 
 /**
+ * 파트너 id → 프로필 사진 signed URL 맵.
+ * 사진 미등록 파트너는 맵에 담기지 않아 화면에서 기본 아이콘으로 폴백된다.
+ */
+async function signPartnerAvatars(
+    admin: ReturnType<typeof createAdminClient>,
+    partnerIds: string[],
+): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
+
+    const { data: rows } = await admin
+        .from("profiles")
+        .select("id, avatar_path")
+        .in("id", partnerIds)
+        .not("avatar_path", "is", null)
+        .returns<{ id: string; avatar_path: string }[]>();
+
+    if (!rows || rows.length === 0) return map;
+
+    const { data: signed } = await admin.storage
+        .from(PROFILE_PHOTO_BUCKET)
+        .createSignedUrls(
+            rows.map((r) => r.avatar_path),
+            PROFILE_PHOTO_URL_TTL,
+        );
+    if (!signed) return map;
+
+    const urlByPath = new Map<string, string>();
+    signed.forEach((s) => {
+        if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl);
+    });
+
+    rows.forEach((r) => {
+        const url = urlByPath.get(r.avatar_path);
+        if (url) map.set(r.id, url);
+    });
+
+    return map;
+}
+
+/**
  * 예약의 ACCEPTED 지원 파트너 상세 목록.
  *  - get_reservation_applicants RPC(소유권 내부 검증)로 지원자 조회
  *  - reviews(공개 읽기)로 평점 집계
  *  - partner_qualifications(본인만 RLS)는 admin 으로 조회(RPC가 검증한 partner_id 한정, VERIFIED만)
+ *  - 프로필 사진도 같은 이유(profiles 는 select_own)로 admin 으로 경로를 읽고
+ *    비공개 버킷의 signed URL 을 발급해 내려준다.
  * 실패/비소유/비로그인 시 빈 배열.
  */
 export async function getReservationApplicantsDetailed(
@@ -91,6 +139,9 @@ export async function getReservationApplicantsDetailed(
             qualMap.set(q.partner_id, arr);
         });
 
+        // 프로필 사진 (profiles 는 본인만 RLS → admin 으로 경로 조회 후 signed URL 발급)
+        const avatarMap = await signPartnerAvatars(admin, partnerIds);
+
         return list.map((a) => {
             const r = ratingMap.get(a.partner_id);
             return {
@@ -100,6 +151,7 @@ export async function getReservationApplicantsDetailed(
                 rating: r && r.count > 0 ? r.sum / r.count : null,
                 reviewCount: r?.count ?? 0,
                 qualifications: qualMap.get(a.partner_id) ?? [],
+                avatarUrl: avatarMap.get(a.partner_id) ?? null,
             };
         });
     } catch {
