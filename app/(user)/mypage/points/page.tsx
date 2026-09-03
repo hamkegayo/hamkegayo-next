@@ -1,6 +1,7 @@
 import { CreditCard, UserRound } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { getMyPoints } from "../_lib/points.server";
 
 function PCoin({ className }: { className?: string }) {
     return (
@@ -15,12 +16,9 @@ function PCoin({ className }: { className?: string }) {
     );
 }
 
-// 포인트 적립/사용 로직은 결제·완료 연동 시 도입 예정. 현재는 실제 보유 0P.
-const BALANCE = 0;
-const PENDING = 0;
-const EXPIRING = 0;
+export default async function MypagePoints() {
+    const { balance, expiring, entries } = await getMyPoints();
 
-export default function MypagePoints() {
     return (
         <div>
             <h1 className="text-foreground text-2xl font-extrabold md:text-3xl">
@@ -39,7 +37,7 @@ export default function MypagePoints() {
                             사용 가능한 포인트
                         </p>
                         <p className="text-3xl font-extrabold text-amber-500">
-                            {BALANCE.toLocaleString()}{" "}
+                            {balance.toLocaleString()}{" "}
                             <span className="text-lg">P</span>
                         </p>
                     </div>
@@ -47,20 +45,15 @@ export default function MypagePoints() {
                 <div className="flex flex-col justify-center gap-3 sm:pl-8">
                     <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">
-                            적립예정 포인트
-                        </span>
-                        <span className="text-foreground font-bold">
-                            {PENDING.toLocaleString()} P
-                        </span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">
                             소멸예정 포인트
                         </span>
                         <span className="text-foreground font-bold">
-                            {EXPIRING.toLocaleString()} P
+                            {expiring.toLocaleString()} P
                         </span>
                     </div>
+                    <p className="text-muted-foreground text-xs">
+                        30일 이내에 유효기간이 끝나는 포인트입니다.
+                    </p>
                 </div>
             </div>
 
@@ -70,11 +63,46 @@ export default function MypagePoints() {
                     <h2 className="text-foreground text-lg font-bold">
                         포인트 내역
                     </h2>
-                    <div className="text-muted-foreground mt-4 rounded-xl border border-dashed px-6 py-14 text-center text-sm">
-                        아직 포인트 적립/사용 내역이 없어요.
-                        <br />
-                        서비스를 이용하면 내역이 표시됩니다.
-                    </div>
+
+                    {entries.length === 0 ? (
+                        <div className="text-muted-foreground mt-4 rounded-xl border border-dashed px-6 py-14 text-center text-sm">
+                            아직 포인트 적립/사용 내역이 없어요.
+                            <br />
+                            서비스를 이용하면 내역이 표시됩니다.
+                        </div>
+                    ) : (
+                        <ul className="divide-border mt-4 divide-y">
+                            {entries.map((e) => (
+                                <li
+                                    key={e.id}
+                                    className="flex items-center justify-between gap-4 py-3.5"
+                                >
+                                    <div className="min-w-0">
+                                        <p className="text-foreground font-semibold">
+                                            {e.label}
+                                        </p>
+                                        <p className="text-muted-foreground mt-0.5 text-xs">
+                                            {e.dateLabel}
+                                            {e.expiresLabel
+                                                ? ` · ${e.expiresLabel}`
+                                                : ""}
+                                        </p>
+                                    </div>
+                                    <span
+                                        className={cn(
+                                            "shrink-0 font-extrabold",
+                                            e.amount > 0
+                                                ? "text-amber-500"
+                                                : "text-muted-foreground",
+                                        )}
+                                    >
+                                        {e.amount > 0 ? "+" : ""}
+                                        {e.amount.toLocaleString()} P
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </div>
 
                 {/* 우측: 안내 */}
@@ -115,7 +143,9 @@ export default function MypagePoints() {
                         </h2>
                         <div className="mt-6 text-center">
                             <p className="text-foreground font-bold">
-                                소멸 예정 포인트가 없습니다.
+                                {expiring > 0
+                                    ? `${expiring.toLocaleString()} P 가 곧 소멸됩니다.`
+                                    : "소멸 예정 포인트가 없습니다."}
                             </p>
                             <p className="text-muted-foreground mt-1 text-sm">
                                 유효기간이 지나면 포인트가 자동으로 소멸됩니다.
