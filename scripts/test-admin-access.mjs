@@ -322,6 +322,17 @@ async function main() {
     // =============================================================
 
     // 확인용 데이터를 서비스 롤로 심는다
+    const { data: partnerRow } = await admin
+        .from("partner_accounts")
+        .select("profile_id")
+        .limit(1)
+        .maybeSingle();
+    if (!partnerRow) {
+        console.error("❌ 파트너 계정이 없습니다. npm run seed:dev 를 먼저 실행하세요.");
+        process.exit(1);
+    }
+    const partnerId = partnerRow.profile_id;
+
     const { data: seededRes, error: resErr } = await admin
         .from("reservations")
         .insert({
@@ -378,8 +389,47 @@ async function main() {
 
     const svcRead = await adminClient.from("services").select("id");
     check(
-        "관리자는 services 를 읽지 못함 (수행 메모 보호)",
+        "관리자는 services 를 직접 읽지 못함 (수행 메모 보호)",
         !svcRead.error && (svcRead.data ?? []).length === 0,
+    );
+
+    // 정산 검증에 필요한 시각만 RPC 로 연다 — 메모는 빠져야 한다
+    const { data: seededSvc, error: svcErr } = await admin
+        .from("services")
+        .insert({
+            reservation_id: seededRes.id,
+            partner_id: partnerId,
+            status: "COMPLETED",
+            started_at: "2026-12-01T01:00:00Z",
+            arrived_at: "2026-12-01T00:40:00Z",
+            ended_at: "2026-12-01T03:10:00Z",
+            start_memo: "메모테스트-시작",
+            end_memo: "메모테스트-종료",
+        })
+        .select("id")
+        .single();
+    if (svcErr) throw svcErr;
+
+    const svcList = await adminClient.rpc("admin_list_services", {
+        p_limit: 50,
+    });
+    check(
+        "admin_list_services() 로 수행 시각은 볼 수 있음",
+        !svcList.error &&
+            (svcList.data ?? []).some((s) => s.id === seededSvc.id),
+        svcList.error?.message,
+    );
+
+    const svcRow = (svcList.data ?? []).find((s) => s.id === seededSvc.id) ?? {};
+    check(
+        "시각 3종(도착·시작·종료)이 모두 반환됨",
+        !!svcRow.arrived_at && !!svcRow.started_at && !!svcRow.ended_at,
+    );
+    const svcLeaked = ["start_memo", "end_memo"].filter((k) => k in svcRow);
+    check(
+        "수행 메모는 반환되지 않음",
+        svcLeaked.length === 0,
+        `노출된 컬럼: ${svcLeaked.join(", ")}`,
     );
 
     // =============================================================
@@ -509,6 +559,7 @@ async function main() {
     // =============================================================
     for (const [name, args] of [
         ["admin_list_reservations", {}],
+        ["admin_list_services", {}],
         ["admin_get_reservation", { p_id: seededRes.id, p_reason: "x" }],
         ["admin_grant_role", { p_target: userId }],
         ["admin_set_account_status", { p_target: userId, p_status: "SUSPENDED" }],
@@ -551,18 +602,11 @@ async function main() {
         .single();
     check("승격 시도 후에도 고객 role 이 USER", stillUser.role === "USER");
 
-    const partnerProfile = await admin
-        .from("partner_accounts")
-        .select("profile_id")
-        .limit(1)
-        .maybeSingle();
-    if (partnerProfile.data) {
-        const promotePartner = await adminClient.rpc("admin_grant_role", {
-            p_target: partnerProfile.data.profile_id,
-            p_reason: "TEST-50 파트너 승격 시도",
-        });
-        check("파트너 계정도 승격할 수 없음", !!promotePartner.error);
-    }
+    const promotePartner = await adminClient.rpc("admin_grant_role", {
+        p_target: partnerId,
+        p_reason: "TEST-50 파트너 승격 시도",
+    });
+    check("파트너 계정도 승격할 수 없음", !!promotePartner.error);
 
     // 전용 계정(이용 이력 없음)만 통과한다 — #56 의 계정 발급이 만들 형태
     const dedicated = await admin.auth.admin.createUser({

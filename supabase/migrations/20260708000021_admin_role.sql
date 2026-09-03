@@ -20,9 +20,11 @@
 --     처리한 정보주체 정보·수행업무
 --
 --  ⚠️ 관리자가 볼 수 없는 것 (의도된 것이며 정책을 추가하지 말 것)
---     care_recipients · reports · report_attachments · services · notifications
+--     care_recipients · reports · report_attachments · notifications
 --     · reservation_applications — 이용자 건강정보와 파트너 자유기술이 들어 있다.
 --     reservations 는 admin_list_reservations() / admin_get_reservation() 으로만.
+--     services 도 직접 조회는 막는다(start_memo / end_memo 가 자유기술이라 건강정보가
+--     들어갈 수 있다). 정산 검증에 필요한 시각만 admin_list_services() 로 연다.
 --
 --  * 여러 번 실행해도 안전(idempotent).
 -- =============================================================
@@ -423,12 +425,70 @@ $$;
 comment on function public.admin_get_reservation(uuid, text) is
   '관리자 예약 상세. 사유가 없으면 거절하고, 열람 사실을 접속기록에 남긴다.';
 
+-- 서비스 수행 시각 — 정산 검증에 필요하다.
+--
+--  services 를 통째로 열지 않는 이유는 start_memo / end_memo 때문이다.
+--  파트너가 자유롭게 적는 칸이라 건강정보가 들어갈 수 있는데, 정산을 맞춰보는 데는
+--  시각만 있으면 된다. 그래서 메모를 뺀 시각 컬럼만 반환한다.
+create or replace function public.admin_list_services(
+  p_from    date    default null,
+  p_to      date    default null,
+  p_partner uuid    default null,
+  p_limit   integer default 50,
+  p_offset  integer default 0
+)
+returns table (
+  id               uuid,
+  reservation_id   uuid,
+  reservation_code text,
+  use_date         date,
+  partner_id       uuid,
+  status           public.service_status,
+  started_at       timestamptz,
+  arrived_at       timestamptz,
+  ended_at         timestamptz,
+  billed_minutes   integer,
+  final_amount     integer
+)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+
+  perform public.log_access('SERVICE_LIST', 'services');
+
+  return query
+    select s.id, s.reservation_id, r.code, r.use_date, s.partner_id, s.status,
+           s.started_at, s.arrived_at, s.ended_at,
+           r.billed_minutes, r.final_amount
+      from public.services s
+      join public.reservations r on r.id = s.reservation_id
+     where (p_partner is null or s.partner_id = p_partner)
+       and (p_from    is null or r.use_date >= p_from)
+       and (p_to      is null or r.use_date <= p_to)
+     order by r.use_date desc, s.created_at desc
+     limit  greatest(1, least(coalesce(p_limit, 50), 200))
+    offset  greatest(0, coalesce(p_offset, 0));
+end;
+$$;
+
+comment on function public.admin_list_services(date, date, uuid, integer, integer) is
+  '관리자 서비스 수행 시각. 정산 검증용이며 start_memo / end_memo 는 반환하지 않는다.';
+
 revoke all on function public.admin_list_reservations(text, date, date, integer, integer)
   from public, anon;
 revoke all on function public.admin_get_reservation(uuid, text) from public, anon;
+revoke all on function public.admin_list_services(date, date, uuid, integer, integer)
+  from public, anon;
 grant execute on function public.admin_list_reservations(text, date, date, integer, integer)
   to authenticated;
 grant execute on function public.admin_get_reservation(uuid, text) to authenticated;
+grant execute on function public.admin_list_services(date, date, uuid, integer, integer)
+  to authenticated;
 
 -- =============================================================
 -- 9. 쓰기 RPC — 계정 · 심사 · 정산
