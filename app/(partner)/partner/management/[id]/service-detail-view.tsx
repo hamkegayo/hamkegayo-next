@@ -358,9 +358,10 @@ export function ServiceDetailView({
                                     type="button"
                                     onClick={onArrive}
                                     disabled={pending}
-                                    className="bg-brand text-brand-foreground hover:bg-brand/90 mt-3 w-full rounded-lg px-4 py-3 text-sm font-bold transition-colors disabled:opacity-60"
+                                    className="bg-brand text-brand-foreground hover:bg-brand/90 mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-3 text-sm font-bold transition-colors disabled:opacity-60"
                                 >
-                                    📍 도착 통보
+                                    <MapPin className="size-4" />
+                                    도착 통보
                                 </button>
                             </>
                         )}
@@ -385,9 +386,10 @@ export function ServiceDetailView({
                                 type="button"
                                 onClick={onStart}
                                 disabled={pending}
-                                className="bg-brand text-brand-foreground hover:bg-brand/90 w-full rounded-lg px-4 py-3 text-sm font-bold transition-colors disabled:opacity-60"
+                                className="bg-brand text-brand-foreground hover:bg-brand/90 inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-3 text-sm font-bold transition-colors disabled:opacity-60"
                             >
-                                ▶ 서비스 시작
+                                <Play className="size-4" />
+                                서비스 시작
                             </button>
                         )}
                     </StepBlock>
@@ -415,13 +417,14 @@ export function ServiceDetailView({
                                     disabled={!started}
                                     onClick={() => setEndOpen(true)}
                                     className={cn(
-                                        "mt-3 w-full rounded-lg border px-4 py-3 text-sm font-bold transition-colors",
+                                        "mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border px-4 py-3 text-sm font-bold transition-colors",
                                         started
                                             ? "border-destructive/50 text-destructive hover:bg-destructive/5"
                                             : "border-border text-muted-foreground cursor-not-allowed",
                                     )}
                                 >
-                                    ☐ 서비스 종료
+                                    <Square className="size-4" />
+                                    서비스 종료
                                 </button>
                             </>
                         )}
