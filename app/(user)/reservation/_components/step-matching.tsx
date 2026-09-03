@@ -17,7 +17,7 @@ import { StepBand } from "./step-band";
 const POLL_MS = 5000;
 
 export function StepMatching() {
-    const { data, next } = useReservationStore();
+    const { data, next, finish } = useReservationStore();
     const reservationId = data.reservationId;
 
     const [applicants, setApplicants] = useState<DetailedApplicant[]>([]);
@@ -61,6 +61,8 @@ export function StepMatching() {
             const res = await cancelReservation(reservationId);
             if (res.ok) {
                 toast.success("매칭 요청을 취소했습니다.");
+                // 끝난 플로우로 표시 — 다시 예약하기로 들어오면 STEP1 부터 시작한다.
+                finish();
                 router.push("/");
             } else {
                 toast.error(res.message);

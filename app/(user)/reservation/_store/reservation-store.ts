@@ -75,23 +75,42 @@ type ReservationState = {
     step: number;
     /** STEP0 안내 모달 확인 여부 */
     introConfirmed: boolean;
+    /**
+     * 이 플로우가 끝났는지 (매칭 취소 또는 예약 완료).
+     * 스토어는 모듈 싱글턴이라 클라이언트 이동만으로는 비워지지 않는다.
+     * 끝난 플로우를 표시해 두고 다음 진입 때 ReservationFlow 가 초기화한다.
+     */
+    finished: boolean;
     data: ReservationData;
     confirmIntro: () => void;
     patch: (partial: Partial<ReservationData>) => void;
     next: () => void;
     prev: () => void;
     goStep: (step: number) => void;
+    /** 플로우 종료 표시 — 화면은 그대로 두고 플래그만 세운다 */
+    finish: () => void;
+    /** 처음 상태로 되돌린다 */
+    reset: () => void;
 };
 
 export const useReservationStore = create<ReservationState>((set) => ({
     step: 1,
     introConfirmed: false,
+    finished: false,
     data: initialData,
     confirmIntro: () => set({ introConfirmed: true }),
     patch: (partial) => set((s) => ({ data: { ...s.data, ...partial } })),
     next: () => set((s) => ({ step: Math.min(s.step + 1, TOTAL_STEPS) })),
     prev: () => set((s) => ({ step: Math.max(s.step - 1, 1) })),
     goStep: (step) => set({ step: Math.min(Math.max(step, 1), TOTAL_STEPS) }),
+    finish: () => set({ finished: true }),
+    reset: () =>
+        set({
+            step: 1,
+            introConfirmed: false,
+            finished: false,
+            data: initialData,
+        }),
 }));
 
 /**
