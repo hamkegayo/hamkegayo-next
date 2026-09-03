@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,6 +14,9 @@ import { useReservationStore, PLAN_INFO } from "../_store/reservation-store";
 import { step4Schema, type Step4Values } from "../_lib/schema";
 import { CARD_COMPANIES, INSTALLMENTS, PAY_METHODS } from "../_lib/options";
 import { createReservation } from "../_actions/reservation";
+import { getReservationQuote } from "../_actions/quote";
+import type { ReservationQuote } from "../_lib/quote.server";
+import { formatMinutes } from "@/lib/pricing";
 import { trackReservationComplete } from "@/lib/analytics";
 import { StepBand, StepNav } from "./step-band";
 import { FieldError, FieldLabel, NativeSelect } from "./fields";
@@ -47,6 +50,26 @@ export function StepPayment() {
     const plan = PLAN_INFO[data.plan || "basic"];
     const [agreed, setAgreed] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+
+    // 예상비용 — 공휴일 판정이 서버에서만 가능해 서버 액션으로 받아온다(#46).
+    const [quote, setQuote] = useState<ReservationQuote | null>(null);
+    const { plan: planCode, useDate, duration } = data;
+
+    useEffect(() => {
+        if (!useDate || !duration) return;
+
+        let alive = true;
+        getReservationQuote({
+            plan: planCode || "basic",
+            useDate,
+            duration,
+        }).then((q) => {
+            if (alive) setQuote(q);
+        });
+        return () => {
+            alive = false;
+        };
+    }, [planCode, useDate, duration]);
 
     const {
         register,
@@ -89,7 +112,7 @@ export function StepPayment() {
             }
             patch({ reservationCode: res.code, reservationId: res.id });
             // 서버가 성공을 반환한 직후에만 예약 신청 완료 이벤트 전송
-            if (data.plan) trackReservationComplete(data.plan);
+            if (data.plan) trackReservationComplete(data.plan, quote?.amount);
             next();
         } finally {
             setSubmitting(false);
@@ -197,13 +220,50 @@ export function StepPayment() {
                                     </span>
                                     입니다. 예약 요청만 등록됩니다.
                                 </p>
-                                <div className="border-border mt-4 flex items-center justify-between border-b pb-4">
-                                    <span className="text-foreground font-semibold">
-                                        예상비용
-                                    </span>
-                                    <span className="text-foreground text-lg font-extrabold">
-                                        {plan.price.toLocaleString()}원
-                                    </span>
+                                <div className="border-border mt-4 space-y-2.5 border-b pb-4 text-sm">
+                                    <div className="text-muted-foreground flex items-center justify-between">
+                                        <span>
+                                            기본 이용요금
+                                            {quote
+                                                ? ` (${formatMinutes(quote.prepayMinutes)})`
+                                                : ""}
+                                        </span>
+                                        <span className="text-foreground font-semibold">
+                                            {quote
+                                                ? `${quote.baseAmount.toLocaleString()}원`
+                                                : "계산 중…"}
+                                        </span>
+                                    </div>
+
+                                    {quote && quote.surchargeAmount > 0 && (
+                                        <div className="text-muted-foreground flex items-center justify-between">
+                                            <span>주말·공휴일 할증 30%</span>
+                                            <span className="text-foreground font-semibold">
+                                                +
+                                                {quote.surchargeAmount.toLocaleString()}
+                                                원
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    <div className="flex items-center justify-between pt-1">
+                                        <span className="text-foreground font-semibold">
+                                            선결제 금액
+                                        </span>
+                                        <span className="text-foreground text-lg font-extrabold">
+                                            {quote
+                                                ? `${quote.amount.toLocaleString()}원`
+                                                : "-"}
+                                        </span>
+                                    </div>
+
+                                    <p className="text-muted-foreground text-xs leading-relaxed">
+                                        시간당 {plan.price.toLocaleString()}원 ·
+                                        최소 2시간분을 먼저 결제합니다. 서비스
+                                        종료 후 실제 이용시간으로 정산하여
+                                        남으면 환불, 모자라면 추가결제를
+                                        안내드립니다.
+                                    </p>
                                 </div>
 
                                 <div className="mt-5 space-y-5">
@@ -456,9 +516,12 @@ export function StepPayment() {
                                 </h3>
                                 <div className="text-muted-foreground mt-4 space-y-3 text-sm leading-relaxed">
                                     <p>
-                                        서비스는 후불제이며, 모든 서비스가
-                                        종료된 이후 최종 요금 안내에 따라 결제를
-                                        진행해주시면 됩니다.
+                                        예약 확정을 위해 최소 2시간분의
+                                        이용요금을 먼저 결제합니다. 서비스 종료
+                                        후 실제 이용시간과 주말·공휴일 할증을
+                                        반영해 최종 요금을 산정하며, 남는 금액은
+                                        환불하고 모자란 금액은 추가결제를
+                                        안내드립니다.
                                     </p>
                                     <p>
                                         카드결제를 이용하실 경우

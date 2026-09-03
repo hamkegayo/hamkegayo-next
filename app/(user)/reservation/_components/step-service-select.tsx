@@ -30,8 +30,8 @@ const PLANS: PlanCard[] = [
             "진료 및 검사 동행",
             "약국 동행 (선택)",
         ],
-        price: "이용금액 20,000원",
-        priceNote: "(30분 추가 시 10,000원)",
+        price: "시간당 20,000원",
+        priceNote: "(최소 2시간 · 15분 연장 시 5,000원)",
     },
     {
         value: "plus",
@@ -44,8 +44,8 @@ const PLANS: PlanCard[] = [
             "진료 및 검사 동행",
             "귀가 동행 지원",
         ],
-        price: "이용금액 25,000원",
-        priceNote: "(30분 추가 시 12,500원)",
+        price: "시간당 25,000원",
+        priceNote: "(최소 2시간 · 15분 연장 시 6,250원)",
     },
 ];
 
@@ -117,7 +117,8 @@ export function StepServiceSelect() {
                                     </div>
                                     <div className="border-brand/30 mt-4 border-b" />
 
-                                    <ul className="mt-6 flex flex-col gap-3">
+                                    {/* flex-1 — 항목 수가 달라도 가격·버튼이 카드 바닥에 맞춰지도록 */}
+                                    <ul className="mt-6 flex flex-1 flex-col gap-3">
                                         {plan.features.map((f) => (
                                             <li
                                                 key={f}

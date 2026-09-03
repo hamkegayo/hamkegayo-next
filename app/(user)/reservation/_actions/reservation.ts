@@ -3,6 +3,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { generateReservationCode } from "@/lib/reservation";
 import { reservationServerSchema } from "../_lib/schema";
+import { quoteReservation } from "../_lib/quote.server";
 
 export type CreateReservationResult =
     | { ok: true; code: string; id: string }
@@ -34,6 +35,17 @@ export async function createReservation(
         return { ok: false, reason: "auth", message: "로그인이 필요합니다." };
     }
 
+    // 요금 스냅샷 — 단가·할증률·선결제액을 예약 시점에 고정한다(#46).
+    // 이후 요금표가 바뀌어도 이미 접수된 예약의 금액은 흔들리지 않는다.
+    const quote = await quoteReservation(v.plan, v.useDate, v.duration);
+    if (!quote) {
+        return {
+            ok: false,
+            reason: "validation",
+            message: "예상 소요 시간을 다시 선택해 주세요.",
+        };
+    }
+
     const row = {
         customer_id: user.id,
         status: "MATCHING" as const,
@@ -58,6 +70,12 @@ export async function createReservation(
         duration: v.duration,
         depart_address: v.departAddress,
         hospital_address: v.hospitalAddress,
+
+        duration_minutes: quote.durationMinutes,
+        hourly_rate: quote.hourlyRate,
+        fee_rate: quote.feeRate,
+        surcharge_rate: quote.surchargeRate,
+        prepaid_amount: quote.amount,
     };
 
     // 예약번호 충돌(23505) 시 최대 5회 재시도

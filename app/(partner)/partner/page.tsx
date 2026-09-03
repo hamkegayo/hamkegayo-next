@@ -261,12 +261,12 @@ export default async function PartnerHome() {
                                     >
                                         {/* 데스크톱/태블릿: 행 */}
                                         <div className="hidden items-center gap-4 sm:flex">
-                                            <div className="shrink-0">
+                                            <div className="w-32 shrink-0">
                                                 <p className="text-foreground font-bold whitespace-nowrap">
-                                                    {r.listTime}
+                                                    {r.dateLabel}
                                                 </p>
-                                                <p className="text-muted-foreground text-xs whitespace-nowrap">
-                                                    {r.duration}
+                                                <p className="text-muted-foreground mt-0.5 text-sm whitespace-nowrap">
+                                                    {r.timeLabel} · {r.duration}
                                                 </p>
                                             </div>
                                             <div className="min-w-0 flex-1">
@@ -297,7 +297,7 @@ export default async function PartnerHome() {
                                         <div className="sm:hidden">
                                             <div className="flex items-center justify-between gap-2">
                                                 <span className="text-foreground font-bold">
-                                                    {r.listTime}{" "}
+                                                    {r.dateLabel} {r.timeLabel}{" "}
                                                     <span className="text-muted-foreground text-xs font-normal">
                                                         {r.duration}
                                                     </span>
