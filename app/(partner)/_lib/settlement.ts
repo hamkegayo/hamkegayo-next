@@ -12,8 +12,12 @@ export type Settlement = {
     serviceDate: string;
     hospital: string;
     plan: "Basic" | "Plus";
-    /** 정산 금액 (없으면 null) */
+    /** 실지급액 = 서비스 금액 − 플랫폼 수수료 (없으면 null) */
     amount: number | null;
+    /** 고객이 결제한 서비스 총액 (없으면 null) */
+    grossAmount: number | null;
+    /** 플랫폼 수수료 — Basic 20% / Plus 24%, 원천징수 없음 */
+    fee: number | null;
     status: SettlementStatus;
     /** 정산일 (미지급이면 null) */
     settledDate: string | null;

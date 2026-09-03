@@ -1,6 +1,8 @@
 import { createClient } from "@/utils/supabase/server";
 import { expirePastMatchings } from "@/lib/expire-matchings";
-import { planDisplay, planPrice, type PlanCode } from "@/lib/reservation";
+import { toHhmm } from "@/lib/format";
+import { planDisplay, type PlanCode } from "@/lib/reservation";
+import { calcPartnerPayout, calcPrepayment } from "@/lib/pricing";
 
 /** 수락 대기 목록(파트너 화면)에 표시할 최소 필드 */
 export type PartnerMatchingItem = {
@@ -10,8 +12,10 @@ export type PartnerMatchingItem = {
     hospital: string;
     /** 목록 부제 — 진료 내용(treatment) */
     type: string;
-    /** "오늘/내일/M월 D일 HH:mm" 형태의 노출용 라벨 */
-    listTime: string;
+    /** "오늘" / "내일" / "9월 5일 (토)" */
+    dateLabel: string;
+    /** "15:00" */
+    timeLabel: string;
     /** 예상 소요시간(원본 duration 문자열) */
     duration: string;
 };
@@ -27,27 +31,20 @@ type MatchingRow = {
     duration: string;
 };
 
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
 /** basic/plus → Basic/Plus (공용 헬퍼 래핑, 알 수 없는 값은 Basic) */
 function planLabel(plan: string): "Basic" | "Plus" {
     return planDisplay(plan === "plus" ? "plus" : "basic");
 }
 
-/** "HH:mm:ss"/"HH:mm" → "HH:mm" (그 외 형태면 원본 유지) */
-function toHhmm(reserveTime: string): string {
-    const m = /^(\d{1,2}):(\d{2})/.exec(reserveTime.trim());
-    if (!m) return reserveTime;
-    return `${m[1].padStart(2, "0")}:${m[2]}`;
-}
-
 /**
- * use_date(YYYY-MM-DD) + reserve_time → "오늘/내일/M월 D일 HH:mm" 라벨.
+ * use_date(YYYY-MM-DD) → "오늘" / "내일" / "9월 5일 (토)".
  * 오늘/내일은 서버 로컬 날짜 기준으로 판별한다.
  */
-function formatListTime(useDate: string, reserveTime: string): string {
-    const hhmm = toHhmm(reserveTime);
-
+function formatDateLabel(useDate: string): string {
     const [y, mo, d] = useDate.split("-").map((n) => Number(n));
-    if (!y || !mo || !d) return `${useDate} ${hhmm}`;
+    if (!y || !mo || !d) return useDate;
 
     const target = new Date(y, mo - 1, d);
     const now = new Date();
@@ -56,9 +53,9 @@ function formatListTime(useDate: string, reserveTime: string): string {
         (target.getTime() - today.getTime()) / 86_400_000,
     );
 
-    if (diffDays === 0) return `오늘 ${hhmm}`;
-    if (diffDays === 1) return `내일 ${hhmm}`;
-    return `${mo}월 ${d}일 ${hhmm}`;
+    if (diffDays === 0) return "오늘";
+    if (diffDays === 1) return "내일";
+    return `${mo}월 ${d}일 (${WEEKDAYS[target.getDay()] ?? ""})`;
 }
 
 /**
@@ -149,7 +146,8 @@ export async function getPartnerMatchingRequests(): Promise<
             plan: planLabel(r.plan),
             hospital: r.hospital_address,
             type: r.treatment,
-            listTime: formatListTime(r.use_date, r.reserve_time),
+            dateLabel: formatDateLabel(r.use_date),
+            timeLabel: toHhmm(r.reserve_time),
             duration: r.duration,
         }));
     } catch {
@@ -160,8 +158,6 @@ export async function getPartnerMatchingRequests(): Promise<
 // =============================================================
 // 상세 조회 (수락/거절 화면)
 // =============================================================
-
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 export type PartnerRequestDetail = {
     id: string;
@@ -180,7 +176,10 @@ export type PartnerRequestDetail = {
     arriveDate: string;
     arriveTime: string;
     estDuration: string;
+    /** 예상 지급액(원) — 선결제액에서 플랫폼 수수료를 뺀 값 */
     amount: number;
+    /** 주말·공휴일 30% 할증 적용 여부 */
+    surcharged: boolean;
     departure: string;
     customer: {
         name: string;
@@ -211,6 +210,9 @@ type DetailRow = {
     duration: string;
     depart_address: string;
     hospital_address: string;
+    duration_minutes: number | null;
+    surcharge_rate: number | string | null;
+    prepaid_amount: number | null;
 };
 
 /** "YYYY-MM-DD" → "YYYY.MM.DD (요일)" */
@@ -263,7 +265,7 @@ export async function getPartnerRequestDetail(
         const { data, error } = await supabase
             .from("reservations")
             .select(
-                "id, code, status, plan, patient_name, patient_birth, patient_gender, treatment, purpose, cautions, other_requests, use_date, arrive_time, reserve_time, duration, depart_address, hospital_address",
+                "id, code, status, plan, patient_name, patient_birth, patient_gender, treatment, purpose, cautions, other_requests, use_date, arrive_time, reserve_time, duration, depart_address, hospital_address, duration_minutes, surcharge_rate, prepaid_amount",
             )
             .eq("id", reservationId)
             .maybeSingle<DetailRow>();
@@ -281,6 +283,13 @@ export async function getPartnerRequestDetail(
         const planCode: PlanCode = data.plan === "plus" ? "plus" : "basic";
         const plan = planDisplay(planCode);
 
+        // 예상 지급액 — 선결제액 기준. 구 데이터(스냅샷 없음)는 그 자리에서 산정한다.
+        const surcharged = Number(data.surcharge_rate ?? 0) > 0;
+        const prepaid =
+            data.prepaid_amount ??
+            calcPrepayment(planCode, data.duration_minutes ?? 120, surcharged)
+                .amount;
+
         return {
             id: data.id,
             code: data.code,
@@ -294,7 +303,8 @@ export async function getPartnerRequestDetail(
             arriveDate: formatDate(data.use_date),
             arriveTime: toHhmm(data.arrive_time),
             estDuration: data.duration,
-            amount: planPrice(planCode),
+            amount: calcPartnerPayout(planCode, prepaid).net,
+            surcharged,
             departure: data.depart_address,
             customer: {
                 name: data.patient_name,

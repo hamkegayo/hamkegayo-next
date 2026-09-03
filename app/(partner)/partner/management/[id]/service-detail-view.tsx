@@ -10,6 +10,7 @@ import {
     FileText,
     Hourglass,
     House,
+    MapPin,
     Play,
     Square,
     Upload,
@@ -19,6 +20,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { PartnerServiceView } from "../../../_lib/services.server";
 import {
+    arriveService,
     completeService,
     endService,
     startService,
@@ -50,6 +52,9 @@ export function ServiceDetailView({
         }
     }, [service.state]);
 
+    const [arrived, setArrived] = useState(
+        !!service.arrivedAtLabel || initial.started,
+    );
     const [started, setStarted] = useState(initial.started);
     const [ended, setEnded] = useState(initial.ended);
     const [done, setDone] = useState(initial.done);
@@ -86,6 +91,19 @@ export function ServiceDetailView({
                   cls: "bg-blue-100 text-blue-600 dark:bg-blue-500/15",
                   dot: "bg-blue-500",
               };
+
+    const onArrive = () => {
+        startTransition(async () => {
+            const res = await arriveService(service.id);
+            if (res.ok) {
+                setArrived(true);
+                toast.success("도착이 기록되고 보호자에게 안내되었습니다.");
+                router.refresh();
+            } else {
+                toast.error(res.message);
+            }
+        });
+    };
 
     const onStart = () => {
         startTransition(async () => {
@@ -160,7 +178,15 @@ export function ServiceDetailView({
                         <SummaryRow label="서비스 시작" value={startAt} />
                         <SummaryRow label="서비스 종료" value={endAt} />
                         <SummaryRow
-                            label="예상 정산 금액"
+                            label="청구 이용시간"
+                            value={item.durationLabel}
+                        />
+                        <SummaryRow
+                            label={
+                                item.amountProvisional
+                                    ? "예상 정산 금액"
+                                    : "정산 금액"
+                            }
                             value={`${item.amount.toLocaleString()}원`}
                             valueClass="text-brand"
                         />
@@ -278,14 +304,22 @@ export function ServiceDetailView({
                 </div>
                 <div className="border-border shrink-0 border-t pt-4 text-right md:border-t-0 md:border-l md:pt-0 md:pl-8">
                     <p className="text-muted-foreground text-sm">
-                        예상 정산 금액
+                        {item.amountProvisional
+                            ? "예상 정산 금액"
+                            : "정산 금액"}
                     </p>
                     <p className="text-brand mt-1 text-3xl font-extrabold">
                         {item.amount.toLocaleString()}원
                     </p>
                     <p className="text-muted-foreground text-xs">
-                        (기본 요금 포함)
+                        {item.durationLabel} 기준 · 수수료 차감 후
+                        {item.surcharged ? " · 주말·공휴일 할증 적용" : ""}
                     </p>
+                    {item.amountProvisional && (
+                        <p className="text-muted-foreground text-xs">
+                            (실제 이용시간에 따라 종료 후 확정)
+                        </p>
+                    )}
                 </div>
             </div>
 
@@ -299,9 +333,43 @@ export function ServiceDetailView({
                         서비스 시작과 종료 시간을 기록해주세요.
                     </p>
 
-                    {/* STEP 1 - 시작 */}
+                    {/* STEP 1 - 도착 통보 */}
                     <StepBlock
                         index={1}
+                        title="현장 도착 통보"
+                        icon={MapPin}
+                        done={arrived}
+                    >
+                        {arrived ? (
+                            <RecordedBox
+                                label="도착 통보 완료"
+                                date={item.dateLabel}
+                                timeLabel="도착 시간"
+                                time={service.arrivedAtLabel ?? "-"}
+                            />
+                        ) : (
+                            <>
+                                <p className="text-muted-foreground text-sm">
+                                    약속 장소에 도착하면 눌러주세요. 보호자에게
+                                    도착이 안내되고, 이 시각부터 이용시간이
+                                    계산됩니다.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={onArrive}
+                                    disabled={pending}
+                                    className="bg-brand text-brand-foreground hover:bg-brand/90 mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-3 text-sm font-bold transition-colors disabled:opacity-60"
+                                >
+                                    <MapPin className="size-4" />
+                                    도착 통보
+                                </button>
+                            </>
+                        )}
+                    </StepBlock>
+
+                    {/* STEP 2 - 시작 */}
+                    <StepBlock
+                        index={2}
                         title="서비스 시작"
                         icon={Play}
                         done={started}
@@ -318,16 +386,17 @@ export function ServiceDetailView({
                                 type="button"
                                 onClick={onStart}
                                 disabled={pending}
-                                className="bg-brand text-brand-foreground hover:bg-brand/90 w-full rounded-lg px-4 py-3 text-sm font-bold transition-colors disabled:opacity-60"
+                                className="bg-brand text-brand-foreground hover:bg-brand/90 inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-3 text-sm font-bold transition-colors disabled:opacity-60"
                             >
-                                ▶ 서비스 시작
+                                <Play className="size-4" />
+                                서비스 시작
                             </button>
                         )}
                     </StepBlock>
 
-                    {/* STEP 2 - 종료 */}
+                    {/* STEP 3 - 종료 */}
                     <StepBlock
-                        index={2}
+                        index={3}
                         title="서비스 종료"
                         icon={Square}
                         done={ended}
@@ -348,13 +417,14 @@ export function ServiceDetailView({
                                     disabled={!started}
                                     onClick={() => setEndOpen(true)}
                                     className={cn(
-                                        "mt-3 w-full rounded-lg border px-4 py-3 text-sm font-bold transition-colors",
+                                        "mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border px-4 py-3 text-sm font-bold transition-colors",
                                         started
                                             ? "border-destructive/50 text-destructive hover:bg-destructive/5"
                                             : "border-border text-muted-foreground cursor-not-allowed",
                                     )}
                                 >
-                                    ☐ 서비스 종료
+                                    <Square className="size-4" />
+                                    서비스 종료
                                 </button>
                             </>
                         )}
