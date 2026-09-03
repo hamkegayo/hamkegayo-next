@@ -38,6 +38,16 @@ export const EXTENSION_GRACE_MIN = 8;
 /** 주말·공휴일 할증률 — 약관 제13조 ① */
 export const SURCHARGE_RATE = 0.3;
 
+/**
+ * 파트너 선택 후 선결제 기한(분) — 약관 제9조 ④.
+ * 실제 강제는 DB(reservations.payment_deadline)가 하고, 여기 값은 화면 안내용이다.
+ * 둘을 함께 바꿔야 한다.
+ */
+export const PAYMENT_DEADLINE_MIN = 30;
+
+/** 결제액 대비 포인트 적립률 (1P = 1원). 약관 표기는 '크레딧'이나 제품 용어는 포인트다. */
+export const POINT_EARN_RATE = 0.01;
+
 // =============================================================
 // duration 파싱 · 시간 단위
 // =============================================================
@@ -296,6 +306,15 @@ export function calcSettlementDiff(
         refund: diff < 0 ? -diff : 0,
         additional: diff > 0 ? diff : 0,
     };
+}
+
+/**
+ * 결제액에 대한 포인트 적립액(원). 1P = 1원, 원 단위 절사.
+ * 적립 기록은 결제 성공 시 서버에서 points 원장에 남긴다.
+ */
+export function calcPointEarn(paidAmount: number): number {
+    if (paidAmount <= 0) return 0;
+    return Math.floor(paidAmount * POINT_EARN_RATE);
 }
 
 export type PartnerPayout = {
