@@ -9,7 +9,9 @@
         "lint": "eslint",
         "typecheck": "tsc --noEmit",
         "seed:dev": "node --env-file=.env.local scripts/seed-dev.mjs",
+        "seed:admin": "node --env-file=.env.local scripts/seed-admin.mjs",
         "test:payments": "node --env-file=.env.local scripts/test-payment-flow.mjs",
+        "test:admin": "node --env-file=.env.local scripts/test-admin-access.mjs",
         "prepare": "husky"
     },
     "dependencies": {
