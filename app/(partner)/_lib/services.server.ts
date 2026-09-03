@@ -1,10 +1,10 @@
 import { createClient } from "@/utils/supabase/server";
 import {
     planDisplay,
-    planPrice,
     type PlanCode,
     type ServiceState,
 } from "@/lib/reservation";
+import { calcPartnerPayout, formatMinutes } from "@/lib/pricing";
 
 /** 진행 관리 목록/상세 공용 뷰 */
 export type PartnerServiceView = {
@@ -18,9 +18,19 @@ export type PartnerServiceView = {
     customerAge: string;
     dateLabel: string;
     timeLabel: string;
+    /** 파트너 실지급 예상액(원) — 최종 요금(없으면 선결제액)에서 수수료를 뺀 값 */
     amount: number;
+    /** 산정 기준 금액(원) — 고객이 결제하는 총액 */
+    grossAmount: number;
+    /** 최종 산정 전이면 true (선결제액 기준의 잠정 금액) */
+    amountProvisional: boolean;
+    /** 이용시간 표기 — 확정 전에는 예상 소요시간, 확정 후에는 청구 시간 */
+    durationLabel: string;
+    /** 주말·공휴일 30% 할증 적용 여부 */
+    surcharged: boolean;
     code: string;
-    /** 시작/종료 기록 시각(없으면 null) */
+    /** 도착/시작/종료 기록 시각(없으면 null) */
+    arrivedAtLabel: string | null;
     startedAtLabel: string | null;
     endedAtLabel: string | null;
     startMemo: string | null;
@@ -30,6 +40,7 @@ export type PartnerServiceView = {
 type ServiceRow = {
     id: string;
     status: ServiceState;
+    arrived_at: string | null;
     started_at: string | null;
     ended_at: string | null;
     start_memo: string | null;
@@ -43,6 +54,11 @@ type ServiceRow = {
         patient_birth: string;
         use_date: string;
         reserve_time: string;
+        duration: string;
+        surcharge_rate: number | string | null;
+        prepaid_amount: number | null;
+        billed_minutes: number | null;
+        final_amount: number | null;
     } | null;
 };
 
@@ -83,11 +99,18 @@ function ageLabel(birth: string): string {
 }
 
 const SELECT =
-    "id, status, started_at, ended_at, start_memo, end_memo, reservations!inner(code, plan, hospital_address, treatment, patient_name, patient_birth, use_date, reserve_time)";
+    "id, status, arrived_at, started_at, ended_at, start_memo, end_memo, " +
+    "reservations!inner(code, plan, hospital_address, treatment, patient_name, patient_birth, " +
+    "use_date, reserve_time, duration, surcharge_rate, prepaid_amount, billed_minutes, final_amount)";
 
 function toView(r: ServiceRow): PartnerServiceView {
     const res = r.reservations;
     const planCode: PlanCode = res?.plan === "plus" ? "plus" : "basic";
+
+    // 최종 산정 전에는 선결제액을 잠정 기준으로 보여준다.
+    const grossAmount = res?.final_amount ?? res?.prepaid_amount ?? 0;
+    const payout = calcPartnerPayout(planCode, grossAmount);
+
     return {
         id: r.id,
         state: r.status,
@@ -98,8 +121,15 @@ function toView(r: ServiceRow): PartnerServiceView {
         customerAge: res ? ageLabel(res.patient_birth) : "",
         dateLabel: res ? formatDate(res.use_date) : "",
         timeLabel: res ? toHhmm(res.reserve_time) : "",
-        amount: planPrice(planCode),
+        amount: payout.net,
+        grossAmount,
+        amountProvisional: res?.final_amount == null,
+        durationLabel: res?.billed_minutes
+            ? formatMinutes(res.billed_minutes)
+            : (res?.duration ?? ""),
+        surcharged: Number(res?.surcharge_rate ?? 0) > 0,
         code: res?.code ?? "",
+        arrivedAtLabel: toTimeLabel(r.arrived_at),
         startedAtLabel: toTimeLabel(r.started_at),
         endedAtLabel: toTimeLabel(r.ended_at),
         startMemo: r.start_memo,

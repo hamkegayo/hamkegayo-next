@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { expirePastMatchings } from "@/lib/expire-matchings";
-import { planDisplay, planPrice, type PlanCode } from "@/lib/reservation";
+import { planDisplay, type PlanCode } from "@/lib/reservation";
+import { calcPartnerPayout, calcPrepayment } from "@/lib/pricing";
 
 /** 수락 대기 목록(파트너 화면)에 표시할 최소 필드 */
 export type PartnerMatchingItem = {
@@ -180,7 +181,10 @@ export type PartnerRequestDetail = {
     arriveDate: string;
     arriveTime: string;
     estDuration: string;
+    /** 예상 지급액(원) — 선결제액에서 플랫폼 수수료를 뺀 값 */
     amount: number;
+    /** 주말·공휴일 30% 할증 적용 여부 */
+    surcharged: boolean;
     departure: string;
     customer: {
         name: string;
@@ -211,6 +215,9 @@ type DetailRow = {
     duration: string;
     depart_address: string;
     hospital_address: string;
+    duration_minutes: number | null;
+    surcharge_rate: number | string | null;
+    prepaid_amount: number | null;
 };
 
 /** "YYYY-MM-DD" → "YYYY.MM.DD (요일)" */
@@ -263,7 +270,7 @@ export async function getPartnerRequestDetail(
         const { data, error } = await supabase
             .from("reservations")
             .select(
-                "id, code, status, plan, patient_name, patient_birth, patient_gender, treatment, purpose, cautions, other_requests, use_date, arrive_time, reserve_time, duration, depart_address, hospital_address",
+                "id, code, status, plan, patient_name, patient_birth, patient_gender, treatment, purpose, cautions, other_requests, use_date, arrive_time, reserve_time, duration, depart_address, hospital_address, duration_minutes, surcharge_rate, prepaid_amount",
             )
             .eq("id", reservationId)
             .maybeSingle<DetailRow>();
@@ -281,6 +288,13 @@ export async function getPartnerRequestDetail(
         const planCode: PlanCode = data.plan === "plus" ? "plus" : "basic";
         const plan = planDisplay(planCode);
 
+        // 예상 지급액 — 선결제액 기준. 구 데이터(스냅샷 없음)는 그 자리에서 산정한다.
+        const surcharged = Number(data.surcharge_rate ?? 0) > 0;
+        const prepaid =
+            data.prepaid_amount ??
+            calcPrepayment(planCode, data.duration_minutes ?? 120, surcharged)
+                .amount;
+
         return {
             id: data.id,
             code: data.code,
@@ -294,7 +308,8 @@ export async function getPartnerRequestDetail(
             arriveDate: formatDate(data.use_date),
             arriveTime: toHhmm(data.arrive_time),
             estDuration: data.duration,
-            amount: planPrice(planCode),
+            amount: calcPartnerPayout(planCode, prepaid).net,
+            surcharged,
             departure: data.depart_address,
             customer: {
                 name: data.patient_name,

@@ -13,15 +13,26 @@
 /** DB plan 값 (check 제약과 동일) */
 export type PlanCode = "basic" | "plus";
 
-/** 플랜 표시 라벨 / 가격 (베이직 20,000 / 플러스 25,000 단일화) */
+/**
+ * 플랜 표시 라벨 / 단가 / 수수료율.
+ *  - price 는 **시간당** 기본요금이다 (약관 제11조 ① — Basic 20,000 / Plus 25,000).
+ *  - feeRate 는 최종 결제 총액 기준 플랫폼 수수료율. 원천징수는 하지 않는다(파트너 프리랜서).
+ *  - 실제 금액 계산은 lib/pricing.ts 가 담당한다.
+ */
 export const PLAN_INFO: Record<
     PlanCode,
     {
         short: string;
         label: string;
         badge: string;
+        /** 시간당 기본요금(원) */
         price: number;
-        extra: number;
+        /** 30분 단가(원) */
+        halfHourPrice: number;
+        /** 15분 단가(원) — 연장·부분 청구 단위 */
+        quarterPrice: number;
+        /** 플랫폼 수수료율 (최종 결제 총액 기준) */
+        feeRate: number;
     }
 > = {
     basic: {
@@ -29,18 +40,22 @@ export const PLAN_INFO: Record<
         label: "베이직 서비스 (병원에서 만남 + 진료 동행)",
         badge: "[베이직] 병원 동행 서비스",
         price: 20000,
-        extra: 10000,
+        halfHourPrice: 10000,
+        quarterPrice: 5000,
+        feeRate: 0.2,
     },
     plus: {
         short: "플러스",
         label: "플러스 서비스 (자택 픽업 + 병원 동행)",
         badge: "[플러스] 병원 동행 서비스",
         price: 25000,
-        extra: 12500,
+        halfHourPrice: 12500,
+        quarterPrice: 6250,
+        feeRate: 0.24,
     },
 };
 
-/** plan 예상 정산 금액(원) */
+/** plan 시간당 기본요금(원) */
 export function planPrice(plan: PlanCode): number {
     return PLAN_INFO[plan].price;
 }

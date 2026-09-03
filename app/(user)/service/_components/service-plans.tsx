@@ -36,7 +36,7 @@ const PLANS: Plan[] = [
             { icon: ClipboardPlus, label: "동행 리포트" },
         ],
         price: "1시간당 20,000원",
-        priceNote: "(30분 추가 시 10,000원)",
+        priceNote: "(최소 2시간 · 15분 연장 시 5,000원)",
         cta: "Basic으로 예약하기",
     },
     {
@@ -52,7 +52,7 @@ const PLANS: Plan[] = [
             { icon: House, label: "귀가 지원" },
         ],
         price: "1시간당 25,000원",
-        priceNote: "(30분 추가 시 12,500원)",
+        priceNote: "(최소 2시간 · 15분 연장 시 6,250원)",
         cta: "Plus로 예약하기",
     },
 ];

@@ -5,7 +5,10 @@ export type NotificationType =
     | "PARTNER_APPLIED"
     | "RESERVATION_CONFIRMED"
     | "RESERVATION_CANCELLED"
+    | "PARTNER_ARRIVED"
     | "SERVICE_COMPLETED"
+    | "PAYMENT_ADDITIONAL"
+    | "PAYMENT_REFUND"
     | "REPORT_READY";
 
 export type NotificationView = {

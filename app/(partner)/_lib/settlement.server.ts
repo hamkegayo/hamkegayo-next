@@ -5,6 +5,8 @@ import type { Settlement, SettlementSummary } from "./settlement";
 type ServiceRow = {
     id: string;
     amount: number;
+    fee: number;
+    net: number;
     status: "PENDING" | "PAID";
     settled_at: string | null;
     services: {
@@ -49,7 +51,10 @@ function toView(r: ServiceRow): Settlement {
         serviceDate: useDate ? formatDate(useDate) : "",
         hospital: res?.hospital_address ?? "",
         plan: planDisplay(planCode),
-        amount: r.amount,
+        // 파트너에게 보여줄 기본 금액은 실지급액이다.
+        amount: r.net,
+        grossAmount: r.amount,
+        fee: r.fee,
         status: r.status === "PAID" ? "paid" : "pending",
         settledDate: formatSettled(r.settled_at),
     };
@@ -76,7 +81,7 @@ export async function getPartnerSettlements(): Promise<{
         const { data, error } = await supabase
             .from("settlements")
             .select(
-                "id, amount, status, settled_at, services!inner(reservations!inner(plan, hospital_address, use_date))",
+                "id, amount, fee, net, status, settled_at, services!inner(reservations!inner(plan, hospital_address, use_date))",
             )
             .eq("partner_id", user.id)
             .order("created_at", { ascending: false })
@@ -86,7 +91,7 @@ export async function getPartnerSettlements(): Promise<{
 
         const settlements = data.map(toView);
         const summary: SettlementSummary = {
-            totalAmount: data.reduce((s, r) => s + r.amount, 0),
+            totalAmount: data.reduce((s, r) => s + r.net, 0),
             serviceCount: data.length,
             paidCount: data.filter((r) => r.status === "PAID").length,
             pendingCount: data.filter((r) => r.status === "PENDING").length,

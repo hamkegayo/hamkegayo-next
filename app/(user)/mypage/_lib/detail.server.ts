@@ -3,11 +3,18 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import {
     PLAN_INFO,
     RESERVATION_STATUS_LABEL,
-    planPrice,
     type PlanCode,
     type ReservationStatus,
     type ServiceState,
 } from "@/lib/reservation";
+import {
+    MIN_PREPAY_MIN,
+    baseAmountFor,
+    calcPrepayment,
+    calcSettlementDiff,
+    formatMinutes,
+    parseDurationMinutes,
+} from "@/lib/pricing";
 
 export type DetailQualification = { type: string; issuer: string | null };
 
@@ -16,6 +23,26 @@ export type DetailPartner = {
     rating: number | null;
     reviewCount: number;
     qualifications: DetailQualification[];
+};
+
+/** 결제 내역 — 서비스 종료 전에는 선결제 기준의 예상값(#46) */
+export type ReservationPayment = {
+    /** 청구(또는 예상) 이용시간 표기 */
+    durationLabel: string;
+    /** 할증 전 이용요금 */
+    baseAmount: number;
+    /** 주말·공휴일 30% 할증액 (약관 제13조 ①) */
+    surchargeAmount: number;
+    /** 이용요금 합계 */
+    total: number;
+    /** 선결제액 (약관 제21조 ①) */
+    prepaidAmount: number;
+    /** 환불 예정액 (약관 제21조 ④) */
+    refund: number;
+    /** 추가결제액 (약관 제21조 ⑤) */
+    additional: number;
+    /** 서비스 종료 후 최종 산정이 끝났는지 */
+    isFinal: boolean;
 };
 
 /** 확정/완료/취소 예약의 리치 상세 뷰 */
@@ -36,9 +63,7 @@ export type ReservationDetailView = {
     userPhone: string;
     cautions: string | null;
     otherRequests: string | null;
-    amount: number;
-    extra: number;
-    total: number;
+    payment: ReservationPayment;
     includes: string[];
     /** 서비스 진행 단계: 0=파트너 확정, 1=서비스 진행, 2=서비스 완료 */
     stepIndex: number;
@@ -127,7 +152,49 @@ type ReservationRow = {
     depart_address: string;
     hospital_address: string;
     confirmed_partner_id: string | null;
+    duration: string;
+    duration_minutes: number | null;
+    surcharge_rate: number | string | null;
+    prepaid_amount: number | null;
+    billed_minutes: number | null;
+    final_amount: number | null;
 };
+
+/**
+ * 결제 내역 산정.
+ *  - 종료 전 : 선결제액 기준의 예상값
+ *  - 종료 후 : 저장된 최종 이용요금(final_amount)과 청구 시간(billed_minutes) 기준
+ *  - 스냅샷이 없는 구 데이터는 그 자리에서 선결제액을 산정해 채운다.
+ */
+function toPayment(r: ReservationRow, plan: PlanCode): ReservationPayment {
+    const surcharged = Number(r.surcharge_rate ?? 0) > 0;
+    const durationMinutes =
+        r.duration_minutes ??
+        parseDurationMinutes(r.duration) ??
+        MIN_PREPAY_MIN;
+
+    const prepayment = calcPrepayment(plan, durationMinutes, surcharged);
+    const prepaidAmount = r.prepaid_amount ?? prepayment.amount;
+
+    const isFinal = r.final_amount != null;
+    const billedMinutes = r.billed_minutes ?? prepayment.prepayMinutes;
+    const total = r.final_amount ?? prepaidAmount;
+
+    // 할증 전 금액은 청구 시간에서 되짚는다(총액 = 할증 전 × 1.3).
+    const baseAmount = baseAmountFor(plan, billedMinutes);
+    const diff = calcSettlementDiff(prepaidAmount, total);
+
+    return {
+        durationLabel: formatMinutes(billedMinutes),
+        baseAmount,
+        surchargeAmount: total - baseAmount,
+        total,
+        prepaidAmount,
+        refund: isFinal ? diff.refund : 0,
+        additional: isFinal ? diff.additional : 0,
+        isFinal,
+    };
+}
 
 type ServiceRow = {
     status: ServiceState;
@@ -203,7 +270,7 @@ export async function getReservationDetail(
         const { data: r, error } = await supabase
             .from("reservations")
             .select(
-                "id, code, created_at, status, plan, patient_name, patient_gender, patient_birth, patient_phone, cautions, other_requests, use_date, arrive_time, reserve_time, depart_address, hospital_address, confirmed_partner_id",
+                "id, code, created_at, status, plan, patient_name, patient_gender, patient_birth, patient_phone, cautions, other_requests, use_date, arrive_time, reserve_time, depart_address, hospital_address, confirmed_partner_id, duration, duration_minutes, surcharge_rate, prepaid_amount, billed_minutes, final_amount",
             )
             .eq("id", reservationId)
             .maybeSingle<ReservationRow>();
@@ -218,7 +285,6 @@ export async function getReservationDetail(
             .maybeSingle<ServiceRow>();
 
         const planCode: PlanCode = r.plan === "plus" ? "plus" : "basic";
-        const amount = planPrice(planCode);
 
         const serviceState = svc?.status ?? null;
         const stepIndex =
@@ -249,9 +315,7 @@ export async function getReservationDetail(
             userPhone: r.patient_phone,
             cautions: r.cautions,
             otherRequests: r.other_requests,
-            amount,
-            extra: 0,
-            total: amount,
+            payment: toPayment(r, planCode),
             includes: PLAN_INCLUDES[planCode],
             stepIndex,
             serviceState,
