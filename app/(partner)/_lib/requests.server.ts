@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { expirePastMatchings } from "@/lib/expire-matchings";
+import { toHhmm } from "@/lib/format";
 import { planDisplay, type PlanCode } from "@/lib/reservation";
 import { calcPartnerPayout, calcPrepayment } from "@/lib/pricing";
 
@@ -11,8 +12,10 @@ export type PartnerMatchingItem = {
     hospital: string;
     /** 목록 부제 — 진료 내용(treatment) */
     type: string;
-    /** "오늘/내일/M월 D일 HH:mm" 형태의 노출용 라벨 */
-    listTime: string;
+    /** "오늘" / "내일" / "9월 5일 (토)" */
+    dateLabel: string;
+    /** "15:00" */
+    timeLabel: string;
     /** 예상 소요시간(원본 duration 문자열) */
     duration: string;
 };
@@ -28,27 +31,20 @@ type MatchingRow = {
     duration: string;
 };
 
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
 /** basic/plus → Basic/Plus (공용 헬퍼 래핑, 알 수 없는 값은 Basic) */
 function planLabel(plan: string): "Basic" | "Plus" {
     return planDisplay(plan === "plus" ? "plus" : "basic");
 }
 
-/** "HH:mm:ss"/"HH:mm" → "HH:mm" (그 외 형태면 원본 유지) */
-function toHhmm(reserveTime: string): string {
-    const m = /^(\d{1,2}):(\d{2})/.exec(reserveTime.trim());
-    if (!m) return reserveTime;
-    return `${m[1].padStart(2, "0")}:${m[2]}`;
-}
-
 /**
- * use_date(YYYY-MM-DD) + reserve_time → "오늘/내일/M월 D일 HH:mm" 라벨.
+ * use_date(YYYY-MM-DD) → "오늘" / "내일" / "9월 5일 (토)".
  * 오늘/내일은 서버 로컬 날짜 기준으로 판별한다.
  */
-function formatListTime(useDate: string, reserveTime: string): string {
-    const hhmm = toHhmm(reserveTime);
-
+function formatDateLabel(useDate: string): string {
     const [y, mo, d] = useDate.split("-").map((n) => Number(n));
-    if (!y || !mo || !d) return `${useDate} ${hhmm}`;
+    if (!y || !mo || !d) return useDate;
 
     const target = new Date(y, mo - 1, d);
     const now = new Date();
@@ -57,9 +53,9 @@ function formatListTime(useDate: string, reserveTime: string): string {
         (target.getTime() - today.getTime()) / 86_400_000,
     );
 
-    if (diffDays === 0) return `오늘 ${hhmm}`;
-    if (diffDays === 1) return `내일 ${hhmm}`;
-    return `${mo}월 ${d}일 ${hhmm}`;
+    if (diffDays === 0) return "오늘";
+    if (diffDays === 1) return "내일";
+    return `${mo}월 ${d}일 (${WEEKDAYS[target.getDay()] ?? ""})`;
 }
 
 /**
@@ -150,7 +146,8 @@ export async function getPartnerMatchingRequests(): Promise<
             plan: planLabel(r.plan),
             hospital: r.hospital_address,
             type: r.treatment,
-            listTime: formatListTime(r.use_date, r.reserve_time),
+            dateLabel: formatDateLabel(r.use_date),
+            timeLabel: toHhmm(r.reserve_time),
             duration: r.duration,
         }));
     } catch {
@@ -161,8 +158,6 @@ export async function getPartnerMatchingRequests(): Promise<
 // =============================================================
 // 상세 조회 (수락/거절 화면)
 // =============================================================
-
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 export type PartnerRequestDetail = {
     id: string;

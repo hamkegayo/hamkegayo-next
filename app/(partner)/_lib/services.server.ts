@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { toHhmm } from "@/lib/format";
 import {
     planDisplay,
     type PlanCode,
@@ -69,11 +70,6 @@ function formatDate(useDate: string): string {
     if (!y || !mo || !d) return useDate;
     const weekday = WEEKDAYS[new Date(y, mo - 1, d).getDay()] ?? "";
     return `${y}.${String(mo).padStart(2, "0")}.${String(d).padStart(2, "0")} (${weekday})`;
-}
-
-function toHhmm(time: string): string {
-    const m = /^(\d{1,2}):(\d{2})/.exec(time.trim());
-    return m ? `${m[1].padStart(2, "0")}:${m[2]}` : time;
 }
 
 /** ISO → "HH:mm" (기록 시각 표시용) */

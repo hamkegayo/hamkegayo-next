@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { toHhmm } from "@/lib/format";
 import { createAdminClient } from "@/utils/supabase/admin";
 import {
     PLAN_INFO,
@@ -95,12 +96,6 @@ const PLAN_INCLUDES: Record<PlanCode, string[]> = {
         "보호자 리포트 전달",
     ],
 };
-
-function toHhmm(time: string): string {
-    const m = /^(\d{1,2})\D+(\d{1,2})/.exec(time.trim());
-    if (!m) return time;
-    return `${m[1].padStart(2, "0")}:${m[2].padStart(2, "0")}`;
-}
 
 /** "YYYY-MM-DD" + 시간 → "YYYY. MM. DD (요일) 오전/오후 h:mm" */
 function formatDateTime(useDate: string, time: string): string {
