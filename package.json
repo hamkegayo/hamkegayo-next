@@ -8,6 +8,8 @@
         "start": "next start",
         "lint": "eslint",
         "typecheck": "tsc --noEmit",
+        "seed:dev": "node --env-file=.env.local scripts/seed-dev.mjs",
+        "test:payments": "node --env-file=.env.local scripts/test-payment-flow.mjs",
         "prepare": "husky"
     },
     "dependencies": {
