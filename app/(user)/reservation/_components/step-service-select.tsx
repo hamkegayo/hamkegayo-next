@@ -117,7 +117,8 @@ export function StepServiceSelect() {
                                     </div>
                                     <div className="border-brand/30 mt-4 border-b" />
 
-                                    <ul className="mt-6 flex flex-col gap-3">
+                                    {/* flex-1 — 항목 수가 달라도 가격·버튼이 카드 바닥에 맞춰지도록 */}
+                                    <ul className="mt-6 flex flex-1 flex-col gap-3">
                                         {plan.features.map((f) => (
                                             <li
                                                 key={f}
