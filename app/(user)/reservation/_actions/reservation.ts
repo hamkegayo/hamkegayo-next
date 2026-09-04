@@ -60,6 +60,8 @@ export async function createReservation(
         treatment: v.treatment,
         purpose: v.purpose,
         cautions: v.cautions ?? null,
+        mobility_status: v.mobilityStatus,
+        cognitive_status: v.cognitiveStatus,
         doc_prescription: v.docPrescription ?? false,
         doc_receipt: v.docReceipt ?? false,
         doc_certificate: v.docCertificate ?? false,
@@ -69,6 +71,7 @@ export async function createReservation(
         reserve_time: v.reserveTime,
         duration: v.duration,
         depart_address: v.departAddress,
+        hospital_name: v.hospitalName,
         hospital_address: v.hospitalAddress,
 
         duration_minutes: quote.durationMinutes,

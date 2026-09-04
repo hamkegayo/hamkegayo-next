@@ -19,6 +19,8 @@ export type ReservationData = {
     // STEP1 · 진료 정보
     treatment: string;
     purpose: string;
+    mobilityStatus: string;
+    cognitiveStatus: string;
     cautions: string;
     docPrescription: boolean;
     docReceipt: boolean;
@@ -30,6 +32,7 @@ export type ReservationData = {
     reserveTime: string;
     duration: string;
     departAddress: string;
+    hospitalName: string;
     hospitalAddress: string;
     // STEP3 · 서비스 선택
     plan: Plan;
@@ -52,6 +55,8 @@ const initialData: ReservationData = {
     relation: "",
     treatment: "",
     purpose: "",
+    mobilityStatus: "",
+    cognitiveStatus: "",
     cautions: "",
     docPrescription: false,
     docReceipt: false,
@@ -62,6 +67,7 @@ const initialData: ReservationData = {
     reserveTime: "",
     duration: "",
     departAddress: "",
+    hospitalName: "",
     hospitalAddress: "",
     plan: "",
     partnerId: "",
