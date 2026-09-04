@@ -14,7 +14,11 @@ import {
     type ReservationData,
 } from "../_store/reservation-store";
 import { step1Schema, type Step1Values } from "../_lib/schema";
-import { RELATION_OPTIONS } from "../_lib/options";
+import {
+    COGNITIVE_OPTIONS,
+    MOBILITY_OPTIONS,
+    RELATION_OPTIONS,
+} from "../_lib/options";
 import { StepBand, StepNav } from "./step-band";
 import { FieldError, FieldLabel, NativeSelect, Textarea } from "./fields";
 
@@ -48,6 +52,8 @@ export function StepUserInfo() {
             relation: data.relation,
             treatment: data.treatment,
             purpose: data.purpose,
+            mobilityStatus: data.mobilityStatus,
+            cognitiveStatus: data.cognitiveStatus,
             cautions: data.cautions,
             docPrescription: data.docPrescription,
             docReceipt: data.docReceipt,
@@ -316,6 +322,62 @@ export function StepUserInfo() {
                                 />
                                 <FieldError>
                                     {errors.purpose?.message}
+                                </FieldError>
+                            </div>
+                        </div>
+
+                        {/*
+                         * 거동·인지 상태는 파트너가 수락 여부를 판단하는 근거라
+                         * 매칭 전에 제공된다 (개인정보처리방침 제5조 ④).
+                         * 아래 '주의해야 할 점' 은 예약 확정 후에만 전달된다.
+                         */}
+                        <div className="mt-5 grid gap-5 md:grid-cols-2">
+                            <div>
+                                <FieldLabel htmlFor="mobilityStatus" required>
+                                    거동 상태
+                                </FieldLabel>
+                                <NativeSelect
+                                    id="mobilityStatus"
+                                    aria-invalid={!!errors.mobilityStatus}
+                                    {...register("mobilityStatus", {
+                                        onChange: () =>
+                                            errors.mobilityStatus &&
+                                            clearErrors("mobilityStatus"),
+                                    })}
+                                >
+                                    <option value="">선택하세요</option>
+                                    {MOBILITY_OPTIONS.map((m) => (
+                                        <option key={m} value={m}>
+                                            {m}
+                                        </option>
+                                    ))}
+                                </NativeSelect>
+                                <FieldError>
+                                    {errors.mobilityStatus?.message}
+                                </FieldError>
+                            </div>
+                            <div>
+                                <FieldLabel htmlFor="cognitiveStatus" required>
+                                    인지 상태
+                                </FieldLabel>
+                                <NativeSelect
+                                    id="cognitiveStatus"
+                                    aria-invalid={!!errors.cognitiveStatus}
+                                    {...register("cognitiveStatus", {
+                                        onChange: () =>
+                                            errors.cognitiveStatus &&
+                                            clearErrors("cognitiveStatus"),
+                                    })}
+                                >
+                                    <option value="">선택하세요</option>
+                                    {COGNITIVE_OPTIONS.map((c) => (
+                                        <option key={c} value={c}>
+                                            {c}
+                                        </option>
+                                    ))}
+                                </NativeSelect>
+                                <FieldError>
+                                    {errors.cognitiveStatus?.message}
                                 </FieldError>
                             </div>
                         </div>

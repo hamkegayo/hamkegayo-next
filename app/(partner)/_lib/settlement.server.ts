@@ -2,20 +2,24 @@ import { createClient } from "@/utils/supabase/server";
 import { planDisplay, type PlanCode } from "@/lib/reservation";
 import type { Settlement, SettlementSummary } from "./settlement";
 
-type ServiceRow = {
+/**
+ * 정산 이력은 partner_list_settlements() RPC 로 읽는다 — #66 · #67
+ *
+ * 서비스 종료 후 24시간이 지나면 파트너의 예약 접근이 차단되므로(처리방침 제9조 ④),
+ * settlements → services → reservations 조인이 끊겨 목록이 비어버린다.
+ * RPC 는 이용자 개인정보 없이 예약번호 · 일자 · 금액만 돌려준다.
+ */
+type SettlementRow = {
     id: string;
+    code: string;
+    use_date: string;
+    plan: string;
     amount: number;
     fee: number;
     net: number;
     status: "PENDING" | "PAID";
     settled_at: string | null;
-    services: {
-        reservations: {
-            plan: string;
-            hospital_address: string;
-            use_date: string;
-        } | null;
-    } | null;
+    created_at: string;
 };
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -42,14 +46,14 @@ function displayId(id: string, useDate: string): string {
     return `ST-${ym}-${id.slice(0, 4).toUpperCase()}`;
 }
 
-function toView(r: ServiceRow): Settlement {
-    const res = r.services?.reservations ?? null;
-    const planCode: PlanCode = res?.plan === "plus" ? "plus" : "basic";
-    const useDate = res?.use_date ?? "";
+function toView(r: SettlementRow): Settlement {
+    const planCode: PlanCode = r.plan === "plus" ? "plus" : "basic";
+    const useDate = r.use_date ?? "";
     return {
         id: displayId(r.id, useDate),
         serviceDate: useDate ? formatDate(useDate) : "",
-        hospital: res?.hospital_address ?? "",
+        // 병원명·주소는 종료 후 접근이 차단되므로 예약번호로 대신한다 (제9조 ④)
+        hospital: r.code,
         plan: planDisplay(planCode),
         // 파트너에게 보여줄 기본 금액은 실지급액이다.
         amount: r.net,
@@ -78,16 +82,12 @@ export async function getPartnerSettlements(): Promise<{
         } = await supabase.auth.getUser();
         if (!user) return { settlements: [], summary: empty };
 
-        const { data, error } = await supabase
-            .from("settlements")
-            .select(
-                "id, amount, fee, net, status, settled_at, services!inner(reservations!inner(plan, hospital_address, use_date))",
-            )
-            .eq("partner_id", user.id)
-            .order("created_at", { ascending: false })
-            .returns<ServiceRow[]>();
+        const { data: raw, error } = await supabase.rpc(
+            "partner_list_settlements",
+        );
 
-        if (error || !data) return { settlements: [], summary: empty };
+        if (error || !raw) return { settlements: [], summary: empty };
+        const data = raw as SettlementRow[];
 
         const settlements = data.map(toView);
         const summary: SettlementSummary = {

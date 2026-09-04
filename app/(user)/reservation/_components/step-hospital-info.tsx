@@ -29,6 +29,7 @@ export function StepHospitalInfo() {
             reserveTime: data.reserveTime,
             duration: data.duration,
             departAddress: data.departAddress,
+            hospitalName: data.hospitalName,
             hospitalAddress: data.hospitalAddress,
         },
     });
@@ -175,6 +176,26 @@ export function StepHospitalInfo() {
                                 />
                                 <FieldError>
                                     {errors.departAddress?.message}
+                                </FieldError>
+                            </div>
+
+                            <div>
+                                {/* 병원명은 매칭 전 파트너에게 제공된다 (처리방침 제5조 ②) */}
+                                <FieldLabel htmlFor="hospitalName" required>
+                                    병원 이름
+                                </FieldLabel>
+                                <Input
+                                    id="hospitalName"
+                                    placeholder="세브란스병원"
+                                    aria-invalid={!!errors.hospitalName}
+                                    {...register("hospitalName", {
+                                        onChange: () =>
+                                            errors.hospitalName &&
+                                            clearErrors("hospitalName"),
+                                    })}
+                                />
+                                <FieldError>
+                                    {errors.hospitalName?.message}
                                 </FieldError>
                             </div>
 
