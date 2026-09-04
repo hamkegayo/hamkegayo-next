@@ -92,7 +92,7 @@ export function StepComplete() {
     return (
         <>
             <StepBand
-                index={7}
+                index={8}
                 title="예약이 확정되었습니다."
                 subtitles={[
                     "선택하신 파트너와의 매칭이 확정되었습니다.",
@@ -168,7 +168,9 @@ export function StepComplete() {
                             />
                             <InfoRow
                                 label="병원"
-                                value={data.hospitalAddress}
+                                value={
+                                    data.hospitalName || data.hospitalAddress
+                                }
                             />
                             <InfoRow label="이용자" value={data.userName} />
                             <InfoRow label="연락처" value={data.userPhone} />

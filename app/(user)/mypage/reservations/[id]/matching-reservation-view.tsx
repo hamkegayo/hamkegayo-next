@@ -18,7 +18,7 @@ import type {
     CustomerReservation,
     ReservationApplicant,
 } from "../../_lib/matching.server";
-import { confirmPartner } from "../../_actions/matching";
+import { selectPartner } from "../../_actions/matching";
 import { cancelReservation } from "@/app/(user)/reservation/_actions/matching";
 
 function statusBadge(status: CustomerReservation["status"]) {
@@ -51,15 +51,22 @@ export function MatchingReservationView({
         (a) => a.partnerId === reservation.confirmedPartnerId,
     );
 
+    /**
+     * 파트너 선택 — 확정이 아니라 **결제 단계로 넘어가는 것**이다 (약관 제9조 ④).
+     * 선택 시점부터 30분 안에 선결제를 마쳐야 예약이 확정된다.
+     */
     const onConfirm = () => {
         if (!selected) return;
         const partnerId = selected.partnerId;
         startTransition(async () => {
-            const res = await confirmPartner(reservation.id, partnerId);
+            const res = await selectPartner(reservation.id, partnerId);
             setSelected(null);
             if (res.ok) {
-                toast.success("파트너를 확정했습니다.");
-                router.refresh();
+                toast.success(
+                    "파트너를 선택했습니다. 결제를 완료하면 예약이 확정됩니다.",
+                );
+                // 예약 플로우의 결제 단계(STEP7)로 보낸다.
+                router.push(`/reservation?pay=resume&rid=${reservation.id}`);
             } else {
                 toast.error(res.message);
             }

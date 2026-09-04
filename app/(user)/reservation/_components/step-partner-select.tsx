@@ -7,7 +7,8 @@ import { toast } from "sonner";
 import { Section } from "@/app/(user)/_components/home/section";
 import { ConfirmModal } from "@/components/ui/modal";
 import { Avatar } from "@/components/ui/avatar";
-import { confirmPartner } from "@/app/(user)/mypage/_actions/matching";
+import { selectPartner } from "@/app/(user)/mypage/_actions/matching";
+import { resumeReservation } from "../_actions/payment";
 import { useReservationStore } from "../_store/reservation-store";
 import {
     getReservationApplicantsDetailed,
@@ -42,22 +43,33 @@ export function StepPartnerSelect() {
         };
     }, [reservationId]);
 
+    /**
+     * 파트너 선택 — **확정이 아니다.** 약관 제9조 ④ 에 따라 선결제를 마쳐야 확정된다.
+     * 선택하면 30분 결제 기한이 걸리고 STEP7(결제)로 넘어간다.
+     */
     const onConfirm = () => {
         if (!selected || !reservationId) return;
         const partner = selected;
         startTransition(async () => {
-            const res = await confirmPartner(reservationId, partner.partnerId);
+            const res = await selectPartner(reservationId, partner.partnerId);
             setSelected(null);
-            if (res.ok) {
-                patch({
-                    partnerId: partner.partnerId,
-                    confirmedPartnerName: partner.name,
-                });
-                toast.success("파트너를 확정했습니다.");
-                next();
-            } else {
+            if (!res.ok) {
                 toast.error(res.message);
+                return;
             }
+
+            // 결제 화면이 쓸 금액·포인트 잔액을 서버에서 받아온다.
+            const state = await resumeReservation(reservationId);
+
+            patch({
+                partnerId: partner.partnerId,
+                confirmedPartnerName: partner.name,
+                paymentDeadline: res.paymentDeadline,
+                prepaidAmount: state?.prepaidAmount ?? 0,
+                pointBalance: state?.pointBalance ?? 0,
+            });
+            toast.success("파트너를 선택했습니다. 결제를 진행해 주세요.");
+            next();
         });
     };
 
@@ -81,8 +93,8 @@ export function StepPartnerSelect() {
                         </span>
                     </h3>
                     <p className="text-muted-foreground mt-1 text-sm">
-                        한 분을 선택하면 예약이 확정되고, 다른 지원 파트너는
-                        자동으로 마감됩니다.
+                        한 분을 선택하면 결제 단계로 넘어갑니다. 결제가 완료되면
+                        예약이 확정되고 다른 지원 파트너는 자동으로 마감됩니다.
                     </p>
 
                     {applicants.length === 0 ? (
@@ -179,17 +191,21 @@ export function StepPartnerSelect() {
                 open={selected !== null}
                 onClose={() => setSelected(null)}
                 onConfirm={onConfirm}
-                title="이 파트너로 확정할까요?"
+                title="이 파트너로 진행할까요?"
                 cancelLabel="돌아가기"
-                confirmLabel="파트너 확정"
+                confirmLabel="선택하고 결제하기"
                 confirmDisabled={pending}
             >
                 <p className="text-muted-foreground mt-3 text-left text-sm leading-relaxed">
                     <span className="text-foreground font-bold">
                         {selected?.name}
                     </span>{" "}
-                    님으로 예약이 확정되며, 다른 지원 파트너는 자동으로
-                    마감됩니다. 확정 후에는 변경할 수 없습니다.
+                    님을 선택하고 결제 단계로 이동합니다.{" "}
+                    <span className="text-foreground font-semibold">
+                        30분 안에 결제
+                    </span>
+                    하지 않으면 선택이 해제되어 다시 고르셔야 합니다. 결제가
+                    완료되면 예약이 확정되고 다른 지원 파트너는 마감됩니다.
                 </p>
             </ConfirmModal>
         </>

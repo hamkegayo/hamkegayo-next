@@ -37,35 +37,12 @@ export const RELATION_OPTIONS: string[] = [
     "기타",
 ];
 
-/** 결제수단 */
-export const PAY_METHODS: { value: string; label: string }[] = [
-    { value: "card", label: "카드" },
-    { value: "bank", label: "무통장" },
-];
-
-/** 결제 카드사 */
-export const CARD_COMPANIES: string[] = [
-    "신한카드",
-    "삼성카드",
-    "현대카드",
-    "국민카드",
-    "우리카드",
-    "하나카드",
-    "롯데카드",
-    "BC카드",
-    "농협카드",
-];
-
-/** 할부 기간 */
-export const INSTALLMENTS: string[] = [
-    "일시불",
-    "2개월",
-    "3개월",
-    "4개월",
-    "5개월",
-    "6개월",
-    "12개월",
-];
+/*
+ * 결제수단·카드사·할부 옵션은 #54 에서 제거했다.
+ *  - 카드사·카드번호·유효기간 : PG 결제창이 직접 받는다. 우리가 받으면 PCI-DSS 대상이 된다
+ *  - 할부                     : NICEPAY 결제창 안에서 고객이 고른다
+ *  - 결제수단                 : 카드 + 간편결제를 결제창이 함께 제공한다
+ */
 
 /**
  * 거동 상태 — 민감정보(처리방침 제3조 ①).

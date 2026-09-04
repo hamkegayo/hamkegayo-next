@@ -20,30 +20,33 @@ import { createAdminClient } from "@/utils/supabase/admin";
  *    ⑦ 실패 시 승인 취소 + 포인트 복원
  *
  *  브라우저가 POST 로 이동해 오므로 응답은 JSON 이 아니라 **redirect** 다.
+ *  결제창을 거치며 클라이언트 스토어가 날아갔으므로 `rid` 를 실어 보내
+ *  예약 플로우가 DB 에서 상태를 복원하게 한다 (#54).
  */
 export const dynamic = "force-dynamic";
 
 /** 결과 화면으로 보낸다. 실패 사유는 코드로만 넘기고 상세는 서버 로그에 남긴다. */
 function redirectTo(
     request: NextRequest,
-    path: string,
-    params: Record<string, string>,
+    params: Record<string, string | undefined>,
 ) {
-    const url = new URL(path, request.nextUrl.origin);
-    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    const url = new URL("/reservation", request.nextUrl.origin);
+    for (const [k, v] of Object.entries(params)) {
+        if (v) url.searchParams.set(k, v);
+    }
     // 303 — POST 를 GET 으로 바꿔 이동시킨다(새로고침 시 재전송 방지).
     return NextResponse.redirect(url, 303);
+}
+
+/** 결제 실패. rid 를 알면 함께 실어 결제 화면으로 되돌린다. */
+function fail(request: NextRequest, code: string, rid?: string) {
+    return redirectTo(request, { pay: "fail", code, rid });
 }
 
 export async function POST(request: NextRequest) {
     const form = await request.formData().catch(() => null);
 
-    if (!form) {
-        return redirectTo(request, "/reservation", {
-            pay: "fail",
-            code: "BAD_REQUEST",
-        });
-    }
+    if (!form) return fail(request, "BAD_REQUEST");
 
     const auth = parseAuthResult(form);
     const admin = createAdminClient();
@@ -53,12 +56,10 @@ export async function POST(request: NextRequest) {
         console.warn(
             `[payments/confirm] 인증 실패 code=${auth.code} msg=${auth.message} order=${auth.orderId ?? "-"}`,
         );
-        if (auth.orderId)
-            await cancelPending(admin, auth.orderId, "결제창 인증 실패");
-        return redirectTo(request, "/reservation", {
-            pay: "fail",
-            code: auth.code || "AUTH_FAILED",
-        });
+        const rid = auth.orderId
+            ? await cancelPending(admin, auth.orderId, "결제창 인증 실패")
+            : undefined;
+        return fail(request, auth.code || "AUTH_FAILED", rid);
     }
 
     const gateway = getPaymentGateway();
@@ -68,11 +69,12 @@ export async function POST(request: NextRequest) {
         console.error(
             `[payments/confirm] signature 불일치 order=${auth.orderId} tid=${auth.transactionId}`,
         );
-        await cancelPending(admin, auth.orderId, "signature 검증 실패");
-        return redirectTo(request, "/reservation", {
-            pay: "fail",
-            code: "INVALID_SIGNATURE",
-        });
+        const rid = await cancelPending(
+            admin,
+            auth.orderId,
+            "signature 검증 실패",
+        );
+        return fail(request, "INVALID_SIGNATURE", rid);
     }
 
     // ---------- ② 결제 행 조회 ----------
@@ -90,12 +92,10 @@ export async function POST(request: NextRequest) {
             `[payments/confirm] 알 수 없는 주문번호 order=${auth.orderId}`,
         );
         await netCancelQuietly(auth.orderId);
-        return redirectTo(request, "/reservation", {
-            pay: "fail",
-            code: "UNKNOWN_ORDER",
-        });
+        return fail(request, "UNKNOWN_ORDER");
     }
 
+    const rid = payment.reservation_id;
     const reservation = payment.reservations as unknown as {
         id: string;
         code: string;
@@ -104,20 +104,14 @@ export async function POST(request: NextRequest) {
         payment_deadline: string | null;
     };
 
-    // 이미 승인이 끝난 결제 — 새로고침이나 중복 전송이다. 성공 화면으로 보낸다.
+    // 이미 승인이 끝난 결제 — 새로고침이나 중복 전송이다. 완료 화면으로 보낸다.
     if (payment.status === "PAID") {
-        return redirectTo(request, "/mypage/reservations", {
-            pay: "done",
-            code: reservation.code,
-        });
+        return redirectTo(request, { pay: "done", rid });
     }
 
     if (payment.status !== "PENDING") {
         await netCancelQuietly(auth.orderId);
-        return redirectTo(request, "/reservation", {
-            pay: "fail",
-            code: "PAYMENT_NOT_PENDING",
-        });
+        return fail(request, "PAYMENT_NOT_PENDING", rid);
     }
 
     // ---------- ③ 금액 대조 ----------
@@ -129,10 +123,7 @@ export async function POST(request: NextRequest) {
         );
         await netCancelQuietly(auth.orderId);
         await failPayment(admin, payment.id, "금액 불일치");
-        return redirectTo(request, "/reservation", {
-            pay: "fail",
-            code: "AMOUNT_MISMATCH",
-        });
+        return fail(request, "AMOUNT_MISMATCH", rid);
     }
 
     // ---------- ④ 만료·재선택 재확인 ----------
@@ -150,10 +141,7 @@ export async function POST(request: NextRequest) {
         );
         await netCancelQuietly(auth.orderId);
         await failPayment(admin, payment.id, "결제 기한 만료 또는 선택 해제");
-        return redirectTo(request, "/reservation", {
-            pay: "fail",
-            code: "PAYMENT_EXPIRED",
-        });
+        return fail(request, "PAYMENT_EXPIRED", rid);
     }
 
     // ---------- ⑤ PG 승인 — 여기서 돈이 빠진다 ----------
@@ -173,10 +161,7 @@ export async function POST(request: NextRequest) {
         if (err?.indeterminate) await netCancelQuietly(auth.orderId);
 
         await failPayment(admin, payment.id, err?.message ?? "승인 실패");
-        return redirectTo(request, "/reservation", {
-            pay: "fail",
-            code: err?.code ?? "APPROVE_FAILED",
-        });
+        return fail(request, err?.code ?? "APPROVE_FAILED", rid);
     }
 
     if (approved.status !== "PAID") {
@@ -189,10 +174,7 @@ export async function POST(request: NextRequest) {
             "승인 상태 이상",
         );
         await failPayment(admin, payment.id, `승인 상태 ${approved.status}`);
-        return redirectTo(request, "/reservation", {
-            pay: "fail",
-            code: "APPROVE_NOT_PAID",
-        });
+        return fail(request, "APPROVE_NOT_PAID", rid);
     }
 
     // ---------- ⑥ 확정 — PAID 전이 + 예약 확정을 한 트랜잭션에 ----------
@@ -215,16 +197,13 @@ export async function POST(request: NextRequest) {
             "예약 확정 실패로 자동 취소",
         );
         await failPayment(admin, payment.id, finalizeError.message);
-        return redirectTo(request, "/reservation", {
-            pay: "fail",
-            code: "CONFIRM_FAILED",
-        });
+        return fail(request, "CONFIRM_FAILED", rid);
     }
 
-    return redirectTo(request, "/mypage/reservations", {
-        pay: "done",
-        code: reservation.code,
-    });
+    // 확정됐으니 파트너에게 알린다 — 선택 시점이 아니라 결제 완료 시점이다(제9조 ④).
+    await notifyPartner(admin, reservation.confirmed_partner_id);
+
+    return redirectTo(request, { pay: "done", rid });
 }
 
 // =============================================================
@@ -234,20 +213,21 @@ export async function POST(request: NextRequest) {
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
-/** PENDING 결제를 접고 선점 포인트를 복원한다 */
+/** PENDING 결제를 접고 선점 포인트를 복원한다. 예약 id 를 돌려준다. */
 async function cancelPending(
     admin: AdminClient,
     orderId: string,
     reason: string,
-) {
+): Promise<string | undefined> {
     const { data } = await admin
         .from("payments")
-        .select("id, status")
+        .select("id, status, reservation_id")
         .eq("order_id", orderId)
         .maybeSingle();
 
-    if (!data || data.status !== "PENDING") return;
-    await failPayment(admin, data.id, reason);
+    if (!data) return undefined;
+    if (data.status === "PENDING") await failPayment(admin, data.id, reason);
+    return data.reservation_id;
 }
 
 /** 결제를 FAILED 로 내리고 포인트를 되돌린다 */
@@ -295,5 +275,24 @@ async function netCancelQuietly(orderId: string) {
         await getPaymentGateway().netCancel({ orderId });
     } catch {
         // 승인된 적이 없으면 "거래내역 없음"이 정상 응답이다. 조용히 넘긴다.
+    }
+}
+
+/** 확정 알림. 실패해도 결제는 이미 끝났으므로 흐름을 막지 않는다. */
+async function notifyPartner(admin: AdminClient, partnerId: string | null) {
+    if (!partnerId) return;
+    try {
+        const { error } = await admin.from("notifications").insert({
+            recipient_id: partnerId,
+            type: "RESERVATION_CONFIRMED",
+            title: "예약이 확정되었어요",
+            body: "고객이 결제를 완료해 예약이 확정되었습니다. 진행 관리에서 확인해 주세요.",
+            link: "/partner/management",
+        });
+        if (error) {
+            console.error("[payments/confirm] 파트너 알림 실패", error);
+        }
+    } catch (e) {
+        console.error("[payments/confirm] 파트너 알림 예외", e);
     }
 }
