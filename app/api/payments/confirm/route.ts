@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getPaymentGateway, parseAuthResult } from "@/lib/payments/nicepay";
+import { reportIncident } from "@/lib/payments/incident";
 import { PaymentGatewayError } from "@/lib/payments/types";
 import { createAdminClient } from "@/utils/supabase/admin";
 
@@ -88,10 +89,14 @@ export async function POST(request: NextRequest) {
 
     if (!payment) {
         // 우리가 만들지 않은 주문번호다. 승인하지 않고 즉시 망취소한다.
-        console.error(
-            `[payments/confirm] 알 수 없는 주문번호 order=${auth.orderId}`,
-        );
+        // 반복되면 공격 신호이므로 기록한다.
         await netCancelQuietly(auth.orderId);
+        await reportIncident({
+            kind: "UNKNOWN_ORDER",
+            orderId: auth.orderId,
+            amount: auth.amount,
+            detail: { transactionId: auth.transactionId },
+        });
         return fail(request, "UNKNOWN_ORDER");
     }
 
@@ -118,11 +123,17 @@ export async function POST(request: NextRequest) {
     const expected = payment.gross_amount - payment.discount_amount;
 
     if (auth.amount !== expected) {
-        console.error(
-            `[payments/confirm] 금액 불일치 order=${auth.orderId} 결제창=${auth.amount} DB=${expected}`,
-        );
+        // 서명은 유효한데 금액이 다르다 → 위변조 시도일 수 있다.
         await netCancelQuietly(auth.orderId);
-        await failPayment(admin, payment.id, "금액 불일치");
+        await failPayment(admin, payment.id, "금액 불일치", auth.orderId);
+        await reportIncident({
+            kind: "AMOUNT_MISMATCH",
+            orderId: auth.orderId,
+            paymentId: payment.id,
+            reservationCode: reservation.code,
+            amount: expected,
+            detail: { requested: auth.amount, expected },
+        });
         return fail(request, "AMOUNT_MISMATCH", rid);
     }
 
@@ -136,11 +147,17 @@ export async function POST(request: NextRequest) {
         !reservation.confirmed_partner_id ||
         expired
     ) {
+        // 정상 흐름이다(사용자가 늦었거나 선택이 풀렸다). 사고가 아니므로 로그만 남긴다.
         console.warn(
             `[payments/confirm] 승인 직전 상태 변경 order=${auth.orderId} status=${reservation.status} expired=${expired}`,
         );
         await netCancelQuietly(auth.orderId);
-        await failPayment(admin, payment.id, "결제 기한 만료 또는 선택 해제");
+        await failPayment(
+            admin,
+            payment.id,
+            "결제 기한 만료 또는 선택 해제",
+            auth.orderId,
+        );
         return fail(request, "PAYMENT_EXPIRED", rid);
     }
 
@@ -153,27 +170,53 @@ export async function POST(request: NextRequest) {
         });
     } catch (e) {
         const err = e instanceof PaymentGatewayError ? e : null;
-        console.error(
-            `[payments/confirm] 승인 실패 order=${auth.orderId} code=${err?.code} msg=${err?.message ?? String(e)}`,
-        );
 
         // 응답을 못 받았다면 승인이 나갔을 수도 있다 → 재시도 대신 망취소로 정리한다.
-        if (err?.indeterminate) await netCancelQuietly(auth.orderId);
+        if (err?.indeterminate) {
+            await netCancelQuietly(auth.orderId);
+            // 망취소가 통했는지 알 수 없다. 사람이 PG 콘솔에서 확인해야 한다.
+            await reportIncident({
+                kind: "APPROVE_INDETERMINATE",
+                orderId: auth.orderId,
+                paymentId: payment.id,
+                reservationCode: reservation.code,
+                amount: expected,
+                detail: {
+                    transactionId: auth.transactionId,
+                    pgCode: err.code,
+                    pgMessage: err.message,
+                },
+            });
+        } else {
+            // PG 가 거절을 명시한 경우(한도 초과·카드 오류 등)는 사고가 아니다.
+            console.warn(
+                `[payments/confirm] 승인 거절 order=${auth.orderId} code=${err?.code} msg=${err?.message ?? String(e)}`,
+            );
+        }
 
-        await failPayment(admin, payment.id, err?.message ?? "승인 실패");
+        await failPayment(
+            admin,
+            payment.id,
+            err?.message ?? "승인 실패",
+            auth.orderId,
+        );
         return fail(request, err?.code ?? "APPROVE_FAILED", rid);
     }
 
     if (approved.status !== "PAID") {
-        console.error(
-            `[payments/confirm] 승인 응답이 PAID 가 아님 order=${auth.orderId} status=${approved.status}`,
-        );
         await cancelApproved(
             auth.transactionId,
             auth.orderId,
             "승인 상태 이상",
+            payment.id,
+            expected,
         );
-        await failPayment(admin, payment.id, `승인 상태 ${approved.status}`);
+        await failPayment(
+            admin,
+            payment.id,
+            `승인 상태 ${approved.status}`,
+            auth.orderId,
+        );
         return fail(request, "APPROVE_NOT_PAID", rid);
     }
 
@@ -188,15 +231,32 @@ export async function POST(request: NextRequest) {
 
     if (finalizeError) {
         // ---------- ⑦ 돈은 받았는데 확정에 실패했다. 승인을 되돌린다 ----------
-        console.error(
-            `[payments/confirm] 확정 실패 → 승인 취소 order=${auth.orderId} err=${finalizeError.message}`,
-        );
+        // 취소가 성공하면 고객 손해는 없다. 취소마저 실패하면 cancelApproved 가
+        // CANCEL_FAILED 로 따로 알린다.
+        await reportIncident({
+            kind: "FINALIZE_FAILED",
+            orderId: auth.orderId,
+            paymentId: payment.id,
+            reservationCode: reservation.code,
+            amount: expected,
+            detail: {
+                transactionId: approved.transactionId,
+                dbError: finalizeError.message,
+            },
+        });
         await cancelApproved(
             approved.transactionId,
             auth.orderId,
             "예약 확정 실패로 자동 취소",
+            payment.id,
+            expected,
         );
-        await failPayment(admin, payment.id, finalizeError.message);
+        await failPayment(
+            admin,
+            payment.id,
+            finalizeError.message,
+            auth.orderId,
+        );
         return fail(request, "CONFIRM_FAILED", rid);
     }
 
@@ -226,7 +286,9 @@ async function cancelPending(
         .maybeSingle();
 
     if (!data) return undefined;
-    if (data.status === "PENDING") await failPayment(admin, data.id, reason);
+    if (data.status === "PENDING") {
+        await failPayment(admin, data.id, reason, orderId);
+    }
     return data.reservation_id;
 }
 
@@ -235,16 +297,20 @@ async function failPayment(
     admin: AdminClient,
     paymentId: string,
     reason: string,
+    orderId?: string,
 ) {
     const { error } = await admin.rpc("release_points", {
         p_payment_id: paymentId,
         p_memo: reason.slice(0, 200),
     });
     if (error) {
-        console.error(
-            `[payments/confirm] 포인트 복원 실패 payment=${paymentId}`,
-            error,
-        );
+        // 고객 포인트가 차감된 채로 남는다. 사람이 손으로 되돌려야 한다.
+        await reportIncident({
+            kind: "POINT_RESTORE_FAILED",
+            orderId,
+            paymentId,
+            detail: { reason, dbError: error.message },
+        });
     }
 
     await admin
@@ -253,19 +319,36 @@ async function failPayment(
         .eq("id", paymentId);
 }
 
-/** 승인된 거래를 취소한다. 실패하면 로그만 남긴다 — 수동 정산 대상이다. */
+/**
+ * 승인된 거래를 취소한다.
+ *
+ *  ⚠️ 실패하면 **돈은 받았는데 예약이 없는 상태**가 된다.
+ *     여기서 던지면 더 나빠지므로(이미 처리된 것까지 되돌릴 수 없다) 기록만 남기고
+ *     담당자에게 즉시 알린다. 수동 취소 대상이다.
+ */
 async function cancelApproved(
     transactionId: string,
     orderId: string,
     reason: string,
+    paymentId?: string,
+    amount?: number,
 ) {
     try {
         await getPaymentGateway().cancel({ transactionId, orderId, reason });
     } catch (e) {
-        console.error(
-            `[payments/confirm] ⚠️ 승인 취소 실패 — 수동 확인 필요 order=${orderId} tid=${transactionId}`,
-            e,
-        );
+        const err = e instanceof PaymentGatewayError ? e : null;
+        await reportIncident({
+            kind: "CANCEL_FAILED",
+            orderId,
+            paymentId,
+            amount,
+            detail: {
+                transactionId,
+                reason,
+                pgCode: err?.code ?? null,
+                pgMessage: err?.message ?? String(e),
+            },
+        });
     }
 }
 

@@ -151,7 +151,17 @@ async function cleanup() {
         .select("id")
         .like("code", `${CODE_PREFIX}%`);
 
+    // 사고 원장은 예약과 무관한 행(UNKNOWN_ORDER)도 있어 order_id 로 따로 지운다.
+    // 섹션 [3] 이 쓰는 NOT-OURS- 주문번호도 함께 정리한다.
+    for (const prefix of [`${CODE_PREFIX}%`, "NOT-OURS-%"]) {
+        await admin
+            .from("payment_incidents")
+            .delete()
+            .like("order_id", prefix);
+    }
+
     for (const r of rows ?? []) {
+        await admin.from("payment_incidents").delete().eq("reservation_id", r.id);
         await admin.from("points").delete().eq("reservation_id", r.id);
         await admin.from("settlements").delete().eq("service_id", r.id);
         await admin.from("services").delete().eq("reservation_id", r.id);
@@ -666,6 +676,107 @@ try {
             "이전 선점이 복원되어 잔액이 2000 이 된다",
             bal2 === 2000,
             `잔액=${bal2}`,
+        );
+    }
+
+    // ---------- 결제 사고 적재 (#79) ----------
+    // 사고는 "돈이 어긋난 상황" 이므로 기록이 남지 않으면 아무도 모른다.
+    // 여기서는 승인 라우트가 실제로 적재하는지를 본다.
+    console.log("\n[12] 결제 사고 적재");
+    {
+        // 알 수 없는 주문번호로 승인 시도 → UNKNOWN_ORDER
+        const token = "tok-incident";
+        const bogusOrder = `${CODE_PREFIX}-BOGUS-${Date.now()}`;
+        await postConfirm({
+            authResultCode: "0000",
+            tid: "fake-tid-incident",
+            orderId: bogusOrder,
+            amount: "40000",
+            authToken: token,
+            signature: sign(token, 40000),
+        });
+
+        const { data: unknown } = await admin
+            .from("payment_incidents")
+            .select("kind, severity, status, order_id, amount")
+            .eq("order_id", bogusOrder)
+            .maybeSingle();
+
+        check(
+            "알 수 없는 주문 승인 시도가 적재된다",
+            unknown?.kind === "UNKNOWN_ORDER",
+            `kind=${unknown?.kind}`,
+        );
+        check("심각도 MEDIUM 으로 기록된다", unknown?.severity === "MEDIUM");
+        check("OPEN 상태로 시작한다", unknown?.status === "OPEN");
+
+        // 금액 위조 → AMOUNT_MISMATCH (서명은 유효)
+        const s = await makeScenario("incident-amount");
+        const t2 = "tok-amt";
+        await postConfirm({
+            authResultCode: "0000",
+            tid: "fake-tid-amt",
+            orderId: s.orderId,
+            amount: "1000",
+            authToken: t2,
+            signature: sign(t2, 1000),
+        });
+
+        const { data: mismatch } = await admin
+            .from("payment_incidents")
+            .select("kind, severity, amount, detail, reservation_id")
+            .eq("order_id", s.orderId)
+            .eq("kind", "AMOUNT_MISMATCH")
+            .maybeSingle();
+
+        check(
+            "금액 위조가 적재된다",
+            mismatch?.kind === "AMOUNT_MISMATCH",
+            `kind=${mismatch?.kind}`,
+        );
+        check("심각도 HIGH 로 기록된다", mismatch?.severity === "HIGH");
+        check(
+            "요청 금액과 기대 금액이 detail 에 남는다",
+            mismatch?.detail?.requested === 1000 &&
+                mismatch?.detail?.expected === s.gross,
+            JSON.stringify(mismatch?.detail),
+        );
+        check(
+            "예약과 연결된다 (관리자 화면에서 건을 지목할 수 있어야 함)",
+            mismatch?.reservation_id === s.reservation.id,
+        );
+
+        // 개인정보가 새지 않는지 — detail 은 조치용 값만 담아야 한다
+        const { data: all } = await admin
+            .from("payment_incidents")
+            .select("detail")
+            .like("order_id", `${CODE_PREFIX}%`);
+        const leaked = (all ?? []).filter((r) => {
+            const s = JSON.stringify(r.detail ?? {});
+            return /환자|보호자|010-|patient|guardian/.test(s);
+        });
+        check(
+            "detail 에 개인정보가 담기지 않는다",
+            leaked.length === 0,
+            `${leaked.length}건에서 발견`,
+        );
+
+        // 일반 사용자는 사고 원장을 볼 수 없어야 한다
+        const cookieUser = await makeUser("incident-peek", "USER");
+        const anonC = createClient(
+            url,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+            { auth: { persistSession: false, autoRefreshToken: false } },
+        );
+        await anonC.auth.signInWithPassword({
+            email: cookieUser.email,
+            password: cookieUser.password,
+        });
+        const peek = await anonC.from("payment_incidents").select("id");
+        check(
+            "일반 사용자는 사고 원장을 조회할 수 없다",
+            (peek.data ?? []).length === 0,
+            `${(peek.data ?? []).length}건 보임`,
         );
     }
 } finally {

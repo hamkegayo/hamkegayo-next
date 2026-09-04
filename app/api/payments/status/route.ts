@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getPaymentGateway } from "@/lib/payments/nicepay";
+import { reportIncident } from "@/lib/payments/incident";
 import { PaymentGatewayError } from "@/lib/payments/types";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
@@ -87,14 +88,32 @@ export async function GET(request: NextRequest) {
     try {
         const remote = await getPaymentGateway().find({ orderId });
 
+        /**
+         * true 면 "PG 는 결제됐는데 우리 DB 는 아니다" 는 뜻이다.
+         * 화면은 사용자에게 재시도를 권하지 말고 고객센터로 안내해야 한다.
+         */
+        const mismatch = remote.status === "PAID" && payment.status !== "PAID";
+
+        if (mismatch) {
+            // 고객이 돈을 냈는데 예약이 없는 상태다. 사람이 정리해야 한다.
+            await reportIncident({
+                kind: "STATE_MISMATCH",
+                orderId,
+                paymentId: payment.id,
+                reservationCode: reservation.code,
+                amount: base.amount,
+                detail: {
+                    dbStatus: payment.status,
+                    gatewayStatus: remote.status,
+                    transactionId: remote.transactionId,
+                },
+            });
+        }
+
         return NextResponse.json({
             ...base,
             gatewayStatus: remote.status,
-            /**
-             * true 면 "PG 는 결제됐는데 우리 DB 는 아니다" 는 뜻이다.
-             * 화면은 사용자에게 재시도를 권하지 말고 고객센터로 안내해야 한다.
-             */
-            mismatch: remote.status === "PAID" && payment.status !== "PAID",
+            mismatch,
         });
     } catch (e) {
         const err = e instanceof PaymentGatewayError ? e : null;
