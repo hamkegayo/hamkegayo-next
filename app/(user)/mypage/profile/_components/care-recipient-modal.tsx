@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Modal } from "@/components/ui/modal";
+import { DateField } from "@/components/ui/date-field";
 import { cn } from "@/lib/utils";
 import {
     addCareRecipient,
@@ -121,11 +122,11 @@ export function CareRecipientModal({
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
                     <Field label="생년월일">
-                        <input
-                            type="date"
+                        {/* 예약 폼과 같은 방식 — 키보드 입력, 달력은 아이콘으로 */}
+                        <DateField
                             value={form.birth}
-                            onChange={(e) => set({ birth: e.target.value })}
-                            className={inputCls}
+                            onChange={(v) => set({ birth: v })}
+                            max={new Date().toISOString().slice(0, 10)}
                         />
                     </Field>
                     <Field label="성별">
