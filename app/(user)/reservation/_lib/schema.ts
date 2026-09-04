@@ -37,59 +37,16 @@ export const step2Schema = z.object({
     hospitalAddress: z.string().min(1, required),
 });
 
-/** STEP4 · 결제 정보 (결제수단이 카드일 때만 카드 필드 검증) */
-export const step4Schema = z
-    .object({
-        method: z.string().min(1, "결제수단을 선택해 주세요."),
-        cardCompany: z.string().optional(),
-        cardNumber: z.string().optional(),
-        expMonth: z.string().optional(),
-        expYear: z.string().optional(),
-        installment: z.string().optional(),
-    })
-    .superRefine((v, ctx) => {
-        if (v.method !== "card") return;
-        if (!v.cardCompany) {
-            ctx.addIssue({
-                code: "custom",
-                path: ["cardCompany"],
-                message: "카드사를 선택해 주세요.",
-            });
-        }
-        const digits = (v.cardNumber ?? "").replace(/\D/g, "");
-        if (digits.length < 15) {
-            ctx.addIssue({
-                code: "custom",
-                path: ["cardNumber"],
-                message: "카드 번호를 확인해 주세요.",
-            });
-        }
-        if (!/^(0[1-9]|1[0-2])$/.test(v.expMonth ?? "")) {
-            ctx.addIssue({
-                code: "custom",
-                path: ["expMonth"],
-                message: "월(MM)을 확인해 주세요.",
-            });
-        }
-        if (!/^\d{2}$/.test(v.expYear ?? "")) {
-            ctx.addIssue({
-                code: "custom",
-                path: ["expYear"],
-                message: "년(YY)을 확인해 주세요.",
-            });
-        }
-        if (!v.installment) {
-            ctx.addIssue({
-                code: "custom",
-                path: ["installment"],
-                message: "할부 기간을 선택해 주세요.",
-            });
-        }
-    });
+/**
+ * STEP4 는 "신청 내역 확인" 화면이라 입력 필드가 없다 (동의 체크만 로컬 상태).
+ *
+ *  결제 정보 스키마가 여기 있었으나 #54 에서 제거했다 —
+ *  카드 정보는 PG 결제창이 직접 받고 우리는 저장하지 않는다.
+ *  카드번호·유효기간을 우리 폼에서 받으면 PCI-DSS 대상이 된다.
+ */
 
 export type Step1Values = z.infer<typeof step1Schema>;
 export type Step2Values = z.infer<typeof step2Schema>;
-export type Step4Values = z.infer<typeof step4Schema>;
 
 /** 서버 예약 등록 입력 (STEP1 + STEP2 + 플랜, 성별/플랜은 enum으로 강화) */
 export const reservationServerSchema = step1Schema.merge(step2Schema).extend({

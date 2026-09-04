@@ -1,12 +1,13 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { formatPhoneNumber } from "@/lib/format";
 import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/date-field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Section } from "@/app/(user)/_components/home/section";
 import {
@@ -36,6 +37,7 @@ export function StepUserInfo() {
         handleSubmit,
         setValue,
         watch,
+        control,
         clearErrors,
         formState: { errors },
     } = useForm<Step1Values>({
@@ -131,19 +133,28 @@ export function StepUserInfo() {
                                 <FieldLabel htmlFor="userBirth" required>
                                     이용자 생년월일
                                 </FieldLabel>
-                                <Input
-                                    id="userBirth"
-                                    type="date"
-                                    className="cursor-pointer"
-                                    onClick={(e) =>
-                                        e.currentTarget.showPicker?.()
-                                    }
-                                    aria-invalid={!!errors.userBirth}
-                                    {...register("userBirth", {
-                                        onChange: () =>
-                                            errors.userBirth &&
-                                            clearErrors("userBirth"),
-                                    })}
+                                {/*
+                                  키보드로 바로 치고, 달력이 필요하면 아이콘을 누른다.
+                                  생년월일은 과거 연도라 달력으로 고르는 편이 더 느리다.
+                                */}
+                                <Controller
+                                    control={control}
+                                    name="userBirth"
+                                    render={({ field }) => (
+                                        <DateField
+                                            id="userBirth"
+                                            value={field.value ?? ""}
+                                            onChange={(v) => {
+                                                field.onChange(v);
+                                                if (errors.userBirth)
+                                                    clearErrors("userBirth");
+                                            }}
+                                            max={new Date()
+                                                .toISOString()
+                                                .slice(0, 10)}
+                                            invalid={!!errors.userBirth}
+                                        />
+                                    )}
                                 />
                                 <FieldError>
                                     {errors.userBirth?.message}

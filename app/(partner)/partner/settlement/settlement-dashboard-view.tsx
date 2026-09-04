@@ -7,13 +7,13 @@ import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import type { Settlement, SettlementSummary } from "../../_lib/settlement";
-import { AccountChangeModal } from "../../_components/account-change-modal";
 import { SettlementDetailModal } from "../../_components/settlement-detail-modal";
 
 const HISTORY = "/partner/settlement/history";
 
-// 계좌·정산일은 아직 DB 소스가 없어 정적 표시(연동은 범위 밖)
-const ACCOUNT = { display: "국민 1234-**-7890", lastChanged: "2025.05.01" };
+// 정산일은 아직 DB 소스가 없어 정적 표시다.
+// 정산 계좌는 저장할 곳 자체가 없어(#51) 예시 값을 지웠다 —
+// 등록되지도 않은 계좌를 진짜처럼 보여주면 파트너가 등록됐다고 믿는다.
 const NEXT_PAYOUT = "매월 15일";
 
 const QUICK_MENU: {
@@ -50,8 +50,6 @@ export function SettlementDashboardView({
     summary: SettlementSummary;
 }) {
     const s = summary;
-    const [account, setAccount] = useState(ACCOUNT.display);
-    const [accountOpen, setAccountOpen] = useState(false);
     const [selected, setSelected] = useState<Settlement | null>(null);
 
     const recent = settlements.slice(0, 4);
@@ -109,25 +107,8 @@ export function SettlementDashboardView({
                             <span className="text-muted-foreground">
                                 정산 계좌
                             </span>
-                            <span className="flex items-center gap-2">
-                                <span className="text-foreground font-bold">
-                                    {account}
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={() => setAccountOpen(true)}
-                                    className="border-brand text-brand hover:bg-brand/5 rounded-md border px-2 py-1 text-xs font-bold transition-colors"
-                                >
-                                    계좌 변경
-                                </button>
-                            </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">
-                                마지막 변경일
-                            </span>
-                            <span className="text-foreground font-bold">
-                                {ACCOUNT.lastChanged}
+                            <span className="text-muted-foreground font-bold">
+                                등록 전
                             </span>
                         </div>
                         <div className="flex items-center justify-between">
@@ -155,6 +136,18 @@ export function SettlementDashboardView({
                             {s.totalAmount.toLocaleString()}원
                         </span>
                     </div>
+
+                    {/*
+                      정산 계좌 등록은 아직 없다 (#51).
+                      이전에는 예시 계좌를 진짜처럼 보여주고, 변경 모달이 화면 문자열만
+                      바꾼 뒤 "변경되었습니다" 를 띄웠다. 파트너가 등록했다고 믿게 되는
+                      상태라 안내로 바꿨다. 실제 등록 기능이 들어오면 이 블록을 걷어낸다.
+                    */}
+                    <p className="border-border text-muted-foreground mt-4 rounded-xl border border-dashed px-4 py-3 text-xs leading-relaxed">
+                        정산 계좌 등록 기능은 준비 중입니다. 첫 정산 전에 등록
+                        안내를 드리며, 그때까지는 담당자가 개별 연락으로
+                        확인합니다.
+                    </p>
                 </section>
 
                 {/* 최근 정산 내역 */}
@@ -250,14 +243,7 @@ export function SettlementDashboardView({
                 </section>
             </div>
 
-            <AccountChangeModal
-                open={accountOpen}
-                onClose={() => setAccountOpen(false)}
-                onChange={(bank, acc) => {
-                    setAccount(`${bank} ${acc}`);
-                    toast.success("정산 계좌가 변경되었습니다.");
-                }}
-            />
+            {/* AccountChangeModal 은 #51 에서 실제 저장과 함께 다시 붙인다. */}
             <SettlementDetailModal
                 open={selected !== null}
                 onClose={() => setSelected(null)}
