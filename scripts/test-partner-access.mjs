@@ -190,6 +190,18 @@ async function main() {
         list.error?.message,
     );
 
+    // ⚠️ 회귀 방지 — 수락·거절 액션이 예약 상태를 확인하는 경로.
+    //    직접 조회가 막혔으므로(위 검증) 상태 판정은 partner_in_review() 로만 가능하다.
+    //    이걸 놓치면 파트너가 요청을 아예 수락할 수 없게 된다.
+    const review = await partnerClient.rpc("partner_in_review", {
+        res_id: openId,
+    });
+    check(
+        "partner_in_review() 가 검토 단계로 판정함 (수락 액션의 전제)",
+        !review.error && review.data === true,
+        review.error?.message ?? `data=${review.data}`,
+    );
+
     // =============================================================
     section("2. 단계 1 반환 항목 — 방침 제5조 ② 단계 1 목록과 일치하는가");
     // =============================================================
@@ -442,6 +454,15 @@ async function main() {
         p_id: rejectId,
     });
     check("거절한 파트너는 상세 RPC 도 거절됨", !!rejectDetail.error);
+
+    const rejectReview = await otherClient.rpc("partner_in_review", {
+        res_id: rejectId,
+    });
+    check(
+        "거절한 파트너에게는 검토 단계가 아님 (재수락 차단)",
+        !rejectReview.error && rejectReview.data === false,
+        `data=${rejectReview.data}`,
+    );
 
     // =============================================================
     section("7. 파트너가 아니면 접근할 수 없다");

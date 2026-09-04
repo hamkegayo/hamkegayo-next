@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Check, Clock, House, Plus, Truck } from "lucide-react";
+import { Calendar, Check, Clock, Hospital, House, Truck } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,11 +19,19 @@ type PlanCard = {
     priceNote: string;
 };
 
+/*
+ * 아이콘은 **만나는 장소**를 나타낸다 — 두 플랜의 실제 차이가 그것이기 때문이다.
+ *   베이직 : 병원에서 만나 원내 절차만 동행
+ *   플러스 : 자택에서 만나 병원까지 왕복 동행
+ *
+ * 베이직에 Plus(＋) 를 쓰던 것을 바꿨다. 옆 카드 이름이 "플러스 서비스" 라
+ * ＋ 기호가 그쪽을 가리키는 것처럼 읽혔다.
+ */
 const PLANS: PlanCard[] = [
     {
         value: "basic",
         name: "베이직 서비스",
-        icon: Plus,
+        icon: Hospital,
         features: [
             "병원에서 파트너와 만남",
             "접수 및 수납 지원",

@@ -71,6 +71,51 @@ function sign(authToken, amount) {
         .digest("hex");
 }
 
+/**
+ * 로그인 세션 쿠키를 만든다.
+ *
+ *  @supabase/ssr 은 세션을 `sb-<hostname 첫 조각>-auth-token` 쿠키에
+ *  `base64-` + base64url(JSON) 로 저장한다. 3180byte 를 넘으면 `.0` `.1` 로 쪼갠다.
+ *  라우트의 소유권·상태 검증을 태우려면 실제 세션이 필요해서 직접 만든다.
+ */
+const COOKIE_NAME = `sb-${new URL(url).hostname.split(".")[0]}-auth-token`;
+const CHUNK = 3180;
+
+async function loginCookie(email, password) {
+    const anon = createClient(url, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await anon.auth.signInWithPassword({
+        email,
+        password,
+    });
+    if (error) throw error;
+
+    const encoded =
+        "base64-" +
+        Buffer.from(JSON.stringify(data.session), "utf8").toString("base64url");
+
+    if (encoded.length <= CHUNK) return `${COOKIE_NAME}=${encoded}`;
+
+    const parts = [];
+    for (let i = 0; i * CHUNK < encoded.length; i += 1) {
+        parts.push(
+            `${COOKIE_NAME}.${i}=${encoded.slice(i * CHUNK, (i + 1) * CHUNK)}`,
+        );
+    }
+    return parts.join("; ");
+}
+
+async function postPrepare(cookie, body) {
+    const res = await fetch(`${APP}/api/payments/prepare`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify(body),
+    });
+    const json = await res.json().catch(() => null);
+    return { status: res.status, json };
+}
+
 /** returnUrl 로 오는 것과 같은 form POST */
 async function postConfirm(fields) {
     const body = new URLSearchParams(fields);
@@ -81,9 +126,17 @@ async function postConfirm(fields) {
         redirect: "manual",
     });
     const location = res.headers.get("location") ?? "";
-    const code = location ? new URL(location, APP).searchParams.get("code") : null;
-    const pay = location ? new URL(location, APP).searchParams.get("pay") : null;
-    return { status: res.status, location, code, pay };
+    const q = location ? new URL(location, APP).searchParams : null;
+    const path = location ? new URL(location, APP).pathname : "";
+    return {
+        status: res.status,
+        location,
+        path,
+        code: q?.get("code") ?? null,
+        pay: q?.get("pay") ?? null,
+        // 결제창을 거치며 클라이언트 스토어가 날아가므로 rid 로 복원한다 (#54)
+        rid: q?.get("rid") ?? null,
+    };
 }
 
 // ---------------------------------------------------------------
@@ -128,11 +181,14 @@ async function makeUser(tag, role) {
         email,
         role,
     });
-    return data.user.id;
+    return { id: data.user.id, email, password: "test1234!" };
 }
 
 /** MATCHING + 파트너 선택 + PENDING 결제까지 만들어 둔다 */
-async function makeScenario(suffix, { gross = 40000, discount = 0, deadlineMin = 30 } = {}) {
+async function makeScenario(
+    suffix,
+    { gross = 40000, discount = 0, deadlineMin = 30, selectPartner = true } = {},
+) {
     const customer = await makeUser(`u${suffix}`, "USER");
     const partner = await makeUser(`p${suffix}`, "PARTNER");
 
@@ -140,7 +196,7 @@ async function makeScenario(suffix, { gross = 40000, discount = 0, deadlineMin =
         .from("reservations")
         .insert({
             code: `${CODE_PREFIX}-${suffix}`,
-            customer_id: customer,
+            customer_id: customer.id,
             status: "MATCHING",
             plan: "basic",
             patient_name: "환자",
@@ -160,8 +216,10 @@ async function makeScenario(suffix, { gross = 40000, discount = 0, deadlineMin =
             hospital_address: "서울특별시 종로구 2",
             duration_minutes: 120,
             prepaid_amount: gross,
-            confirmed_partner_id: partner,
-            payment_deadline: new Date(Date.now() + deadlineMin * 60000).toISOString(),
+            confirmed_partner_id: selectPartner ? partner.id : null,
+            payment_deadline: selectPartner
+                ? new Date(Date.now() + deadlineMin * 60000).toISOString()
+                : null,
         })
         .select("id, code")
         .single();
@@ -169,7 +227,7 @@ async function makeScenario(suffix, { gross = 40000, discount = 0, deadlineMin =
 
     await admin.from("reservation_applications").insert({
         reservation_id: reservation.id,
-        partner_id: partner,
+        partner_id: partner.id,
         status: "ACCEPTED",
     });
 
@@ -194,7 +252,7 @@ async function makeScenario(suffix, { gross = 40000, discount = 0, deadlineMin =
 
     if (discount > 0) {
         await admin.from("points").insert({
-            user_id: customer,
+            user_id: customer.id,
             amount: discount,
             reason: "COMPENSATION",
             memo: "TEST-53API",
@@ -206,7 +264,25 @@ async function makeScenario(suffix, { gross = 40000, discount = 0, deadlineMin =
         if (spendErr) throw spendErr;
     }
 
-    return { customer, partner, reservation, orderId, paymentId: payment.id, gross, discount };
+    return {
+        customer,
+        partner,
+        reservation,
+        orderId,
+        paymentId: payment.id,
+        gross,
+        discount,
+    };
+}
+
+/** 포인트를 지급한다(선점하지 않음) */
+async function grantPoints(userId, amount) {
+    await admin.from("points").insert({
+        user_id: userId,
+        amount,
+        reason: "COMPENSATION",
+        memo: "TEST-53API",
+    });
 }
 
 async function paymentStatus(id) {
@@ -310,6 +386,11 @@ try {
         });
         check("금액이 다르면 승인하지 않는다", r.code === "AMOUNT_MISMATCH", `code=${r.code}`);
         check("결제가 FAILED 로 정리된다", (await paymentStatus(s.paymentId)) === "FAILED");
+        check(
+            "실패해도 rid 를 실어 결제 화면으로 되돌린다",
+            r.rid === s.reservation.id,
+            `rid=${r.rid}`,
+        );
     }
 
     // ---------- 결제 기한 만료 ----------
@@ -355,7 +436,7 @@ try {
     {
         const s = await makeScenario("points", { discount: 5000 });
 
-        const afterSpend = await balance(s.customer);
+        const afterSpend = await balance(s.customer.id);
         check("선점으로 잔액이 0 이 됐다", afterSpend === 0, `잔액=${afterSpend}`);
 
         const token = "tok-points";
@@ -372,7 +453,7 @@ try {
         check("PG 승인이 실패한다", r.pay === "fail", `code=${r.code}`);
         check("결제가 FAILED 로 정리된다", (await paymentStatus(s.paymentId)) === "FAILED");
 
-        const restored = await balance(s.customer);
+        const restored = await balance(s.customer.id);
         check("포인트 5000 이 복원된다", restored === 5000, `잔액=${restored}`);
     }
 
@@ -397,6 +478,16 @@ try {
 
         check("성공 화면으로 보낸다", r.pay === "done", `pay=${r.pay}`);
         check("PAID 상태가 유지된다", (await paymentStatus(s.paymentId)) === "PAID");
+        check(
+            "예약 플로우로 되돌린다 (#54 복원)",
+            r.path === "/reservation",
+            `path=${r.path}`,
+        );
+        check(
+            "복원용 rid 를 함께 싣는다",
+            r.rid === s.reservation.id,
+            `rid=${r.rid}`,
+        );
     }
 
     // ---------- 로그인 없이 prepare/status ----------
@@ -411,6 +502,171 @@ try {
 
         const st = await fetch(`${APP}/api/payments/status?orderId=whatever`);
         check("비로그인 status 는 401", st.status === 401, `HTTP ${st.status}`);
+    }
+
+    // ---------- prepare 소유권·상태 검증 ----------
+    console.log("\n[10] prepare — 소유권과 상태");
+    {
+        const mine = await makeScenario("prep-mine");
+        const other = await makeScenario("prep-other");
+
+        const cookie = await loginCookie(
+            mine.customer.email,
+            mine.customer.password,
+        );
+
+        // 세션이 실제로 먹는지 먼저 확인한다. 여기서 401 이면 아래 검증이 무의미하다.
+        const own = await postPrepare(cookie, {
+            reservationId: mine.reservation.id,
+            pointsToUse: 0,
+        });
+        check(
+            "세션 쿠키가 인식된다 (401 이 아님)",
+            own.status !== 401,
+            `HTTP ${own.status}`,
+        );
+
+        const foreign = await postPrepare(cookie, {
+            reservationId: other.reservation.id,
+            pointsToUse: 0,
+        });
+        check(
+            "남의 예약은 404 — 존재 여부를 알려주지 않는다",
+            foreign.status === 404,
+            `HTTP ${foreign.status}`,
+        );
+    }
+
+    {
+        // 파트너 미선택 상태
+        const s = await makeScenario("prep-nopartner", { selectPartner: false });
+        const cookie = await loginCookie(s.customer.email, s.customer.password);
+        const r = await postPrepare(cookie, {
+            reservationId: s.reservation.id,
+            pointsToUse: 0,
+        });
+        check(
+            "파트너 미선택이면 거절한다",
+            r.json?.code === "PARTNER_NOT_SELECTED",
+            `code=${r.json?.code} HTTP ${r.status}`,
+        );
+    }
+
+    {
+        // 기한 만료
+        const s = await makeScenario("prep-expired", { deadlineMin: -1 });
+        const cookie = await loginCookie(s.customer.email, s.customer.password);
+        const r = await postPrepare(cookie, {
+            reservationId: s.reservation.id,
+            pointsToUse: 0,
+        });
+        check(
+            "결제 기한이 지났으면 거절한다",
+            r.json?.code === "PAYMENT_EXPIRED",
+            `code=${r.json?.code}`,
+        );
+    }
+
+    // ---------- prepare 정상 경로 + 포인트 ----------
+    console.log("\n[11] prepare — 금액과 포인트");
+    {
+        const s = await makeScenario("prep-ok");
+        const cookie = await loginCookie(s.customer.email, s.customer.password);
+
+        const r = await postPrepare(cookie, {
+            reservationId: s.reservation.id,
+            pointsToUse: 0,
+        });
+
+        check("주문번호를 발급한다", typeof r.json?.orderId === "string");
+        check(
+            "결제 금액이 예약의 선결제액과 같다",
+            r.json?.amount === s.gross,
+            `amount=${r.json?.amount} gross=${s.gross}`,
+        );
+        check(
+            "clientId 를 함께 내려준다",
+            typeof r.json?.clientId === "string" && r.json.clientId.length > 0,
+        );
+
+        // 결제 기한이 +10분으로 연장됐는지
+        const { data: after } = await admin
+            .from("reservations")
+            .select("payment_deadline")
+            .eq("id", s.reservation.id)
+            .single();
+        const left =
+            new Date(after.payment_deadline).getTime() - Date.now();
+        check(
+            "결제창 진입으로 기한이 연장된다",
+            left > 9.5 * 60000,
+            `남은 ${Math.round(left / 1000)}초`,
+        );
+
+        // 새 PENDING 결제가 생기고 기존 것은 접힌다
+        const { data: pays } = await admin
+            .from("payments")
+            .select("status")
+            .eq("reservation_id", s.reservation.id);
+        const pending = (pays ?? []).filter((p) => p.status === "PENDING");
+        check(
+            "PENDING 결제는 하나만 남는다",
+            pending.length === 1,
+            `PENDING ${pending.length}건 / 전체 ${pays?.length}건`,
+        );
+    }
+
+    {
+        const s = await makeScenario("prep-points");
+        const cookie = await loginCookie(s.customer.email, s.customer.password);
+
+        // 잔액보다 많이 쓰려 하면 거절
+        await grantPoints(s.customer.id, 3000);
+        const over = await postPrepare(cookie, {
+            reservationId: s.reservation.id,
+            pointsToUse: 9000,
+        });
+        check(
+            "잔액을 넘는 포인트는 거절한다",
+            over.json?.code === "INSUFFICIENT_POINTS",
+            `code=${over.json?.code}`,
+        );
+
+        // 잔액 범위면 통과하고 승인 요청액에서 빠진다
+        const ok = await postPrepare(cookie, {
+            reservationId: s.reservation.id,
+            pointsToUse: 3000,
+        });
+        check(
+            "포인트만큼 승인 요청액이 줄어든다",
+            ok.json?.amount === s.gross - 3000,
+            `amount=${ok.json?.amount}`,
+        );
+        check(
+            "총액은 그대로 보고된다",
+            ok.json?.grossAmount === s.gross,
+            `gross=${ok.json?.grossAmount}`,
+        );
+
+        const bal = await balance(s.customer.id);
+        check("포인트가 선점되어 잔액이 0 이 된다", bal === 0, `잔액=${bal}`);
+
+        // 다시 준비하면 이전 선점이 풀리고 새로 잡힌다
+        const again = await postPrepare(cookie, {
+            reservationId: s.reservation.id,
+            pointsToUse: 1000,
+        });
+        check(
+            "재시도 시 금액이 새 포인트로 계산된다",
+            again.json?.amount === s.gross - 1000,
+            `amount=${again.json?.amount}`,
+        );
+        const bal2 = await balance(s.customer.id);
+        check(
+            "이전 선점이 복원되어 잔액이 2000 이 된다",
+            bal2 === 2000,
+            `잔액=${bal2}`,
+        );
     }
 } finally {
     await cleanup();
