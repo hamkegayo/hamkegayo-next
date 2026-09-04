@@ -13,6 +13,8 @@
         "test:payments": "node --env-file=.env.local scripts/test-payment-flow.mjs",
         "test:admin": "node --env-file=.env.local scripts/test-admin-access.mjs",
         "test:partner": "node --env-file=.env.local scripts/test-partner-access.mjs",
+        "test:nicepay": "node --env-file=.env.local scripts/test-nicepay.mjs",
+        "test:payapi": "node --env-file=.env.local scripts/test-payment-api.mjs",
         "prepare": "husky"
     },
     "dependencies": {
