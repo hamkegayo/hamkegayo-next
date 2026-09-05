@@ -177,7 +177,15 @@ grant execute on function public.end_service_no_show(uuid) to authenticated;
 --  그건 기록으로 남은 진행 시각을 보고 관리자가 조정할 일이지, 시스템이
 --  추정해서 청구할 일이 아니다. 고객에게 유리한 쪽으로 닫는다.
 --
---  🔸 트리거 여유시간(3시간)은 기획 확인 항목이다. 약관·매뉴얼에 근거가 없다.
+--  트리거는 예정 종료 +3시간을 기본으로 하되 **당일 18시를 상한선으로** 둔다
+--  (2026-09-05 리뷰 확정). 약관 제13조 ③④ 가 "서비스 운영시간은 오전 6시부터
+--  오후 6시" 이고 "오후 6시 이후의 현장 서비스는 제공하지 않는다" 고 정하므로,
+--  18시를 넘겨 열려 있는 서비스는 정상 수행일 수 없다.
+--
+--    마감 시점 = greatest(예정 종료, least(예정 종료 + 3시간, 당일 18:00))
+--
+--  greatest 로 감싸는 이유 — 예정 종료가 이미 18시를 넘는 예약이 데이터상
+--  가능하다. 그대로 두면 시작하자마자 마감된다.
 -- =============================================================
 create or replace function public.auto_close_stale_services()
 returns integer
@@ -191,7 +199,10 @@ begin
   with stale as (
     select s.id,
            s.started_at
-             + make_interval(mins => coalesce(r.duration_minutes, 120)) as planned_end
+             + make_interval(mins => coalesce(r.duration_minutes, 120)) as planned_end,
+           -- 서비스 당일 18:00 (KST). 약관 제13조 ③④ 운영시간 상한.
+           (date_trunc('day', s.started_at at time zone 'Asia/Seoul')
+              + interval '18 hours') at time zone 'Asia/Seoul' as day_cap
       from public.services s
       join public.reservations r on r.id = s.reservation_id
      where s.status = 'IN_PROGRESS'::public.service_status
@@ -203,7 +214,10 @@ begin
            auto_closed_at = now()
       from stale
      where s.id = stale.id
-       and now() > stale.planned_end + interval '3 hours'
+       and now() > greatest(
+             stale.planned_end,
+             least(stale.planned_end + interval '3 hours', stale.day_cap)
+           )
     returning s.id
   )
   select count(*)::integer into affected from closing;
@@ -213,7 +227,7 @@ end;
 $$;
 
 comment on function public.auto_close_stale_services() is
-  '예정 종료시각 +3시간이 지나도 종료되지 않은 서비스를 마감한다. ended_at 은 예정 종료시각으로 적어 과청구를 막는다. 서버 전용.';
+  '종료되지 않은 서비스를 마감한다. 예정 종료 +3시간이 기본이고 당일 18시(약관 제13조 ③④)가 상한이다. ended_at 은 예정 종료시각으로 적어 과청구를 막는다. 서버 전용.';
 
 revoke all on function public.auto_close_stale_services()
   from public, anon, authenticated;

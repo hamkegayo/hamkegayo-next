@@ -342,6 +342,44 @@ async function main() {
         freshRow?.status,
     );
 
+    // 18시 상한이 예정 종료보다 이르면 예정 종료가 이긴다.
+    // 상한을 그대로 쓰면 아직 끝나지 않은 서비스가 시작하자마자 마감된다.
+    const late = await makeService(
+        customerId,
+        partnerId,
+        "LATE",
+        todayKst(),
+        "00:00",
+    );
+    // 이틀 전 20:00(KST) 시작 → 예정 종료 22:00, 당일 상한 18:00 (이미 지남)
+    const lateStart = new Date(Date.now() - 2 * 86_400_000);
+    lateStart.setUTCHours(11, 0, 0, 0); // 20:00 KST
+    await admin
+        .from("services")
+        .update({
+            status: "IN_PROGRESS",
+            started_at: lateStart.toISOString(),
+        })
+        .eq("id", late.serviceId);
+
+    await admin.rpc("auto_close_stale_services");
+    const { data: lateRow } = await admin
+        .from("services")
+        .select("status, ended_at")
+        .eq("id", late.serviceId)
+        .single();
+    const latePlanned = new Date(lateStart.getTime() + 120 * 60_000);
+    const lateDiffMin = lateRow?.ended_at
+        ? Math.abs(
+              new Date(lateRow.ended_at).getTime() - latePlanned.getTime(),
+          ) / 60_000
+        : 999;
+    check(
+        "예정 종료가 18시를 넘으면 상한이 아니라 예정 종료로 마감된다",
+        lateRow?.status === "ENDED" && lateDiffMin < 1,
+        `${lateRow?.status} · 차이 ${lateDiffMin.toFixed(1)}분`,
+    );
+
     const byUser = await user.rpc("auto_close_stale_services");
     check("일반 사용자는 자동 마감을 호출할 수 없다", !!byUser.error);
 
