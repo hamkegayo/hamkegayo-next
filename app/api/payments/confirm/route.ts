@@ -39,6 +39,23 @@ function redirectTo(
     return NextResponse.redirect(url, 303);
 }
 
+/**
+ * 추가결제 결과 화면 (#75).
+ *
+ *  선결제와 달리 결제자가 **로그인 상태가 아닐 수 있다.** 예약 화면으로
+ *  돌려보내면 로그인 벽에 막히므로 토큰 없이 볼 수 있는 결과 페이지로 보낸다.
+ */
+function extensionResult(
+    request: NextRequest,
+    params: Record<string, string | undefined>,
+) {
+    const url = new URL("/pay/result", request.nextUrl.origin);
+    for (const [k, v] of Object.entries(params)) {
+        if (v) url.searchParams.set(k, v);
+    }
+    return NextResponse.redirect(url, 303);
+}
+
 /** 결제 실패. rid 를 알면 함께 실어 결제 화면으로 되돌린다. */
 function fail(request: NextRequest, code: string, rid?: string) {
     return redirectTo(request, { pay: "fail", code, rid });
@@ -82,7 +99,7 @@ export async function POST(request: NextRequest) {
     const { data: payment } = await admin
         .from("payments")
         .select(
-            "id, reservation_id, status, gross_amount, discount_amount, reservations!inner(id, code, status, confirmed_partner_id, payment_deadline)",
+            "id, reservation_id, type, status, gross_amount, discount_amount, token_expires_at, reservations!inner(id, code, status, confirmed_partner_id, payment_deadline)",
         )
         .eq("order_id", auth.orderId)
         .maybeSingle();
@@ -109,9 +126,18 @@ export async function POST(request: NextRequest) {
         payment_deadline: string | null;
     };
 
+    // 추가결제(#75)는 이미 확정된 예약에 붙는 청구다. 예약 상태 검증(④)과
+    // 확정(⑥)이 적용되지 않으므로 여기서 갈라 둔다.
+    const isExtension = payment.type === "EXTENSION";
+
     // 이미 승인이 끝난 결제 — 새로고침이나 중복 전송이다. 완료 화면으로 보낸다.
     if (payment.status === "PAID") {
-        return redirectTo(request, { pay: "done", rid });
+        return isExtension
+            ? extensionResult(request, {
+                  status: "done",
+                  code: reservation.code,
+              })
+            : redirectTo(request, { pay: "done", rid });
     }
 
     if (payment.status !== "PENDING") {
@@ -138,14 +164,19 @@ export async function POST(request: NextRequest) {
     }
 
     // ---------- ④ 만료·재선택 재확인 ----------
-    const expired =
-        reservation.payment_deadline != null &&
-        new Date(reservation.payment_deadline).getTime() <= Date.now();
+    //  추가결제는 링크 토큰의 유효기간으로 대신한다. 예약은 이미 확정됐고
+    //  파트너 선택이 풀리는 일도 없다.
+    const expired = isExtension
+        ? payment.token_expires_at != null &&
+          new Date(payment.token_expires_at).getTime() <= Date.now()
+        : reservation.payment_deadline != null &&
+          new Date(reservation.payment_deadline).getTime() <= Date.now();
 
     if (
-        reservation.status !== "MATCHING" ||
-        !reservation.confirmed_partner_id ||
-        expired
+        expired ||
+        (!isExtension &&
+            (reservation.status !== "MATCHING" ||
+                !reservation.confirmed_partner_id))
     ) {
         // 정상 흐름이다(사용자가 늦었거나 선택이 풀렸다). 사고가 아니므로 로그만 남긴다.
         console.warn(
@@ -158,7 +189,9 @@ export async function POST(request: NextRequest) {
             "결제 기한 만료 또는 선택 해제",
             auth.orderId,
         );
-        return fail(request, "PAYMENT_EXPIRED", rid);
+        return isExtension
+            ? extensionResult(request, { status: "expired" })
+            : fail(request, "PAYMENT_EXPIRED", rid);
     }
 
     // ---------- ⑤ PG 승인 — 여기서 돈이 빠진다 ----------
@@ -221,13 +254,20 @@ export async function POST(request: NextRequest) {
     }
 
     // ---------- ⑥ 확정 — PAID 전이 + 예약 확정을 한 트랜잭션에 ----------
-    const { error: finalizeError } = await admin.rpc("finalize_payment", {
-        p_payment_id: payment.id,
-        p_transaction_id: approved.transactionId,
-        p_paid_at: approved.paidAt,
-        p_receipt_url: approved.receiptUrl,
-        p_raw: approved.raw,
-    });
+    //  추가결제는 예약을 건드리지 않는다. 토큰을 소거해 1회용을 강제할 뿐이다.
+    const { error: finalizeError } = isExtension
+        ? await admin.rpc("finalize_extension_payment", {
+              p_payment_id: payment.id,
+              p_transaction_id: approved.transactionId,
+              p_raw: approved.raw,
+          })
+        : await admin.rpc("finalize_payment", {
+              p_payment_id: payment.id,
+              p_transaction_id: approved.transactionId,
+              p_paid_at: approved.paidAt,
+              p_receipt_url: approved.receiptUrl,
+              p_raw: approved.raw,
+          });
 
     if (finalizeError) {
         // ---------- ⑦ 돈은 받았는데 확정에 실패했다. 승인을 되돌린다 ----------
@@ -257,7 +297,20 @@ export async function POST(request: NextRequest) {
             finalizeError.message,
             auth.orderId,
         );
-        return fail(request, "CONFIRM_FAILED", rid);
+        return isExtension
+            ? extensionResult(request, {
+                  status: "fail",
+                  code: reservation.code,
+              })
+            : fail(request, "CONFIRM_FAILED", rid);
+    }
+
+    if (isExtension) {
+        // 추가결제는 파트너에게 알릴 것이 없다. 예약은 이미 확정돼 있었다.
+        return extensionResult(request, {
+            status: "done",
+            code: reservation.code,
+        });
     }
 
     // 확정됐으니 파트너에게 알린다 — 선택 시점이 아니라 결제 완료 시점이다(제9조 ④).
