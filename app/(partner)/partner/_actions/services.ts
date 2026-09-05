@@ -158,7 +158,11 @@ export async function endServiceNoShow(
         const final = await finalizeNoShowCharge(serviceId);
 
         if (final) {
+            const penalty = final.charge.total.toLocaleString();
+
             if (final.diff.additional > 0) {
+                // 출동비용 실비가 더해져 선결제를 넘는 경우다. 아직 실비가
+                // 정해지지 않아 현재 요금표에서는 발생하지 않는다.
                 await issueExtensionCharge({
                     reservationId: final.reservationId,
                     reservationCode: final.reservationCode,
@@ -167,14 +171,27 @@ export async function endServiceNoShow(
                     reason: "NO_SHOW",
                     useDate: final.useDate,
                 });
+            } else if (final.diff.refund > 0) {
+                // 선결제가 위약금보다 크다 — 잔액을 돌려줘야 한다.
+                // 미달분과 같은 승인 큐를 거친다(#76).
+                await enqueueSettlementRefund({
+                    reservationId: final.reservationId,
+                    amount: final.diff.refund,
+                    reason: `이용자 미도착 · 위약금 ${penalty}원 차감`,
+                });
             }
-            // 차액이 음수면 환불이다. 미달분 환불은 관리자 승인 큐를 거친다(#76).
-            // 여기서는 알림만 보내고 큐 적재는 종료 경로가 아니라 정산에서 한다.
+
+            // 문구가 결과와 어긋나면 안 된다. 위약금은 **선결제에서 차감**되는
+            // 것이지 따로 청구되는 것이 아니다(리뷰 확정).
+            const body =
+                final.diff.refund > 0
+                    ? `파트너가 예약시각부터 20분간 기다린 뒤 종료했습니다. 약관에 따른 위약금 ${penalty}원을 선결제 금액에서 차감하고, 잔액 ${final.diff.refund.toLocaleString()}원을 확인 후 환불해 드립니다.`
+                    : `파트너가 예약시각부터 20분간 기다린 뒤 종료했습니다. 약관에 따른 위약금 ${penalty}원이 선결제 금액에서 처리됩니다.`;
 
             await createNotification(final.customerId, {
                 type: "RESERVATION_CANCELLED",
                 title: "약속 장소에서 만나지 못했어요",
-                body: `파트너가 예약시각부터 20분간 기다린 뒤 종료했습니다. 약관에 따라 1시간 이용요금 ${final.charge.total.toLocaleString()}원이 청구됩니다.`,
+                body,
                 link: "/mypage/reservations",
             });
         } else {
