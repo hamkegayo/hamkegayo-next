@@ -231,3 +231,94 @@ async function notifyAdmins(
         console.error("[extension] 관리자 알림 실패:", e);
     }
 }
+
+/**
+ * 추가결제 독촉 (#75) — 약관 제22조 ①.
+ *
+ *  기한이 지난 건은 토큰이 죽어 링크가 소용없다. 그런 건은 마이페이지로
+ *  보낸다 — 거기서 다시 발급받아 결제할 수 있다. "내야 하는데 낼 수가 없는"
+ *  상태를 만들지 않는 것이 이 분기의 목적이다.
+ *
+ *  실패해도 던지지 않는다. 배치가 한 건 때문에 멈추면 나머지도 못 나간다.
+ */
+export async function sendExtensionReminder(target: {
+    payment_id: string;
+    customer_id: string;
+    amount: number;
+    code: string;
+    use_date: string;
+    pay_token: string | null;
+    overdue: boolean;
+}): Promise<boolean> {
+    try {
+        const admin = createAdminClient();
+        const payable = !target.overdue && !!target.pay_token;
+        const link = payable ? `/pay/${target.pay_token}` : "/mypage";
+        const amount = target.amount.toLocaleString();
+
+        await createNotification(target.customer_id, {
+            type: "PAYMENT_ADDITIONAL",
+            title: target.overdue
+                ? "미결제 금액이 있어요"
+                : "추가 결제를 완료해 주세요",
+            body: target.overdue
+                ? `예약 ${target.code} · ${amount}원이 결제되지 않았습니다. 결제 전에는 새 예약을 신청하실 수 없어요.`
+                : `예약 ${target.code} · ${amount}원이 아직 결제되지 않았습니다.`,
+            link,
+        });
+
+        const { data: profile } = await admin
+            .from("profiles")
+            .select("email")
+            .eq("id", target.customer_id)
+            .maybeSingle();
+
+        if (profile?.email) {
+            const url = payable
+                ? payUrl(target.pay_token!)
+                : `${
+                      process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+                      "https://www.hamkegayo.kr"
+                  }/mypage`;
+
+            await getEmailSender().send(
+                profile.email,
+                `[함께가요] ${target.overdue ? "미결제 안내" : "추가 결제 안내"} · ${amount}원`,
+                `
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
+      <h2 style="margin:0 0 16px;color:#111827">${
+          target.overdue
+              ? "미결제 금액이 있습니다"
+              : "추가 결제가 남아 있습니다"
+      }</h2>
+      <p style="margin:0 0 20px;color:#4b5563;line-height:1.6">
+        ${target.use_date} 이용하신 병원동행 서비스(예약 ${target.code})의
+        추가 요금이 아직 결제되지 않았습니다.
+      </p>
+      <div style="font-size:28px;font-weight:800;color:#2e9ce6;text-align:center;padding:18px 0;background:#f0f9ff;border-radius:12px">
+        ${amount}원
+      </div>
+      <p style="margin:24px 0 0;text-align:center">
+        <a href="${url}" style="display:inline-block;background:#2e9ce6;color:#fff;text-decoration:none;padding:12px 28px;border-radius:10px;font-weight:700">
+          ${payable ? "결제하기" : "마이페이지에서 결제"}
+        </a>
+      </p>
+      ${
+          target.overdue
+              ? `<p style="margin:20px 0 0;font-size:13px;color:#b91c1c;line-height:1.6">
+                   결제가 완료될 때까지 새 예약을 신청하실 수 없습니다(이용약관 제22조 ③).
+                 </p>`
+              : ""
+      }
+      <p style="margin:20px 0 0;font-size:13px;color:#9ca3af;line-height:1.6">
+        이 메일에는 이용자 정보가 담겨 있지 않습니다.
+      </p>
+    </div>`,
+            );
+        }
+        return true;
+    } catch (e) {
+        console.error("[extension] 독촉 실패:", target.payment_id, e);
+        return false;
+    }
+}
