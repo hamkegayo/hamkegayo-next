@@ -74,6 +74,21 @@ export async function createReservation(
         hospital_name: v.hospitalName,
         hospital_address: v.hospitalAddress,
 
+        // 매뉴얼 1장 업무 시작 조건 (#77)
+        notify_target: v.notifyTarget,
+        share_medical_info: v.shareMedicalInfo,
+        transport_to: v.transportTo,
+        transport_home: v.transportHome,
+        end_method: v.endMethod,
+        // 독립 귀가면 인계자를 받지 않았다. 빈 문자열 대신 null 로 넣어
+        // "등록되지 않음" 과 "빈 값" 이 구분되게 한다.
+        handover_name: v.handoverName?.trim() || null,
+        handover_relation: v.handoverRelation?.trim() || null,
+        handover_phone: v.handoverPhone?.trim() || null,
+        backup_handover_name: v.backupHandoverName?.trim() || null,
+        backup_handover_relation: v.backupHandoverRelation?.trim() || null,
+        backup_handover_phone: v.backupHandoverPhone?.trim() || null,
+
         duration_minutes: quote.durationMinutes,
         hourly_rate: quote.hourlyRate,
         fee_rate: quote.feeRate,
