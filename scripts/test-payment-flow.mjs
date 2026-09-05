@@ -339,6 +339,48 @@ async function main() {
         .eq("status", "ACCEPTED");
     check("지원건 유지 → 즉시 재선택 가능", stillAccepted === 1);
 
+    const { data: expiredNotis } = await admin
+        .from("notifications")
+        .select("type, title, link")
+        .eq("recipient_id", customerId)
+        .eq("type", "PAYMENT_EXPIRED")
+        .like("link", `%${r3}`);
+    check(
+        "만료 시 고객에게 알림이 남는다",
+        (expiredNotis?.length ?? 0) === 1,
+        `알림 ${expiredNotis?.length ?? 0}건`,
+    );
+
+    // 크론이 5분마다 부르므로 같은 예약에 알림이 쌓이면 안 된다.
+    await admin.rpc("release_expired_selections");
+    const { count: notiAgain } = await admin
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("recipient_id", customerId)
+        .eq("type", "PAYMENT_EXPIRED")
+        .like("link", `%${r3}`);
+    check("다시 돌려도 알림이 중복되지 않는다", notiAgain === 1);
+
+    const { data: sweep, error: sweepErr } =
+        await admin.rpc("run_expiry_sweep");
+    check(
+        "run_expiry_sweep 이 두 정리 결과를 함께 반환",
+        !sweepErr &&
+            typeof sweep?.released === "number" &&
+            typeof sweep?.expired === "number",
+        sweepErr?.message ?? JSON.stringify(sweep),
+    );
+
+    const { error: sweepDenied } = await user.rpc("run_expiry_sweep");
+    check("일반 사용자는 만료 배치를 호출할 수 없다", !!sweepDenied);
+
+    await admin
+        .from("notifications")
+        .delete()
+        .eq("recipient_id", customerId)
+        .eq("type", "PAYMENT_EXPIRED")
+        .like("link", `%${r3}`);
+
     console.log("\n▶ 금액 제약 · 환불 (약관 제19조 ② · 제21조 ④)");
 
     const { error: badErr } = await admin.from("payments").insert({

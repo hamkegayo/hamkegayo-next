@@ -9,6 +9,7 @@ export type NotificationType =
     | "SERVICE_COMPLETED"
     | "PAYMENT_ADDITIONAL"
     | "PAYMENT_REFUND"
+    | "PAYMENT_EXPIRED"
     | "REPORT_READY";
 
 export type NotificationView = {
