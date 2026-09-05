@@ -7,7 +7,11 @@ import { quoteReservation } from "../_lib/quote.server";
 
 export type CreateReservationResult =
     | { ok: true; code: string; id: string }
-    | { ok: false; reason: "auth" | "validation" | "error"; message: string };
+    | {
+          ok: false;
+          reason: "auth" | "validation" | "error" | "unpaid";
+          message: string;
+      };
 
 /**
  * 예약 등록 (STEP4 매칭 신청 시점).
@@ -33,6 +37,21 @@ export async function createReservation(
     } = await supabase.auth.getUser();
     if (!user) {
         return { ok: false, reason: "auth", message: "로그인이 필요합니다." };
+    }
+
+    // 약관 제22조 ③ — 미납금이 전액 지급될 때까지 신규 예약을 제한한다.
+    // 기한이 지난 건만 걸린다. 링크를 보낸 직후부터 막으면 결제할 시간을
+    // 주지 않고 제재하는 셈이 된다.
+    const { data: unpaid } = await supabase.rpc("has_unpaid_charge", {
+        p_user_id: user.id,
+    });
+    if (unpaid === true) {
+        return {
+            ok: false,
+            reason: "unpaid",
+            message:
+                "미결제 금액이 있어 새 예약을 신청할 수 없습니다. 마이페이지에서 결제를 완료해 주세요.",
+        };
     }
 
     // 요금 스냅샷 — 단가·할증률·선결제액을 예약 시점에 고정한다(#46).

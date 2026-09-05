@@ -89,11 +89,13 @@ export function StepReview() {
         try {
             const res = await createReservation(data);
             if (!res.ok) {
+                toast.error(res.message);
                 if (res.reason === "auth") {
-                    toast.error(res.message);
                     router.push("/login");
-                } else {
-                    toast.error(res.message);
+                } else if (res.reason === "unpaid") {
+                    // 약관 제22조 ③ — 낼 곳으로 데려간다. 막기만 하면
+                    // 어디서 결제하는지 알 수 없다.
+                    router.push("/mypage");
                 }
                 return;
             }
