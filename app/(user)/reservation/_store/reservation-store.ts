@@ -94,7 +94,9 @@ const initialData: ReservationData = {
     docCertificate: false,
     otherRequests: "",
     notifyTarget: "BOTH",
-    shareMedicalInfo: true,
+    // Opt-in 이 원칙이다. 진료정보는 민감정보라 기본 동의로 두면 이용자가
+    // 인지하지 못한 채 보호자에게 전달될 수 있다 (2026-09-05 기획 확정).
+    shareMedicalInfo: false,
     useDate: "",
     arriveTime: "",
     reserveTime: "",
