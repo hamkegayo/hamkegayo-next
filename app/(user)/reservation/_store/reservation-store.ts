@@ -34,6 +34,8 @@ export type ReservationData = {
     docReceipt: boolean;
     docCertificate: boolean;
     otherRequests: string;
+    notifyTarget: string;
+    shareMedicalInfo: boolean;
     // STEP2 · 병원 및 일정 정보
     useDate: string;
     arriveTime: string;
@@ -42,6 +44,15 @@ export type ReservationData = {
     departAddress: string;
     hospitalName: string;
     hospitalAddress: string;
+    transportTo: string;
+    transportHome: string;
+    endMethod: string;
+    handoverName: string;
+    handoverRelation: string;
+    handoverPhone: string;
+    backupHandoverName: string;
+    backupHandoverRelation: string;
+    backupHandoverPhone: string;
     // STEP3 · 서비스 선택
     plan: Plan;
     // STEP6 · 파트너 선택
@@ -82,6 +93,10 @@ const initialData: ReservationData = {
     docReceipt: false,
     docCertificate: false,
     otherRequests: "",
+    notifyTarget: "BOTH",
+    // Opt-in 이 원칙이다. 진료정보는 민감정보라 기본 동의로 두면 이용자가
+    // 인지하지 못한 채 보호자에게 전달될 수 있다 (2026-09-05 기획 확정).
+    shareMedicalInfo: false,
     useDate: "",
     arriveTime: "",
     reserveTime: "",
@@ -89,6 +104,15 @@ const initialData: ReservationData = {
     departAddress: "",
     hospitalName: "",
     hospitalAddress: "",
+    transportTo: "",
+    transportHome: "",
+    endMethod: "",
+    handoverName: "",
+    handoverRelation: "",
+    handoverPhone: "",
+    backupHandoverName: "",
+    backupHandoverRelation: "",
+    backupHandoverPhone: "",
     plan: "",
     partnerId: "",
     confirmedPartnerName: "",

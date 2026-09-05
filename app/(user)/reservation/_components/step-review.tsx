@@ -12,6 +12,14 @@ import { getReservationQuote } from "../_actions/quote";
 import type { ReservationQuote } from "../_lib/quote.server";
 import { formatMinutes, PAYMENT_DEADLINE_MIN } from "@/lib/pricing";
 import { trackReservationComplete } from "@/lib/analytics";
+import {
+    END_METHOD_LABEL,
+    NOTIFY_TARGET_LABEL,
+    TRANSPORT_LABEL,
+    type EndMethodCode,
+    type NotifyTargetCode,
+    type TransportCode,
+} from "@/lib/handover";
 import { StepBand, StepNav } from "./step-band";
 
 /**
@@ -187,6 +195,76 @@ export function StepReview() {
                             <Readonly
                                 label="병원 주소"
                                 value={data.hospitalAddress}
+                            />
+                            {/*
+                              매뉴얼 1장이 업무 시작 조건으로 정한 항목이라
+                              확인 화면에서도 빠지면 안 된다 (#77).
+                            */}
+                            <Readonly
+                                label="병원까지 이동"
+                                value={
+                                    TRANSPORT_LABEL[
+                                        data.transportTo as TransportCode
+                                    ]
+                                }
+                            />
+                            <Readonly
+                                label="귀가수단"
+                                value={
+                                    TRANSPORT_LABEL[
+                                        data.transportHome as TransportCode
+                                    ]
+                                }
+                            />
+                            <Readonly
+                                label="종료 방식"
+                                value={
+                                    END_METHOD_LABEL[
+                                        data.endMethod as EndMethodCode
+                                    ]
+                                }
+                            />
+                            {data.handoverName && (
+                                <Readonly
+                                    label="인계자"
+                                    value={`${data.handoverName}${
+                                        data.handoverRelation
+                                            ? ` (${data.handoverRelation})`
+                                            : ""
+                                    }${
+                                        data.handoverPhone
+                                            ? ` · ${data.handoverPhone}`
+                                            : ""
+                                    }`}
+                                />
+                            )}
+                            {data.backupHandoverName && (
+                                <Readonly
+                                    label="대체 인계자"
+                                    value={`${data.backupHandoverName}${
+                                        data.backupHandoverRelation
+                                            ? ` (${data.backupHandoverRelation})`
+                                            : ""
+                                    }${
+                                        data.backupHandoverPhone
+                                            ? ` · ${data.backupHandoverPhone}`
+                                            : ""
+                                    }`}
+                                />
+                            )}
+                            <Readonly
+                                label="도착·진행상황 통보"
+                                value={
+                                    NOTIFY_TARGET_LABEL[
+                                        data.notifyTarget as NotifyTargetCode
+                                    ]
+                                }
+                            />
+                            <Readonly
+                                label="진료정보 보호자 전달"
+                                value={
+                                    data.shareMedicalInfo ? "동의" : "미동의"
+                                }
                             />
                         </div>
                     </div>

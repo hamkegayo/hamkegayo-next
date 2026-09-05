@@ -20,6 +20,7 @@ import {
     MOBILITY_OPTIONS,
     RELATION_OPTIONS,
 } from "../_lib/options";
+import { NOTIFY_TARGET_OPTIONS } from "@/lib/handover";
 import { StepBand, StepNav } from "./step-band";
 import { FieldError, FieldLabel, NativeSelect, Textarea } from "./fields";
 
@@ -61,6 +62,8 @@ export function StepUserInfo() {
             docReceipt: data.docReceipt,
             docCertificate: data.docCertificate,
             otherRequests: data.otherRequests,
+            notifyTarget: data.notifyTarget as "USER" | "GUARDIAN" | "BOTH",
+            shareMedicalInfo: data.shareMedicalInfo,
         },
     });
 
@@ -288,6 +291,70 @@ export function StepUserInfo() {
                                 <FieldError>
                                     {errors.relation?.message}
                                 </FieldError>
+                            </div>
+
+                            {/*
+                              통보대상 — 매뉴얼 4단계에서 파트너가 "도착했습니다"
+                              를 보낼 대상이다. 용어정의상 이용자 또는 보호자다.
+                            */}
+                            <div>
+                                <FieldLabel htmlFor="notifyTarget" required>
+                                    도착·진행상황을 알려드릴 대상
+                                </FieldLabel>
+                                <NativeSelect
+                                    id="notifyTarget"
+                                    aria-invalid={!!errors.notifyTarget}
+                                    {...register("notifyTarget", {
+                                        onChange: () =>
+                                            errors.notifyTarget &&
+                                            clearErrors("notifyTarget"),
+                                    })}
+                                >
+                                    {NOTIFY_TARGET_OPTIONS.map((o) => (
+                                        <option key={o.value} value={o.value}>
+                                            {o.label}
+                                        </option>
+                                    ))}
+                                </NativeSelect>
+                                <FieldError>
+                                    {errors.notifyTarget?.message}
+                                </FieldError>
+                            </div>
+
+                            {/*
+                              약관 제8조 ① — 진료내용을 보호자에게 전달할지는
+                              이용자 의사에 따른다. 동의하지 않으면 파트너는
+                              전달하지 않는다(대응카드 16).
+                            */}
+                            <div className="md:col-span-2">
+                                <Controller
+                                    control={control}
+                                    name="shareMedicalInfo"
+                                    render={({ field }) => (
+                                        <label className="flex cursor-pointer items-start gap-2.5">
+                                            <Checkbox
+                                                className="mt-0.5"
+                                                checked={field.value === true}
+                                                onCheckedChange={(checked) =>
+                                                    field.onChange(
+                                                        checked === true,
+                                                    )
+                                                }
+                                            />
+                                            <span className="text-sm leading-relaxed">
+                                                <span className="text-foreground">
+                                                    진료 내용을 보호자에게
+                                                    전달하는 데 동의합니다.
+                                                </span>
+                                                <span className="text-muted-foreground block">
+                                                    동의하지 않으시면 파트너가
+                                                    보호자에게 진료 내용을
+                                                    전달하지 않습니다.
+                                                </span>
+                                            </span>
+                                        </label>
+                                    )}
+                                />
                             </div>
                         </div>
                     </div>

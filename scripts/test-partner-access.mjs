@@ -25,7 +25,9 @@ const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!url || !serviceKey || !anonKey) {
-    console.error("❌ SUPABASE URL / ANON_KEY / SERVICE_ROLE_KEY 가 필요합니다.");
+    console.error(
+        "❌ SUPABASE URL / ANON_KEY / SERVICE_ROLE_KEY 가 필요합니다.",
+    );
     process.exit(1);
 }
 if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.test(url)) {
@@ -140,6 +142,19 @@ async function seedReservation(customerId, code, extra = {}) {
             hospital_name: "테스트정형외과",
             mobility_status: "부축 필요",
             cognitive_status: "의사소통 원활",
+            // 수행 조건 (#77). 이동 3종은 단계 1 에 나가고,
+            // 인계자는 제3자 개인정보라 확정 후에만 나가야 한다.
+            transport_to: "TAXI",
+            transport_home: "FAMILY_CAR",
+            end_method: "ADULT_HANDOVER",
+            notify_target: "BOTH",
+            share_medical_info: true,
+            handover_name: "인계자실명",
+            handover_relation: "자녀",
+            handover_phone: "01099990000",
+            backup_handover_name: "대체인계자실명",
+            backup_handover_relation: "배우자",
+            backup_handover_phone: "01088887777",
             ...extra,
         })
         .select("id")
@@ -387,7 +402,10 @@ async function main() {
     // =============================================================
     section("5. 차단 후에도 정산 이력은 남는다 (#67)");
     // =============================================================
-    await admin.from("services").update({ status: "COMPLETED" }).eq("id", svc.id);
+    await admin
+        .from("services")
+        .update({ status: "COMPLETED" })
+        .eq("id", svc.id);
     const { data: settlement } = await admin
         .from("settlements")
         .select("id")
@@ -412,9 +430,11 @@ async function main() {
         !settleRpc.error && !!settleRow,
         settleRpc.error?.message,
     );
-    const settleLeaked = ["patient_name", "hospital_address", "treatment"].filter(
-        (k) => k in (settleRow ?? {}),
-    );
+    const settleLeaked = [
+        "patient_name",
+        "hospital_address",
+        "treatment",
+    ].filter((k) => k in (settleRow ?? {}));
     check(
         "정산 이력에 이용자 개인정보가 없음 (예약번호·일자·금액만)",
         settleLeaked.length === 0 && !!settleRow?.code,
@@ -448,6 +468,54 @@ async function main() {
     check(
         "거절 후 목록에서 사라짐",
         !(afterReject.data ?? []).some((r) => r.id === rejectId),
+    );
+
+    // =============================================================
+    section("6-1. 수행 조건은 내려가고 인계자 개인정보는 막힌다 (#77)");
+    // =============================================================
+
+    // 앞 섹션에서 상태가 바뀐 예약은 검토 단계가 아니다. 이 섹션 전용으로 새로 심는다.
+    const condId = await seedReservation(customer.id, `${CODE_PREFIX}-COND`);
+    const openDetail = await partnerClient.rpc("partner_get_open_reservation", {
+        p_id: condId,
+    });
+    const openRow = (openDetail.data ?? [])[0];
+
+    check(
+        "수락 전에도 이동수단·귀가수단·종료방식이 보인다",
+        openRow?.transport_to === "TAXI" &&
+            openRow?.transport_home === "FAMILY_CAR" &&
+            openRow?.end_method === "ADULT_HANDOVER",
+        JSON.stringify({
+            to: openRow?.transport_to,
+            home: openRow?.transport_home,
+            end: openRow?.end_method,
+        }),
+    );
+
+    check(
+        "대체 인계자는 등록 여부만 내려간다",
+        openRow?.has_backup_handover === true,
+        `has_backup_handover=${openRow?.has_backup_handover}`,
+    );
+
+    // 이게 이 이슈의 핵심이다. 인계자는 이용자 본인이 아닌 제3자의
+    // 개인정보라 수락 검토 단계에 절대 나가면 안 된다(처리방침 제5조 ②③).
+    const leaked = Object.entries(openRow ?? {}).filter(([, v]) =>
+        ["인계자실명", "대체인계자실명", "01099990000", "01088887777"].includes(
+            String(v),
+        ),
+    );
+    check(
+        "인계자 성명·연락처는 단계 1 에 나가지 않는다",
+        leaked.length === 0,
+        leaked.map(([k]) => k).join(", "),
+    );
+
+    check(
+        "통보대상·진료정보 전달 여부도 단계 1 에 없다",
+        !("notify_target" in (openRow ?? {})) &&
+            !("share_medical_info" in (openRow ?? {})),
     );
 
     const rejectDetail = await otherClient.rpc("partner_get_open_reservation", {
