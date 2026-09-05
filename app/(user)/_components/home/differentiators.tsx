@@ -1,4 +1,4 @@
-import { BadgeCheck, Clock, MapPin } from "lucide-react";
+import { BadgeCheck, Bell, Clock } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import Link from "next/link";
@@ -9,20 +9,22 @@ const ITEMS: { icon: LucideIcon; title: string; desc: string; tag: string }[] =
     [
         {
             icon: Clock,
-            title: "24시간 요청 가능",
-            desc: "갑작스런 상황에도 언제든 요청할 수 있어요.",
-            tag: "긴급 요청 접수 가능",
+            title: "24시간 예약 접수",
+            desc: "밤에도 예약을 남겨두면 순서대로 매칭돼요.",
+            tag: "서비스는 06시~18시 진행",
         },
         {
             icon: BadgeCheck,
             title: "파트너 직접 선택",
-            desc: "경력, 자격증, 후기까지 모든 정보를 공개해요.",
+            desc: "수락한 파트너의 평점과 후기를 보고 고를 수 있어요.",
             tag: "원하는 파트너 선택 가능",
         },
         {
-            icon: MapPin,
-            title: "실시간 위치 공유",
-            desc: "동행 중 실시간 위치 공유로 안심시켜드려요.",
+            // 여기 있던 "실시간 위치 공유" 는 구현된 적이 없는 기능이었다(#60).
+            // 실제로 나가는 알림으로 바꿨다.
+            icon: Bell,
+            title: "단계마다 알림",
+            desc: "파트너 도착부터 완료·리포트까지 알려드려요.",
             tag: "진행 상황 확인 가능",
         },
     ];
