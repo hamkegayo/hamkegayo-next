@@ -16,6 +16,7 @@
 import {
     CANCEL_FLAT_FEE,
     calcCancelFee,
+    oneHourCharge,
     calcCancelRefund,
     calcFinalCharge,
     calcPrepayment,
@@ -80,6 +81,19 @@ check(
 check(
     "시작 예정시각이 지나도 1시간 이용요금 구간",
     feeIn(-30).bracket === "ONE_HOUR",
+);
+
+console.log("\n▶ 1시간 이용요금 (제11조 ②③ · 제17조 ② · 제19조)");
+
+check("Basic 1시간은 20,000", oneHourCharge("basic", false) === 20000);
+check("Plus 1시간은 25,000", oneHourCharge("plus", false) === 25000);
+check(
+    "주말·공휴일 할증이 붙는다 (20,000 → 26,000)",
+    oneHourCharge("basic", true) === 26000,
+);
+check(
+    "취소수수료의 1시간 구간과 같은 값이다",
+    oneHourCharge("basic", false) === feeIn(60).amount,
 );
 
 console.log("\n▶ 취소 환불액");

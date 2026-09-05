@@ -4,8 +4,12 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/utils/supabase/server";
 import { createNotification } from "@/lib/notifications";
+import { issueExtensionCharge } from "@/lib/payments/extension";
 import { enqueueSettlementRefund } from "@/lib/payments/settlement-refund";
-import { finalizeServiceCharge } from "../../_lib/finalize-charge";
+import {
+    finalizeNoShowCharge,
+    finalizeServiceCharge,
+} from "../../_lib/finalize-charge";
 import { formatMinutes } from "@/lib/pricing";
 
 export type ServiceActionResult = { ok: true } | { ok: false; message: string };
@@ -149,14 +153,57 @@ export async function endServiceNoShow(
     );
 
     if (res.ok) {
-        const customerId = await getCustomerId(serviceId);
-        if (customerId) {
-            await createNotification(customerId, {
+        // 노쇼도 정산 경로를 탄다(#75). 약관 제19조가 1시간 이용요금을 정하고
+        // 선결제(최소 2시간)와의 차액이 부호에 따라 추가결제 또는 환불로 갈린다.
+        const final = await finalizeNoShowCharge(serviceId);
+
+        if (final) {
+            const penalty = final.charge.total.toLocaleString();
+
+            if (final.diff.additional > 0) {
+                // 출동비용 실비가 더해져 선결제를 넘는 경우다. 아직 실비가
+                // 정해지지 않아 현재 요금표에서는 발생하지 않는다.
+                await issueExtensionCharge({
+                    reservationId: final.reservationId,
+                    reservationCode: final.reservationCode,
+                    customerId: final.customerId,
+                    amount: final.diff.additional,
+                    reason: "NO_SHOW",
+                    useDate: final.useDate,
+                });
+            } else if (final.diff.refund > 0) {
+                // 선결제가 위약금보다 크다 — 잔액을 돌려줘야 한다.
+                // 미달분과 같은 승인 큐를 거친다(#76).
+                await enqueueSettlementRefund({
+                    reservationId: final.reservationId,
+                    amount: final.diff.refund,
+                    reason: `이용자 미도착 · 위약금 ${penalty}원 차감`,
+                });
+            }
+
+            // 문구가 결과와 어긋나면 안 된다. 위약금은 **선결제에서 차감**되는
+            // 것이지 따로 청구되는 것이 아니다(리뷰 확정).
+            const body =
+                final.diff.refund > 0
+                    ? `파트너가 예약시각부터 20분간 기다린 뒤 종료했습니다. 약관에 따른 위약금 ${penalty}원을 선결제 금액에서 차감하고, 잔액 ${final.diff.refund.toLocaleString()}원을 확인 후 환불해 드립니다.`
+                    : `파트너가 예약시각부터 20분간 기다린 뒤 종료했습니다. 약관에 따른 위약금 ${penalty}원이 선결제 금액에서 처리됩니다.`;
+
+            await createNotification(final.customerId, {
                 type: "RESERVATION_CANCELLED",
                 title: "약속 장소에서 만나지 못했어요",
-                body: "파트너가 예약시각부터 20분간 기다린 뒤 종료했습니다. 자세한 내용은 고객센터로 문의해 주세요.",
+                body,
                 link: "/mypage/reservations",
             });
+        } else {
+            const customerId = await getCustomerId(serviceId);
+            if (customerId) {
+                await createNotification(customerId, {
+                    type: "RESERVATION_CANCELLED",
+                    title: "약속 장소에서 만나지 못했어요",
+                    body: "파트너가 예약시각부터 20분간 기다린 뒤 종료했습니다. 자세한 내용은 고객센터로 문의해 주세요.",
+                    link: "/mypage/reservations",
+                });
+            }
         }
     }
     return res;
@@ -196,11 +243,15 @@ export async function endService(
         const usage = `이용시간 ${formatMinutes(charge.billedMinutes)} · 최종 요금 ${charge.total.toLocaleString()}원`;
 
         if (diff.additional > 0) {
-            await createNotification(customerId, {
-                type: "PAYMENT_ADDITIONAL",
-                title: "추가 결제가 필요해요",
-                body: `${usage}. ${diff.additional.toLocaleString()}원을 24시간 이내에 결제해 주세요.`,
-                link: "/mypage/reservations",
+            // 링크 발급과 안내는 모듈이 함께 처리한다(#75). 소프트 상한을
+            // 넘으면 링크를 보내지 않고 관리자에게만 알린다.
+            await issueExtensionCharge({
+                reservationId: final.reservationId,
+                reservationCode: final.reservationCode,
+                customerId,
+                amount: diff.additional,
+                reason: "EXTENSION",
+                useDate: final.useDate,
             });
         } else if (diff.refund > 0) {
             // 미달분은 자동으로 나가지 않는다. 종료 시각이 잘못 눌렸을 수 있어

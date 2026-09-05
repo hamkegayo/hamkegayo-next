@@ -10,7 +10,9 @@
 
 import { createAdminClient } from "@/utils/supabase/admin";
 import {
+    MIN_BILLABLE_MIN,
     MIN_PREPAY_MIN,
+    oneHourCharge,
     actualMinutesBetween,
     billingStartMs,
     calcFinalCharge,
@@ -25,6 +27,10 @@ import type { PlanCode } from "@/lib/reservation";
 export type FinalizeResult = {
     customerId: string;
     reservationId: string;
+    /** 예약번호 — 추가결제 주문번호의 접두사가 된다 */
+    reservationCode: string;
+    /** 이용일("2026-09-05") — 결제 안내 문구에 쓴다 */
+    useDate: string;
     charge: FinalCharge;
     prepaidAmount: number;
     diff: SettlementDiff;
@@ -36,6 +42,7 @@ type Row = {
     ended_at: string | null;
     reservation_id: string;
     reservations: {
+        code: string;
         customer_id: string;
         plan: string;
         use_date: string;
@@ -68,7 +75,7 @@ export async function finalizeServiceCharge(
             .from("services")
             .select(
                 "arrived_at, started_at, ended_at, reservation_id, " +
-                    "reservations!inner(customer_id, plan, use_date, arrive_time, duration, duration_minutes, surcharge_rate, prepaid_amount)",
+                    "reservations!inner(code, customer_id, plan, use_date, arrive_time, duration, duration_minutes, surcharge_rate, prepaid_amount)",
             )
             .eq("id", serviceId)
             .maybeSingle<Row>();
@@ -123,12 +130,93 @@ export async function finalizeServiceCharge(
         return {
             customerId: r.customer_id,
             reservationId: data.reservation_id,
+            reservationCode: r.code,
+            useDate: r.use_date,
             charge,
             prepaidAmount,
             diff: calcSettlementDiff(prepaidAmount, charge.total),
         };
     } catch (e) {
         console.error("[finalizeServiceCharge] 산정 실패:", e);
+        return null;
+    }
+}
+
+/**
+ * 이용자 미도착(노쇼) 종료의 최종 이용요금을 확정한다 (#75 · 약관 제19조).
+ *
+ *  조문이 정한 것은 "해당 상품 1시간 이용요금 및 파트너 출동비용 실비" 다.
+ *  🔸 출동비용 실비는 "회사가 별도로 정하여 안내" 로 남아 있어 아직 없다.
+ *     정해지면 여기에 더한다.
+ *
+ *  선결제는 최소 2시간분이라 노쇼 청구(1시간)보다 크다. 그래서 실제로는
+ *  **환불이 난다.** 그래도 같은 경로로 흘려보낸다 — 출동비용이 더해져
+ *  선결제를 넘는 경우가 생기면 부호만 뒤집히면 되기 때문이다.
+ */
+export async function finalizeNoShowCharge(
+    serviceId: string,
+): Promise<FinalizeResult | null> {
+    try {
+        const admin = createAdminClient();
+
+        const { data, error } = await admin
+            .from("services")
+            .select(
+                "reservation_id, " +
+                    "reservations!inner(code, customer_id, plan, use_date, surcharge_rate, prepaid_amount)",
+            )
+            .eq("id", serviceId)
+            .maybeSingle<{
+                reservation_id: string;
+                reservations: {
+                    code: string;
+                    customer_id: string;
+                    plan: string;
+                    use_date: string;
+                    surcharge_rate: number | string | null;
+                    prepaid_amount: number | null;
+                } | null;
+            }>();
+
+        if (error || !data?.reservations) return null;
+
+        const r = data.reservations;
+        const plan: PlanCode = r.plan === "plus" ? "plus" : "basic";
+        const total = oneHourCharge(plan, Number(r.surcharge_rate ?? 0) > 0);
+
+        const { error: updateError } = await admin
+            .from("reservations")
+            .update({ billed_minutes: MIN_BILLABLE_MIN, final_amount: total })
+            .eq("id", data.reservation_id);
+
+        if (updateError) {
+            console.error("[finalizeNoShowCharge] 저장 실패:", updateError);
+            return null;
+        }
+
+        const prepaidAmount = r.prepaid_amount ?? 0;
+        return {
+            customerId: r.customer_id,
+            reservationId: data.reservation_id,
+            reservationCode: r.code,
+            useDate: r.use_date,
+            charge: {
+                actualMinutes: 0,
+                baseMinutes: MIN_BILLABLE_MIN,
+                extraMinutes: 0,
+                billedMinutes: MIN_BILLABLE_MIN,
+                baseAmount: total,
+                extraAmount: 0,
+                surchargeAmount: 0,
+                surchargeRate: 0,
+                total,
+                minimumApplied: true,
+            },
+            prepaidAmount,
+            diff: calcSettlementDiff(prepaidAmount, total),
+        };
+    } catch (e) {
+        console.error("[finalizeNoShowCharge] 산정 실패:", e);
         return null;
     }
 }
