@@ -34,7 +34,11 @@ import {
     arriveService,
     completeService,
     endService,
+    endServiceNoShow,
+    recordServiceTime,
+    SERVICE_TIME_FIELDS,
     startService,
+    type ServiceTimeField,
 } from "../../_actions/services";
 import { EndServiceModal } from "../../../_components/end-service-modal";
 import { ServiceFeedbackModal } from "../../../_components/service-feedback-modal";
@@ -80,6 +84,31 @@ export function ServiceDetailView({
 
     const cond = service.conditions;
     const startAt = `${item.dateLabel} ${service.startedAtLabel ?? "-"}`;
+
+    const onRecord = (field: ServiceTimeField, label: string) => {
+        startTransition(async () => {
+            const res = await recordServiceTime(service.id, field);
+            if (!res.ok) {
+                toast.error(res.message);
+                return;
+            }
+            toast.success(`${label} 시각을 기록했어요.`);
+            router.refresh();
+        });
+    };
+
+    const onNoShow = () => {
+        startTransition(async () => {
+            const res = await endServiceNoShow(service.id);
+            if (!res.ok) {
+                toast.error(res.message);
+                return;
+            }
+            toast.success("이용자 미도착으로 종료했어요.");
+            router.refresh();
+        });
+    };
+
     const endAt = `${item.dateLabel} ${service.endedAtLabel ?? "-"}`;
     const serviceName = `${item.hospital} ${item.type}`;
 
@@ -455,6 +484,92 @@ export function ServiceDetailView({
                     기다린 뒤 종료합니다. 그 전에는 현장을 떠나지 않습니다.
                 </p>
             </div>
+
+            {/*
+             * 진행 시각 기록 (#55) — 매뉴얼이 각 단계에서 기록하라고 정한 항목.
+             * 약관 제12조 ④ 는 이용시간 분쟁 시 시작·종료시각 **외에** 도착
+             * 안내시각과 진행기록을 함께 확인한다고 정한다.
+             *
+             * 시각은 서버가 찍는다. 매뉴얼이 임의 시각 입력을 금지하므로
+             * 화면에는 "지금 눌렀다" 는 버튼만 둔다.
+             */}
+            {started && (
+                <div className="border-border bg-background mt-5 rounded-2xl border p-6 md:p-7">
+                    <h2 className="text-foreground text-lg font-bold">
+                        진행 기록
+                    </h2>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                        각 단계가 끝날 때 눌러주세요. 누른 시각이 그대로
+                        기록되고 결과보고에 반영됩니다. 이미 기록된 항목은 다시
+                        눌러도 바뀌지 않습니다.
+                    </p>
+
+                    <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                        {SERVICE_TIME_FIELDS.map((f) => {
+                            const at = service.times[f.field];
+                            return (
+                                <button
+                                    key={f.field}
+                                    type="button"
+                                    disabled={!!at || pending}
+                                    onClick={() => onRecord(f.field, f.label)}
+                                    className={cn(
+                                        "flex items-center justify-between rounded-xl border px-4 py-3 text-left text-sm transition-colors",
+                                        at
+                                            ? "border-border bg-muted/40 text-muted-foreground"
+                                            : "border-border bg-background text-foreground hover:bg-muted",
+                                    )}
+                                >
+                                    <span className="font-semibold">
+                                        {f.label}
+                                    </span>
+                                    <span
+                                        className={cn(
+                                            "text-xs",
+                                            at
+                                                ? "text-foreground font-bold"
+                                                : "text-muted-foreground",
+                                        )}
+                                    >
+                                        {at ? timeLabel(at) : "기록하기"}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/*
+                     * 대응카드 03 — 이용자가 나타나지 않으면 예약시각 정각에
+                     * 시작을 누르고 미도착 종료시각까지 기다린 뒤 종료한다.
+                     * 20분 전에는 서버가 거절한다.
+                     */}
+                    {!ended && (
+                        <div className="border-border mt-5 border-t pt-5">
+                            <p className="text-muted-foreground text-xs leading-relaxed">
+                                이용자를 만나지 못했다면 예약시각부터{" "}
+                                {NO_SHOW_WAIT_MIN}분간 기다린 뒤 아래로
+                                종료하세요. 그 전에는 현장을 떠나지 않습니다.
+                            </p>
+                            <button
+                                type="button"
+                                disabled={pending}
+                                onClick={onNoShow}
+                                className="border-destructive/40 text-destructive hover:bg-destructive/5 mt-3 w-full rounded-xl border px-4 py-3 text-sm font-bold transition-colors disabled:opacity-50"
+                            >
+                                이용자 미도착으로 종료
+                            </button>
+                        </div>
+                    )}
+
+                    {service.autoClosedAt && (
+                        <p className="border-border text-muted-foreground mt-5 rounded-xl border border-dashed px-4 py-3 text-xs leading-relaxed">
+                            종료 처리가 되지 않아 <b>시스템이 마감</b>했습니다.
+                            청구는 예정 종료시각까지만 반영됩니다. 실제 수행
+                            내용이 다르면 운영센터에 알려주세요.
+                        </p>
+                    )}
+                </div>
+            )}
 
             <div className="mt-5 grid gap-5 lg:grid-cols-2">
                 {/* 서비스 진행 */}
@@ -879,4 +994,14 @@ function PlanRow({
             </span>
         </div>
     );
+}
+
+/** ISO → "14:20" (KST). 기록 버튼에 표시한다. */
+function timeLabel(iso: string): string {
+    return new Date(iso).toLocaleTimeString("ko-KR", {
+        timeZone: "Asia/Seoul",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+    });
 }

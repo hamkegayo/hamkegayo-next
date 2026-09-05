@@ -36,6 +36,12 @@ export type PartnerServiceView = {
     endedAtLabel: string | null;
     startMemo: string | null;
     endMemo: string | null;
+    /** 단계별 진행 시각 (#55). 키는 DB 컬럼명과 같다. */
+    times: Record<string, string | null>;
+    /** 이용자 미도착으로 종료된 건 (약관 제15조 ③) */
+    noShow: boolean;
+    /** 시스템이 마감한 건. 실제 종료가 아니라는 표시 */
+    autoClosedAt: string | null;
     /**
      * 수행 조건 — 매뉴얼 1장이 업무 시작 조건으로 정한 항목 (#77).
      * 인계자 성명·연락처는 **제3자 개인정보**라 확정 후에만 들어온다.
@@ -67,6 +73,19 @@ type ServiceRow = {
     ended_at: string | null;
     start_memo: string | null;
     end_memo: string | null;
+    notified_at: string | null;
+    hospital_arrived_at: string | null;
+    reception_at: string | null;
+    wait_started_at: string | null;
+    wait_ended_at: string | null;
+    treatment_started_at: string | null;
+    treatment_ended_at: string | null;
+    checkout_started_at: string | null;
+    checkout_ended_at: string | null;
+    home_departed_at: string | null;
+    handover_at: string | null;
+    no_show: boolean | null;
+    auto_closed_at: string | null;
     reservations: {
         code: string;
         plan: string;
@@ -128,6 +147,11 @@ function ageLabel(birth: string): string {
 
 const SELECT =
     "id, status, arrived_at, started_at, ended_at, start_memo, end_memo, " +
+    // 매뉴얼이 각 단계에서 기록하라고 정한 시각 (#55).
+    // 약관 제12조 ④ 가 이용시간 분쟁 시 함께 확인하는 자료다.
+    "notified_at, hospital_arrived_at, reception_at, wait_started_at, wait_ended_at, " +
+    "treatment_started_at, treatment_ended_at, checkout_started_at, checkout_ended_at, " +
+    "home_departed_at, handover_at, no_show, auto_closed_at, " +
     "reservations!inner(code, plan, hospital_address, treatment, patient_name, patient_birth, " +
     "use_date, reserve_time, duration, surcharge_rate, prepaid_amount, billed_minutes, final_amount, " +
     // 확정 후에만 제공되는 단계 2 항목 (#77 · 처리방침 제5조 ②).
@@ -180,6 +204,21 @@ function toView(r: ServiceRow): PartnerServiceView {
         endedAtLabel: toTimeLabel(r.ended_at),
         startMemo: r.start_memo,
         endMemo: r.end_memo,
+        times: {
+            notified_at: r.notified_at,
+            hospital_arrived_at: r.hospital_arrived_at,
+            reception_at: r.reception_at,
+            wait_started_at: r.wait_started_at,
+            wait_ended_at: r.wait_ended_at,
+            treatment_started_at: r.treatment_started_at,
+            treatment_ended_at: r.treatment_ended_at,
+            checkout_started_at: r.checkout_started_at,
+            checkout_ended_at: r.checkout_ended_at,
+            home_departed_at: r.home_departed_at,
+            handover_at: r.handover_at,
+        },
+        noShow: r.no_show === true,
+        autoClosedAt: r.auto_closed_at,
         conditions: {
             transportTo: res?.transport_to ?? null,
             transportHome: res?.transport_home ?? null,
