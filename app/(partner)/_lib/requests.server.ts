@@ -34,6 +34,13 @@ type OpenRow = {
     mobility_status: string | null;
     cognitive_status: string | null;
     surcharge_rate: number | string | null;
+    // 매뉴얼 1단계가 수락 전 확인을 요구하는 항목 (#77).
+    // 개인정보가 아니라 수행 조건이라 단계 1 에 포함된다(처리방침 제5조 ② "이동 관련 선택사항").
+    transport_to: string | null;
+    transport_home: string | null;
+    end_method: string | null;
+    /** 대체 인계자 등록 여부만. 성명·연락처는 확정 후에 온다 */
+    has_backup_handover: boolean | null;
     applied: boolean;
 };
 
@@ -174,6 +181,16 @@ export type PartnerRequestDetail = {
     departRegion: string;
     /** 병원 지역(동 단위) */
     hospitalRegion: string;
+    /**
+     * 수행 조건 — 매뉴얼 1단계·PART 4 확인표가 수락 전 확인을 요구한다.
+     * 값이 없으면 "정보 없음" 이 아니라 **수락하지 말라는 신호**다(대응카드 01).
+     */
+    plan_conditions: {
+        transportTo: string | null;
+        transportHome: string | null;
+        endMethod: string | null;
+        hasBackupHandover: boolean;
+    };
     /** 수행 가능 여부 판단용 최소 건강정보 — 제5조 ④ */
     condition: {
         mobility: string;
@@ -243,6 +260,12 @@ export async function getPartnerRequestDetail(
             surcharged,
             departRegion: row.depart_region ?? "지역 정보 없음",
             hospitalRegion: row.hospital_region ?? "지역 정보 없음",
+            plan_conditions: {
+                transportTo: row.transport_to,
+                transportHome: row.transport_home,
+                endMethod: row.end_method,
+                hasBackupHandover: row.has_backup_handover === true,
+            },
             condition: {
                 mobility: row.mobility_status?.trim() || "정보 없음",
                 cognitive: row.cognitive_status?.trim() || "정보 없음",

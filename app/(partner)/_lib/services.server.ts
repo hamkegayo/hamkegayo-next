@@ -36,6 +36,27 @@ export type PartnerServiceView = {
     endedAtLabel: string | null;
     startMemo: string | null;
     endMemo: string | null;
+    /**
+     * 수행 조건 — 매뉴얼 1장이 업무 시작 조건으로 정한 항목 (#77).
+     * 인계자 성명·연락처는 **제3자 개인정보**라 확정 후에만 들어온다.
+     */
+    conditions: PlanDetail;
+};
+
+export type PlanDetail = {
+    transportTo: string | null;
+    transportHome: string | null;
+    endMethod: string | null;
+    notifyTarget: string | null;
+    shareMedicalInfo: boolean;
+    handover: HandoverPerson | null;
+    backupHandover: HandoverPerson | null;
+};
+
+export type HandoverPerson = {
+    name: string;
+    relation: string | null;
+    phone: string | null;
 };
 
 type ServiceRow = {
@@ -60,6 +81,17 @@ type ServiceRow = {
         prepaid_amount: number | null;
         billed_minutes: number | null;
         final_amount: number | null;
+        transport_to: string | null;
+        transport_home: string | null;
+        end_method: string | null;
+        notify_target: string | null;
+        share_medical_info: boolean | null;
+        handover_name: string | null;
+        handover_relation: string | null;
+        handover_phone: string | null;
+        backup_handover_name: string | null;
+        backup_handover_relation: string | null;
+        backup_handover_phone: string | null;
     } | null;
 };
 
@@ -97,7 +129,12 @@ function ageLabel(birth: string): string {
 const SELECT =
     "id, status, arrived_at, started_at, ended_at, start_memo, end_memo, " +
     "reservations!inner(code, plan, hospital_address, treatment, patient_name, patient_birth, " +
-    "use_date, reserve_time, duration, surcharge_rate, prepaid_amount, billed_minutes, final_amount)";
+    "use_date, reserve_time, duration, surcharge_rate, prepaid_amount, billed_minutes, final_amount, " +
+    // 확정 후에만 제공되는 단계 2 항목 (#77 · 처리방침 제5조 ②).
+    // 인계자는 이용자 본인이 아닌 제3자의 개인정보다.
+    "transport_to, transport_home, end_method, notify_target, share_medical_info, " +
+    "handover_name, handover_relation, handover_phone, " +
+    "backup_handover_name, backup_handover_relation, backup_handover_phone)";
 
 function toView(r: ServiceRow): PartnerServiceView {
     const res = r.reservations;
@@ -106,6 +143,19 @@ function toView(r: ServiceRow): PartnerServiceView {
     // 최종 산정 전에는 선결제액을 잠정 기준으로 보여준다.
     const grossAmount = res?.final_amount ?? res?.prepaid_amount ?? 0;
     const payout = calcPartnerPayout(planCode, grossAmount);
+
+    const person = (
+        name: string | null | undefined,
+        relation: string | null | undefined,
+        phone: string | null | undefined,
+    ): HandoverPerson | null =>
+        name?.trim()
+            ? {
+                  name: name.trim(),
+                  relation: relation?.trim() || null,
+                  phone: phone?.trim() || null,
+              }
+            : null;
 
     return {
         id: r.id,
@@ -130,6 +180,23 @@ function toView(r: ServiceRow): PartnerServiceView {
         endedAtLabel: toTimeLabel(r.ended_at),
         startMemo: r.start_memo,
         endMemo: r.end_memo,
+        conditions: {
+            transportTo: res?.transport_to ?? null,
+            transportHome: res?.transport_home ?? null,
+            endMethod: res?.end_method ?? null,
+            notifyTarget: res?.notify_target ?? null,
+            shareMedicalInfo: res?.share_medical_info === true,
+            handover: person(
+                res?.handover_name,
+                res?.handover_relation,
+                res?.handover_phone,
+            ),
+            backupHandover: person(
+                res?.backup_handover_name,
+                res?.backup_handover_relation,
+                res?.backup_handover_phone,
+            ),
+        },
     };
 }
 

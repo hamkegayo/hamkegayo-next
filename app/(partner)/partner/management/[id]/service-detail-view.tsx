@@ -16,6 +16,17 @@ import {
     Upload,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+    END_METHOD_LABEL,
+    HANDOVER_FAIL_WAIT_MIN,
+    NOTIFY_TARGET_LABEL,
+    NO_SHOW_WAIT_MIN,
+    REPORT_CHANNEL,
+    TRANSPORT_LABEL,
+    type EndMethodCode,
+    type NotifyTargetCode,
+    type TransportCode,
+} from "@/lib/handover";
 
 import { cn } from "@/lib/utils";
 import type { PartnerServiceView } from "../../../_lib/services.server";
@@ -67,6 +78,7 @@ export function ServiceDetailView({
     const [startMemo, setStartMemo] = useState(service.startMemo ?? "");
     const [endMemo, setEndMemo] = useState(service.endMemo ?? "");
 
+    const cond = service.conditions;
     const startAt = `${item.dateLabel} ${service.startedAtLabel ?? "-"}`;
     const endAt = `${item.dateLabel} ${service.endedAtLabel ?? "-"}`;
     const serviceName = `${item.hospital} ${item.type}`;
@@ -321,6 +333,127 @@ export function ServiceDetailView({
                         </p>
                     )}
                 </div>
+            </div>
+
+            {/*
+             * 수행 조건 — 매뉴얼 1장이 업무 시작 조건으로 정한 항목 (#77).
+             * 인계자 성명·연락처는 제3자 개인정보라 **확정 후에만** 내려온다
+             * (처리방침 제5조 ②③). 수락 검토 화면에는 나오지 않는다.
+             */}
+            <div className="border-border bg-background mt-5 rounded-2xl border p-6 md:p-7">
+                <h2 className="text-foreground text-lg font-bold">수행 조건</h2>
+                <p className="text-muted-foreground mt-1 text-sm">
+                    업무 시작 전에 아래 항목을 확인해 주세요. 비어 있거나 현장
+                    상황과 다르면 운영센터에 확인합니다.
+                </p>
+
+                <div className="divide-border mt-5 grid gap-x-10 divide-y md:grid-cols-2 md:divide-y-0">
+                    <div className="divide-border divide-y">
+                        <PlanRow
+                            label="병원까지 이동"
+                            value={transportLabel(cond.transportTo)}
+                        />
+                        <PlanRow
+                            label="귀가수단"
+                            value={transportLabel(cond.transportHome)}
+                        />
+                        <PlanRow
+                            label="종료 방식"
+                            value={
+                                cond.endMethod
+                                    ? (END_METHOD_LABEL[
+                                          cond.endMethod as EndMethodCode
+                                      ] ?? MISSING)
+                                    : MISSING
+                            }
+                        />
+                    </div>
+                    <div className="divide-border divide-y">
+                        <PlanRow
+                            label="통보 대상"
+                            value={
+                                cond.notifyTarget
+                                    ? (NOTIFY_TARGET_LABEL[
+                                          cond.notifyTarget as NotifyTargetCode
+                                      ] ?? MISSING)
+                                    : MISSING
+                            }
+                        />
+                        {/*
+                         * 약관 제8조 ①·대응카드 16 — 이용자가 동의하지 않았으면
+                         * 보호자에게 진료 내용을 전달하지 않는다.
+                         */}
+                        <PlanRow
+                            label="진료정보 전달"
+                            value={
+                                cond.shareMedicalInfo
+                                    ? "보호자에게 전달 동의"
+                                    : "전달 불가 (이용자 미동의)"
+                            }
+                            valueClass={
+                                cond.shareMedicalInfo
+                                    ? undefined
+                                    : "text-destructive"
+                            }
+                        />
+                        <PlanRow label="결과보고 경로" value={REPORT_CHANNEL} />
+                    </div>
+                </div>
+
+                {cond.handover && (
+                    <div className="border-border mt-5 border-t pt-5">
+                        <p className="text-foreground text-sm font-bold">
+                            인계자
+                        </p>
+                        <p className="text-muted-foreground mt-1 text-sm">
+                            현장에서 성함·관계·연락처를 대조한 뒤 인계합니다
+                            (매뉴얼 12단계).
+                        </p>
+                        <div className="divide-border mt-3 divide-y">
+                            <PlanRow
+                                label="성함"
+                                value={`${cond.handover.name}${
+                                    cond.handover.relation
+                                        ? ` (${cond.handover.relation})`
+                                        : ""
+                                }`}
+                            />
+                            <PlanRow
+                                label="연락처"
+                                value={cond.handover.phone ?? MISSING}
+                            />
+                            {cond.backupHandover && (
+                                <PlanRow
+                                    label="대체 인계자"
+                                    value={`${cond.backupHandover.name}${
+                                        cond.backupHandover.relation
+                                            ? ` (${cond.backupHandover.relation})`
+                                            : ""
+                                    }${
+                                        cond.backupHandover.phone
+                                            ? ` · ${cond.backupHandover.phone}`
+                                            : ""
+                                    }`}
+                                />
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/*
+                 * 대기 기준은 예약별 값이 아니다 — 미도착은 약관 제15조 ③④ 가,
+                 * 인계 실패는 회사 정책이 정한다. 파트너가 현장에서 임의로
+                 * 판단하지 않도록 숫자를 그대로 보여 준다.
+                 */}
+                <p className="text-muted-foreground border-border mt-5 rounded-xl border border-dashed px-4 py-3 text-xs leading-relaxed">
+                    이용자가 약속 장소에 나오지 않으면 예약시각부터{" "}
+                    <b className="text-foreground">{NO_SHOW_WAIT_MIN}분</b>,
+                    인계자가 오지 않으면{" "}
+                    <b className="text-foreground">
+                        {HANDOVER_FAIL_WAIT_MIN}분
+                    </b>{" "}
+                    기다린 뒤 종료합니다. 그 전에는 현장을 떠나지 않습니다.
+                </p>
             </div>
 
             <div className="mt-5 grid gap-5 lg:grid-cols-2">
@@ -712,6 +845,35 @@ function SummaryRow({
                     "text-foreground text-right font-bold",
                     valueClass,
                 )}
+            >
+                {value}
+            </span>
+        </div>
+    );
+}
+
+/** 값이 없을 때의 표시. 매뉴얼상 "확인되지 않음" 은 운영센터 확인 신호다. */
+const MISSING = "정보 없음";
+
+function transportLabel(code: string | null): string {
+    if (!code) return MISSING;
+    return TRANSPORT_LABEL[code as TransportCode] ?? MISSING;
+}
+
+function PlanRow({
+    label,
+    value,
+    valueClass,
+}: {
+    label: string;
+    value: string;
+    valueClass?: string;
+}) {
+    return (
+        <div className="flex items-start justify-between gap-4 py-2.5 text-sm">
+            <span className="text-muted-foreground shrink-0">{label}</span>
+            <span
+                className={cn("font-semibold", valueClass ?? "text-foreground")}
             >
                 {value}
             </span>
