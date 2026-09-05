@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/utils/supabase/server";
 import { createNotification } from "@/lib/notifications";
+import { enqueueSettlementRefund } from "@/lib/payments/settlement-refund";
 import { finalizeServiceCharge } from "../../_lib/finalize-charge";
 import { formatMinutes } from "@/lib/pricing";
 
@@ -125,10 +126,18 @@ export async function endService(
                 link: "/mypage/reservations",
             });
         } else if (diff.refund > 0) {
+            // 미달분은 자동으로 나가지 않는다. 종료 시각이 잘못 눌렸을 수 있어
+            // 관리자가 한 번 확인한 뒤 집행한다(#76, 2026-09-05 기획 확정).
+            await enqueueSettlementRefund({
+                reservationId: final.reservationId,
+                amount: diff.refund,
+                reason: usage,
+            });
+
             await createNotification(customerId, {
                 type: "PAYMENT_REFUND",
                 title: "결제 금액이 환불될 예정이에요",
-                body: `${usage}. 선결제 금액 중 ${diff.refund.toLocaleString()}원을 환불해 드립니다.`,
+                body: `${usage}. 선결제 금액 중 ${diff.refund.toLocaleString()}원을 확인 후 환불해 드립니다. 완료되면 다시 알려드릴게요.`,
                 link: "/mypage/reservations",
             });
         }

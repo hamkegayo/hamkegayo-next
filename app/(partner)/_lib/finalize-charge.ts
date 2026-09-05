@@ -24,6 +24,7 @@ import type { PlanCode } from "@/lib/reservation";
 
 export type FinalizeResult = {
     customerId: string;
+    reservationId: string;
     charge: FinalCharge;
     prepaidAmount: number;
     diff: SettlementDiff;
@@ -121,6 +122,7 @@ export async function finalizeServiceCharge(
         const prepaidAmount = r.prepaid_amount ?? 0;
         return {
             customerId: r.customer_id,
+            reservationId: data.reservation_id,
             charge,
             prepaidAmount,
             diff: calcSettlementDiff(prepaidAmount, charge.total),
