@@ -23,7 +23,9 @@ export type IncidentKind =
     | "STATE_MISMATCH" // PG 는 PAID 인데 DB 는 아님
     | "AMOUNT_MISMATCH" // 유효 서명 + 금액 위조 — 공격 신호
     | "UNKNOWN_ORDER" // 우리가 만들지 않은 주문 승인 시도
-    | "FINALIZE_FAILED"; // 확정 실패(취소는 성공)
+    | "FINALIZE_FAILED" // 확정 실패(취소는 성공)
+    | "REFUND_FAILED" // 환불 요청했는데 PG 취소가 실패
+    | "REFUND_RECORD_FAILED"; // PG 취소는 됐는데 DB 기록 실패 — 이중 환불 위험
 
 export type IncidentSeverity = "CRITICAL" | "HIGH" | "MEDIUM";
 
@@ -79,6 +81,18 @@ const INCIDENT_INFO: Record<
         label: "예약 확정 실패",
         summary: "결제 승인 후 예약 확정에 실패해 결제를 취소했습니다.",
         action: "고객 결제는 취소됐습니다. 예약 상태를 확인하고 재시도를 안내하세요.",
+    },
+    REFUND_RECORD_FAILED: {
+        severity: "CRITICAL",
+        label: "환불 기록 실패",
+        summary: "환불은 나갔는데 우리 DB 에 남지 않았습니다.",
+        action: "payments 에 REFUND 행을 수동 적재하고 예약을 취소 상태로 맞추세요. ⚠️ 환불을 재시도하지 마세요 — 두 번 나갑니다.",
+    },
+    REFUND_FAILED: {
+        severity: "HIGH",
+        label: "환불 실패",
+        summary: "고객이 취소했는데 환불이 나가지 않았습니다.",
+        action: "NICEPAY 관리자에서 수동 취소하고 고객에게 안내하세요. 예약은 그대로 남아 있습니다.",
     },
     UNKNOWN_ORDER: {
         severity: "MEDIUM",

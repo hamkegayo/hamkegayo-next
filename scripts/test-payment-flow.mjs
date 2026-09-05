@@ -420,6 +420,302 @@ async function main() {
         net === 10000,
     );
 
+    console.log("\n▶ 취소 환불 (약관 제19조 · #76)");
+
+    // 선결제 40,000 / 포인트 5,000 사용 → PG 결제 35,000
+    const r4 = await makeReservation(customerId, partnerId, "R4", "9시", 120);
+    const { data: pay4 } = await admin
+        .from("payments")
+        .insert({
+            reservation_id: r4,
+            type: "BASE",
+            status: "PAID",
+            order_id: `${CODE_PREFIX}-ORD-4`,
+            gross_amount: 40000,
+            discount_amount: 5000,
+            commission_amount: 3000,
+            payout_amount: 32000,
+            commission_rate: 0.2,
+            paid_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+
+    // 포인트 사용 이력 — 환불 시 USE_CANCEL 로 복원되어야 한다.
+    await admin.from("points").insert({
+        user_id: customerId,
+        amount: -5000,
+        reason: "USE",
+        reservation_id: r4,
+        payment_id: pay4.id,
+        memo: POINT_MEMO,
+    });
+
+    // 취소수수료 10,000 → 현금 25,000 환불, 포인트 5,000 전액 복원
+    const { data: refund, error: refundErr } = await admin.rpc(
+        "refund_payment",
+        {
+            p_payment_id: pay4.id,
+            p_cancel_fee: 10000,
+            p_expected_cash: 25000,
+            p_memo: POINT_MEMO,
+        },
+    );
+    check("환불 RPC 성공", !refundErr, refundErr?.message);
+    check(
+        `현금 25,000 환불 · 수수료 10,000 (실제 ${refund?.cash} / ${refund?.cancel_fee})`,
+        refund?.cash === 25000 && refund?.cancel_fee === 10000,
+    );
+    check(
+        "포인트는 수수료와 무관하게 전액 복원된다",
+        refund?.restored_points === 5000,
+    );
+
+    const { data: refundRow } = await admin
+        .from("payments")
+        .select(
+            "gross_amount, discount_amount, commission_amount, payout_amount, cancel_fee_amount",
+        )
+        .eq("order_id", `${CODE_PREFIX}-ORD-4-R`)
+        .single();
+    check(
+        "환불 행이 원 결제와 같은 공식을 음수로 기록한다",
+        refundRow?.gross_amount === -30000 &&
+            refundRow?.discount_amount === -5000 &&
+            refundRow?.commission_amount === -1000 &&
+            refundRow?.payout_amount === -24000,
+        JSON.stringify(refundRow),
+    );
+
+    const { data: sumRows } = await admin
+        .from("payments")
+        .select("gross_amount, commission_amount, payout_amount")
+        .eq("reservation_id", r4)
+        .eq("status", "PAID");
+    const net4 = sumRows.reduce((s, r) => s + r.gross_amount, 0);
+    const netFee = sumRows.reduce((s, r) => s + r.commission_amount, 0);
+    const netPayout = sumRows.reduce((s, r) => s + r.payout_amount, 0);
+    check(`실수취액이 취소수수료와 같다 (${net4})`, net4 === 10000);
+    check(
+        `수수료율대로 분배된다 (플랫폼 ${netFee} / 파트너 ${netPayout})`,
+        netFee === 2000 && netPayout === 8000,
+    );
+
+    const { data: res4 } = await admin
+        .from("reservations")
+        .select("status, confirmed_partner_id")
+        .eq("id", r4)
+        .single();
+    check(
+        "환불과 예약 취소가 한 트랜잭션에서 처리된다",
+        res4?.status === "CANCELLED" && res4?.confirmed_partner_id === null,
+    );
+
+    // PG 취소는 성공했는데 기록에 실패해 재시도하는 상황.
+    const { data: again } = await admin.rpc("refund_payment", {
+        p_payment_id: pay4.id,
+        p_cancel_fee: 10000,
+        p_expected_cash: 25000,
+    });
+    const { count: refundCount } = await admin
+        .from("payments")
+        .select("id", { count: "exact", head: true })
+        .eq("reservation_id", r4)
+        .eq("type", "REFUND");
+    check(
+        "두 번 불러도 환불이 한 번만 기록된다",
+        again?.already === true && refundCount === 1,
+    );
+
+    const { data: dupRestore } = await admin.rpc("release_points", {
+        p_payment_id: pay4.id,
+    });
+    check("포인트도 두 번 복원되지 않는다", dupRestore === 0);
+
+    // 앱이 계산한 환불액과 DB 계산이 어긋나면 막아야 한다.
+    const { data: pay5 } = await admin
+        .from("payments")
+        .insert({
+            reservation_id: r4,
+            type: "BASE",
+            status: "PAID",
+            order_id: `${CODE_PREFIX}-ORD-5`,
+            gross_amount: 40000,
+            discount_amount: 0,
+            commission_amount: 8000,
+            payout_amount: 32000,
+            commission_rate: 0.2,
+            paid_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+    const { error: mismatchErr } = await admin.rpc("refund_payment", {
+        p_payment_id: pay5.id,
+        p_cancel_fee: 10000,
+        p_expected_cash: 99999,
+    });
+    check("환불액이 어긋나면 거절한다", !!mismatchErr);
+
+    const { error: refundDenied } = await user.rpc("refund_payment", {
+        p_payment_id: pay5.id,
+        p_cancel_fee: 0,
+        p_expected_cash: 40000,
+    });
+    check("고객은 스스로 환불을 일으킬 수 없다", !!refundDenied);
+
+    console.log("\n▶ 미달분 환불 승인 큐 (약관 제21조 ④ · #76)");
+
+    // 서비스는 정상 완료됐고 최종요금이 선결제액보다 적은 상황.
+    const r6 = await makeReservation(customerId, partnerId, "R6", "9시", 120);
+    const { data: pay6 } = await admin
+        .from("payments")
+        .insert({
+            reservation_id: r6,
+            type: "BASE",
+            status: "PAID",
+            order_id: `${CODE_PREFIX}-ORD-6`,
+            gross_amount: 40000,
+            discount_amount: 0,
+            commission_amount: 8000,
+            payout_amount: 32000,
+            commission_rate: 0.2,
+            paid_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+    const { data: svc6 } = await admin
+        .from("services")
+        .insert({ reservation_id: r6, partner_id: partnerId, status: "ENDED" })
+        .select("id")
+        .single();
+
+    const { data: reqId, error: reqErr } = await admin.rpc(
+        "request_settlement_refund",
+        { p_reservation_id: r6, p_amount: 15000, p_reason: "테스트 미달분" },
+    );
+    check("미달분이 승인 큐에 쌓인다", !reqErr && !!reqId, reqErr?.message);
+
+    const { data: queued } = await admin
+        .from("refund_requests")
+        .select("status, amount")
+        .eq("id", reqId)
+        .single();
+    check(
+        "PENDING 으로 시작한다 (자동 환불 아님)",
+        queued?.status === "PENDING" && queued?.amount === 15000,
+    );
+
+    // 종료를 다시 눌러 금액이 재산정된 경우.
+    await admin.rpc("request_settlement_refund", {
+        p_reservation_id: r6,
+        p_amount: 12000,
+    });
+    const { count: queueCount } = await admin
+        .from("refund_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("reservation_id", r6);
+    const { data: requeued } = await admin
+        .from("refund_requests")
+        .select("amount")
+        .eq("id", reqId)
+        .single();
+    check(
+        "예약당 한 건이며 결정 전에는 금액이 갱신된다",
+        queueCount === 1 && requeued?.amount === 12000,
+    );
+
+    const { error: earlyErr } = await admin.rpc("record_settlement_refund", {
+        p_request_id: reqId,
+    });
+    check("승인 전에는 집행되지 않는다", !!earlyErr);
+
+    const { error: notAdminErr } = await user.rpc(
+        "admin_decide_refund_request",
+        { p_id: reqId, p_approve: true },
+    );
+    check("고객은 스스로 승인할 수 없다", !!notAdminErr);
+
+    // admin_decide_refund_request 는 aal2(2단계 인증)를 요구해 스크립트에서
+    // 탈 수 없다. 집행 경로를 보기 위해 상태만 직접 올린다.
+    await admin
+        .from("refund_requests")
+        .update({ status: "APPROVED", decided_at: new Date().toISOString() })
+        .eq("id", reqId);
+
+    const { data: done, error: doneErr } = await admin.rpc(
+        "record_settlement_refund",
+        { p_request_id: reqId },
+    );
+    check(
+        "승인 후 집행된다",
+        !doneErr && done?.already === false,
+        doneErr?.message,
+    );
+
+    const { data: refundRow6 } = await admin
+        .from("payments")
+        .select(
+            "gross_amount, commission_amount, payout_amount, discount_amount",
+        )
+        .eq("order_id", `${CODE_PREFIX}-ORD-6-S`)
+        .single();
+    check(
+        "환불 행이 수수료율대로 음수 기록된다",
+        refundRow6?.gross_amount === -12000 &&
+            refundRow6?.commission_amount === -2400 &&
+            refundRow6?.payout_amount === -9600,
+        JSON.stringify(refundRow6),
+    );
+
+    const { data: adjust } = await admin
+        .from("settlements")
+        .select("amount, fee, net, reason")
+        .eq(
+            "payment_id",
+            (
+                await admin
+                    .from("payments")
+                    .select("id")
+                    .eq("order_id", `${CODE_PREFIX}-ORD-6-S`)
+                    .single()
+            ).data.id,
+        )
+        .maybeSingle();
+    check(
+        "차감 정산이 생긴다",
+        adjust?.amount === -12000 &&
+            adjust?.net === -9600 &&
+            adjust?.reason === "REFUND",
+        JSON.stringify(adjust),
+    );
+
+    const { data: res6 } = await admin
+        .from("reservations")
+        .select("status")
+        .eq("id", r6)
+        .single();
+    check(
+        "미달분 환불은 예약을 취소하지 않는다",
+        res6?.status !== "CANCELLED",
+        `상태 ${res6?.status}`,
+    );
+
+    const { data: doneAgain } = await admin.rpc("record_settlement_refund", {
+        p_request_id: reqId,
+    });
+    const { count: refundRows6 } = await admin
+        .from("payments")
+        .select("id", { count: "exact", head: true })
+        .eq("reservation_id", r6)
+        .eq("type", "REFUND");
+    check(
+        "두 번 집행해도 한 번만 나간다",
+        doneAgain?.already === true && refundRows6 === 1,
+    );
+
+    await admin.from("services").delete().eq("id", svc6.id);
+    void pay6;
+
     console.log("\n▶ 포인트 원장");
 
     // memo 로 표시해 이 스크립트가 만든 행만 지운다.

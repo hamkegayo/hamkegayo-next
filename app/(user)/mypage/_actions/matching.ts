@@ -5,12 +5,22 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createNotification } from "@/lib/notifications";
+import { refundReservationPayment } from "@/lib/payments/refund";
 
 export type SelectPartnerResult =
     { ok: true; paymentDeadline: string } | { ok: false; message: string };
 
 export type CancelConfirmedResult =
-    { ok: true } | { ok: false; message: string };
+    | {
+          ok: true;
+          /** 환불된 현금(원). 결제 전 취소였으면 undefined */
+          refundedCash?: number;
+          /** 환불하지 않고 남긴 취소수수료(원) — 약관 제19조 ② */
+          cancelFee?: number;
+          /** 복원된 포인트(원) */
+          restoredPoints?: number;
+      }
+    | { ok: false; message: string };
 
 /** RPC 예외 메시지 → 사용자 안내 문구 */
 const ERROR_MESSAGE: Record<string, string> = {
@@ -119,15 +129,30 @@ export async function cancelConfirmedReservation(
         };
     }
 
-    const { error: upErr } = await admin
-        .from("reservations")
-        .update({ status: "CANCELLED" })
-        .eq("id", reservationId);
-    if (upErr) {
-        return {
-            ok: false,
-            message: "취소에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-        };
+    // 선결제를 먼저 환불한다(#76). 예약 상태 변경은 환불 RPC 가 같은 트랜잭션에서 한다 —
+    // 둘이 갈라지면 "돈은 돌려줬는데 예약은 살아 있는" 상태가 남는다.
+    const refund = await refundReservationPayment(reservationId, {
+        memo: "고객 예약 취소",
+    });
+
+    if (!refund.ok && refund.code !== "NO_PAYMENT") {
+        // PG 취소 실패거나 기록 실패다. 어느 쪽이든 사고로 적재됐고,
+        // 예약을 취소하지 않는다 — 취소해 버리면 환불받을 근거가 사라진다.
+        return { ok: false, message: refund.message };
+    }
+
+    if (!refund.ok) {
+        // 결제가 없는 확정 예약(있어서는 안 되지만 방어). 예약만 취소한다.
+        const { error: upErr } = await admin
+            .from("reservations")
+            .update({ status: "CANCELLED" })
+            .eq("id", reservationId);
+        if (upErr) {
+            return {
+                ok: false,
+                message: "취소에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+            };
+        }
     }
 
     // 예약된(SCHEDULED) 서비스 행 제거
@@ -148,5 +173,11 @@ export async function cancelConfirmedReservation(
     revalidatePath(`/mypage/reservations/${reservationId}`);
     revalidatePath("/mypage");
 
-    return { ok: true };
+    if (!refund.ok) return { ok: true };
+    return {
+        ok: true,
+        refundedCash: refund.cash,
+        cancelFee: refund.cancelFee,
+        restoredPoints: refund.restoredPoints,
+    };
 }
