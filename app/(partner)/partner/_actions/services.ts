@@ -15,6 +15,9 @@ const ERROR_MESSAGE: Record<string, string> = {
     not_partner: "본인 서비스만 처리할 수 있습니다.",
     invalid_state: "지금은 처리할 수 없는 상태입니다.",
     already_arrived: "이미 도착이 기록되었습니다.",
+    // 매뉴얼 4단계 — 일찍 도착해도 예약시각 정각에 시작한다.
+    too_early: "예약시각 이후에 진행할 수 있습니다.",
+    invalid_field: "기록할 수 없는 항목입니다.",
 };
 
 /** 서비스 행에 연결된 고객 id (알림 수신자) */
@@ -29,7 +32,13 @@ async function getCustomerId(serviceId: string): Promise<string | null> {
 }
 
 async function callRpc(
-    fn: "start_service" | "end_service" | "complete_service" | "arrive_service",
+    fn:
+        | "start_service"
+        | "end_service"
+        | "complete_service"
+        | "arrive_service"
+        | "record_service_time"
+        | "end_service_no_show",
     args: Record<string, unknown>,
     serviceId: string,
 ): Promise<ServiceActionResult> {
@@ -78,6 +87,74 @@ export async function arriveService(
                 type: "PARTNER_ARRIVED",
                 title: "파트너가 도착했어요",
                 body: "파트너가 약속 장소에 도착했습니다.",
+                link: "/mypage/reservations",
+            });
+        }
+    }
+    return res;
+}
+
+/**
+ * 진행 단계 시각 — 매뉴얼이 각 단계에서 기록하라고 정한 항목 (#55).
+ *
+ *  약관 제12조 ④ 는 이용시간 분쟁 시 "시작·종료시각 외에 도착 안내시각,
+ *  서비스 진행기록" 을 함께 확인한다고 정한다. 그 자료가 이 값들이다.
+ *
+ *  라벨은 매뉴얼 단계 표현을 그대로 쓴다.
+ */
+export const SERVICE_TIME_FIELDS = [
+    { field: "notified_at", label: "도착 통보", step: 4 },
+    { field: "hospital_arrived_at", label: "병원 도착", step: 7 },
+    { field: "reception_at", label: "접수 완료", step: 7 },
+    { field: "wait_started_at", label: "대기 시작", step: 7 },
+    { field: "wait_ended_at", label: "대기 종료", step: 7 },
+    { field: "treatment_started_at", label: "진료·검사 시작", step: 8 },
+    { field: "treatment_ended_at", label: "진료·검사 종료", step: 8 },
+    { field: "checkout_started_at", label: "수납·약국 시작", step: 9 },
+    { field: "checkout_ended_at", label: "수납·약국 종료", step: 9 },
+    { field: "home_departed_at", label: "귀가 출발", step: 11 },
+    { field: "handover_at", label: "인계 확인", step: 12 },
+] as const;
+
+export type ServiceTimeField = (typeof SERVICE_TIME_FIELDS)[number]["field"];
+
+/**
+ * 진행 시각을 기록한다. **시각은 서버가 찍는다** — 매뉴얼이 임의 시각 입력을
+ * 금지하기 때문이다(4·13단계·대응카드 26). 두 번 눌러도 처음 시각이 남는다.
+ */
+export async function recordServiceTime(
+    serviceId: string,
+    field: ServiceTimeField,
+): Promise<ServiceActionResult> {
+    return callRpc(
+        "record_service_time",
+        { p_service_id: serviceId, p_field: field },
+        serviceId,
+    );
+}
+
+/**
+ * 이용자 미도착 종료 — 약관 제15조 ③④ · 대응카드 03.
+ *
+ *  시작 후 20분이 지나야 호출할 수 있다. 그 전에 떠나는 것을 매뉴얼이
+ *  금지하므로 서버가 거절한다.
+ */
+export async function endServiceNoShow(
+    serviceId: string,
+): Promise<ServiceActionResult> {
+    const res = await callRpc(
+        "end_service_no_show",
+        { p_service_id: serviceId },
+        serviceId,
+    );
+
+    if (res.ok) {
+        const customerId = await getCustomerId(serviceId);
+        if (customerId) {
+            await createNotification(customerId, {
+                type: "RESERVATION_CANCELLED",
+                title: "약속 장소에서 만나지 못했어요",
+                body: "파트너가 예약시각부터 20분간 기다린 뒤 종료했습니다. 자세한 내용은 고객센터로 문의해 주세요.",
                 link: "/mypage/reservations",
             });
         }
