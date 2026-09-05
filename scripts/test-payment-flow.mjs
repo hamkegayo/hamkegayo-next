@@ -716,6 +716,183 @@ async function main() {
     await admin.from("services").delete().eq("id", svc6.id);
     void pay6;
 
+    console.log("\n▶ 추가결제 링크 (약관 제21조 ⑤ · #75)");
+
+    const r7 = await makeReservation(customerId, partnerId, "R7", "9시", 120);
+    await admin.from("payments").insert({
+        reservation_id: r7,
+        type: "BASE",
+        status: "PAID",
+        order_id: `${CODE_PREFIX}-ORD-7`,
+        gross_amount: 40000,
+        discount_amount: 0,
+        commission_amount: 8000,
+        payout_amount: 32000,
+        commission_rate: 0.2,
+        paid_at: new Date().toISOString(),
+    });
+
+    const token7 = `tok-${CODE_PREFIX}-7`;
+    const expires7 = new Date(Date.now() + 3 * 86_400_000).toISOString();
+    const { data: issued, error: issueErr } = await admin.rpc(
+        "create_extension_payment",
+        {
+            p_reservation_id: r7,
+            p_amount: 15000,
+            p_reason: "EXTENSION",
+            p_order_id: `${CODE_PREFIX}-ORD-7-E`,
+            p_token: token7,
+            p_token_expires: expires7,
+            p_review_threshold: 150000,
+        },
+    );
+    check(
+        "추가결제가 발급된다",
+        !issueErr && !!issued?.payment_id,
+        issueErr?.message,
+    );
+    check(
+        "총액이 상한 아래면 검토 대상이 아니다 (40,000 + 15,000)",
+        issued?.review_required === false,
+    );
+
+    // 파트너가 종료를 두 번 눌러도 청구가 두 벌 생기면 안 된다.
+    const { data: issuedAgain } = await admin.rpc("create_extension_payment", {
+        p_reservation_id: r7,
+        p_amount: 15000,
+        p_reason: "EXTENSION",
+        p_order_id: `${CODE_PREFIX}-ORD-7-E2`,
+        p_token: `${token7}-dup`,
+        p_token_expires: expires7,
+        p_review_threshold: 150000,
+    });
+    const { count: extCount } = await admin
+        .from("payments")
+        .select("id", { count: "exact", head: true })
+        .eq("reservation_id", r7)
+        .eq("type", "EXTENSION");
+    check(
+        "예약당 미결제 추가결제는 하나뿐이다",
+        issuedAgain?.already === true && extCount === 1,
+    );
+
+    // ⚠️ 이 검증이 이 이슈의 핵심이다. 링크는 메일·문자로 흘러다니고
+    //    받는 사람이 예약자가 아닐 수 있다.
+    const { data: chargeRows, error: chargeErr } = await user.rpc(
+        "get_extension_charge",
+        { p_token: token7 },
+    );
+    const charge = (chargeRows ?? [])[0];
+    check(
+        "토큰으로 금액을 조회할 수 있다",
+        !chargeErr && charge?.amount === 15000,
+        chargeErr?.message,
+    );
+
+    const leakedFields = Object.entries(charge ?? {}).filter(([, v]) =>
+        ["홍길동", "김보호", "01011112222", "01022223333"].includes(String(v)),
+    );
+    check(
+        "토큰 조회에 환자·보호자 정보가 없다",
+        leakedFields.length === 0,
+        leakedFields.map(([k]) => k).join(", "),
+    );
+    check(
+        "이용일·예약번호까지만 내려간다",
+        !("patient_name" in (charge ?? {})) &&
+            !("depart_address" in (charge ?? {})) &&
+            !!charge?.code,
+    );
+
+    // 소프트 상한 — 총액 기준이라 이번 청구액만 보면 쪼개서 넘길 수 있다.
+    const r8 = await makeReservation(customerId, partnerId, "R8", "9시", 120);
+    await admin.from("payments").insert({
+        reservation_id: r8,
+        type: "BASE",
+        status: "PAID",
+        order_id: `${CODE_PREFIX}-ORD-8`,
+        gross_amount: 140000,
+        discount_amount: 0,
+        commission_amount: 28000,
+        payout_amount: 112000,
+        commission_rate: 0.2,
+        paid_at: new Date().toISOString(),
+    });
+    const { data: bigCharge } = await admin.rpc("create_extension_payment", {
+        p_reservation_id: r8,
+        p_amount: 20000,
+        p_reason: "EXTENSION",
+        p_order_id: `${CODE_PREFIX}-ORD-8-E`,
+        p_token: `tok-${CODE_PREFIX}-8`,
+        p_token_expires: expires7,
+        p_review_threshold: 150000,
+    });
+    check(
+        "총액이 상한을 넘으면 관리자 검토 대상이 된다 (140,000 + 20,000)",
+        bigCharge?.review_required === true,
+    );
+
+    // 확정 — 예약을 건드리지 않고 토큰만 소거한다.
+    const { data: fin, error: finErr } = await admin.rpc(
+        "finalize_extension_payment",
+        {
+            p_payment_id: issued.payment_id,
+            p_transaction_id: `TID-${CODE_PREFIX}-7`,
+        },
+    );
+    check(
+        "추가결제가 확정된다",
+        !finErr && fin?.already === false,
+        finErr?.message,
+    );
+
+    const { data: extRow } = await admin
+        .from("payments")
+        .select("status, pay_token, token_expires_at")
+        .eq("id", issued.payment_id)
+        .single();
+    check(
+        "확정과 동시에 토큰이 소거된다 (1회용)",
+        extRow?.status === "PAID" &&
+            extRow?.pay_token === null &&
+            extRow?.token_expires_at === null,
+        JSON.stringify(extRow),
+    );
+
+    const { data: res7 } = await admin
+        .from("reservations")
+        .select("status")
+        .eq("id", r7)
+        .single();
+    check(
+        "추가결제는 예약 상태를 건드리지 않는다",
+        res7?.status !== "CANCELLED",
+        res7?.status,
+    );
+
+    const { data: finAgain } = await admin.rpc("finalize_extension_payment", {
+        p_payment_id: issued.payment_id,
+        p_transaction_id: `TID-${CODE_PREFIX}-7`,
+    });
+    check("두 번 확정해도 한 번만 처리된다", finAgain?.already === true);
+
+    const { error: userIssue } = await user.rpc("create_extension_payment", {
+        p_reservation_id: r7,
+        p_amount: 1000,
+        p_reason: "EXTENSION",
+        p_order_id: `${CODE_PREFIX}-ORD-HACK`,
+        p_token: "hack",
+        p_token_expires: expires7,
+        p_review_threshold: 150000,
+    });
+    check("고객은 스스로 추가결제를 만들 수 없다", !!userIssue);
+
+    const { error: userFin } = await user.rpc("finalize_extension_payment", {
+        p_payment_id: issued.payment_id,
+        p_transaction_id: "hack",
+    });
+    check("고객은 스스로 추가결제를 확정할 수 없다", !!userFin);
+
     console.log("\n▶ 포인트 원장");
 
     // memo 로 표시해 이 스크립트가 만든 행만 지운다.
