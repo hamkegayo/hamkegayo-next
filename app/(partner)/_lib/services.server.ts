@@ -5,7 +5,7 @@ import {
     type PlanCode,
     type ServiceState,
 } from "@/lib/reservation";
-import { calcPartnerPayout, formatMinutes } from "@/lib/pricing";
+import { calcPartnerPayout, formatMinutes, toEpochMs } from "@/lib/pricing";
 
 /** 진행 관리 목록/상세 공용 뷰 */
 export type PartnerServiceView = {
@@ -19,6 +19,11 @@ export type PartnerServiceView = {
     customerAge: string;
     dateLabel: string;
     timeLabel: string;
+    /**
+     * 예약 시작 예정시각(ISO). 매뉴얼 4단계 — 이 시각 전에는 시작할 수 없다.
+     * 화면이 남은 시간을 세려면 문자열 라벨이 아니라 실제 시각이 필요하다.
+     */
+    plannedStartAt: string | null;
     /** 파트너 실지급 예상액(원) — 최종 요금(없으면 선결제액)에서 수수료를 뺀 값 */
     amount: number;
     /** 산정 기준 금액(원) — 고객이 결제하는 총액 */
@@ -94,6 +99,7 @@ type ServiceRow = {
         patient_name: string;
         patient_birth: string;
         use_date: string;
+        arrive_time: string;
         reserve_time: string;
         duration: string;
         surcharge_rate: number | string | null;
@@ -153,7 +159,7 @@ const SELECT =
     "treatment_started_at, treatment_ended_at, checkout_started_at, checkout_ended_at, " +
     "home_departed_at, handover_at, no_show, auto_closed_at, " +
     "reservations!inner(code, plan, hospital_address, treatment, patient_name, patient_birth, " +
-    "use_date, reserve_time, duration, surcharge_rate, prepaid_amount, billed_minutes, final_amount, " +
+    "use_date, arrive_time, reserve_time, duration, surcharge_rate, prepaid_amount, billed_minutes, final_amount, " +
     // 확정 후에만 제공되는 단계 2 항목 (#77 · 처리방침 제5조 ②).
     // 인계자는 이용자 본인이 아닌 제3자의 개인정보다.
     "transport_to, transport_home, end_method, notify_target, share_medical_info, " +
@@ -165,6 +171,11 @@ function toView(r: ServiceRow): PartnerServiceView {
     const planCode: PlanCode = res?.plan === "plus" ? "plus" : "basic";
 
     // 최종 산정 전에는 선결제액을 잠정 기준으로 보여준다.
+    // 파트너 도착 희망시각이 시작 기준이다(예약 폼의 arrive_time).
+    const plannedStartMs = res
+        ? toEpochMs(res.use_date, res.arrive_time)
+        : null;
+
     const grossAmount = res?.final_amount ?? res?.prepaid_amount ?? 0;
     const payout = calcPartnerPayout(planCode, grossAmount);
 
@@ -191,6 +202,9 @@ function toView(r: ServiceRow): PartnerServiceView {
         customerAge: res ? ageLabel(res.patient_birth) : "",
         dateLabel: res ? formatDate(res.use_date) : "",
         timeLabel: res ? toHhmm(res.reserve_time) : "",
+        plannedStartAt: plannedStartMs
+            ? new Date(plannedStartMs).toISOString()
+            : null,
         amount: payout.net,
         grossAmount,
         amountProvisional: res?.final_amount == null,
