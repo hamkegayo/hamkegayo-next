@@ -1,5 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
-import { expirePastMatchings } from "@/lib/expire-matchings";
+import { runExpirySweep } from "@/lib/expire-matchings";
 import {
     PLAN_INFO,
     RESERVATION_STATUS_LABEL,
@@ -81,7 +81,7 @@ export async function getMyReservations(): Promise<{
         if (!user) return { current: null, recent: [] };
 
         // 진료일시가 지난 미확정(MATCHING) 예약을 먼저 만료 처리(lazy)
-        await expirePastMatchings();
+        await runExpirySweep();
 
         const { data, error } = await supabase
             .from("reservations")

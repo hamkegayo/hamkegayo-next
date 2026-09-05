@@ -13,7 +13,7 @@
  */
 
 import { createClient } from "@/utils/supabase/server";
-import { expirePastMatchings } from "@/lib/expire-matchings";
+import { runExpirySweep } from "@/lib/expire-matchings";
 import { toHhmm } from "@/lib/format";
 import { planDisplay, type PlanCode } from "@/lib/reservation";
 import { calcPartnerPayout, calcPrepayment } from "@/lib/pricing";
@@ -101,7 +101,7 @@ async function fetchOpenRows(): Promise<OpenRow[]> {
     } = await supabase.auth.getUser();
     if (!user) return [];
 
-    await expirePastMatchings();
+    await runExpirySweep();
 
     const { data, error } = await supabase.rpc(
         "partner_list_open_reservations",
