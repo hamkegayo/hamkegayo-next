@@ -42,6 +42,11 @@ create table if not exists public.refund_requests (
   refund_payment_id uuid references public.payments (id),
 
   -- 미달분 환불은 예약당 한 건이다. 재요청은 기존 건을 다시 쓴다.
+  --
+  -- 부분 재환불이나 특수 CS 로 한 예약에 여러 건이 필요해지면 이 제약을
+  -- 풀고 차감 정산을 건별로 쌓도록 보완한다. 요구사항이 구체화되기 전에
+  -- 미리 열어 두면 "환불이 두 번 나갔다" 를 막을 장치가 사라진다.
+  -- (2026-09-05 리뷰 확정)
   constraint refund_requests_reservation_unique unique (reservation_id)
 );
 
