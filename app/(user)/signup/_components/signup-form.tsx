@@ -35,11 +35,26 @@ const TABS: { type: SignupType; label: string }[] = [
     { type: "partner", label: "파트너 회원가입" },
 ];
 
+// 동의 항목별로 해당 조문을 직접 가리킨다. 방침은 조 단위 앵커가 있어
+// "무엇에 동의하는지" 를 문서 첫머리가 아니라 그 조에서 바로 보여줄 수 있다.
+//   #article-2 개인정보의 항목 · #article-3 민감정보의 처리
 const AGREEMENTS = [
-    { name: "agreeService", label: "서비스 약관에 동의" },
-    { name: "agreePrivacy", label: "개인정보 처리방침에 동의" },
-    { name: "agreePersonal", label: "일반 개인정보 수집/이용에 동의" },
-    { name: "agreeSensitive", label: "민감 개인정보 수집/이용에 동의" },
+    { name: "agreeService", label: "서비스 약관에 동의", href: "/terms" },
+    {
+        name: "agreePrivacy",
+        label: "개인정보 처리방침에 동의",
+        href: "/privacy",
+    },
+    {
+        name: "agreePersonal",
+        label: "일반 개인정보 수집/이용에 동의",
+        href: "/privacy#article-2",
+    },
+    {
+        name: "agreeSensitive",
+        label: "민감 개인정보 수집/이용에 동의",
+        href: "/privacy#article-3",
+    },
 ] as const;
 
 export function SignupForm() {
@@ -91,8 +106,6 @@ export function SignupForm() {
         setShowPwc(false);
         reset(signupDefaultValues);
     };
-
-    const notReady = () => toast.info("준비 중인 기능입니다.");
 
     const onSubmit = async (v: SignupFormValues) => {
         if (submitting) return;
@@ -360,13 +373,14 @@ export function SignupForm() {
                                     {item.label}
                                 </span>
                             </label>
-                            <button
-                                type="button"
-                                onClick={notReady}
+                            <Link
+                                href={item.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2"
                             >
                                 [보기]
-                            </button>
+                            </Link>
                         </div>
                     ))}
                     {agreementsError && (
