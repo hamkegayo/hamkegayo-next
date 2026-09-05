@@ -1032,6 +1032,70 @@ async function main() {
     const { error: adminDenied } = await user.rpc("admin_list_unpaid_charges");
     check("일반 사용자는 미수 목록을 볼 수 없다", !!adminDenied);
 
+    // 상한 — 7회를 채우면 자동 독촉이 멈추고 관리자에게 넘어간다.
+    // 이미 1회 나갔으므로 6회를 더 돌린다. 매번 하루씩 되감아야 대상이 된다.
+    const rewind = async () => {
+        const past = new Date(Date.now() - 2 * 86_400_000).toISOString();
+        await admin
+            .from("payments")
+            .update({ reminded_at: past, link_sent_at: past })
+            .eq("id", due.payment_id);
+    };
+
+    let lastRound = null;
+    for (let i = 0; i < 6; i += 1) {
+        await rewind();
+        const { data: round } = await admin.rpc("claim_extension_reminders", {
+            p_limit: 100,
+        });
+        lastRound = (round ?? []).find((c) => c.payment_id === due.payment_id);
+    }
+
+    check(
+        "7회째에 관리자 이관 표시가 실려 온다",
+        lastRound?.handed_over === true,
+        JSON.stringify(lastRound),
+    );
+
+    const { data: capped } = await admin
+        .from("payments")
+        .select("reminder_count, collection_state")
+        .eq("id", due.payment_id)
+        .single();
+    check(
+        "7회에서 UNPAID_EXPIRED 로 전환된다",
+        capped?.reminder_count === 7 &&
+            capped?.collection_state === "UNPAID_EXPIRED",
+        JSON.stringify(capped),
+    );
+
+    // 이관 뒤에는 하루가 지나도 다시 나가지 않아야 한다.
+    await rewind();
+    const { data: afterCap } = await admin.rpc("claim_extension_reminders", {
+        p_limit: 100,
+    });
+    check(
+        "이관 후에는 자동 독촉 대상에서 빠진다",
+        !(afterCap ?? []).some((c) => c.payment_id === due.payment_id),
+    );
+
+    // 독촉만 멈춘다. 미납과 이용 제한은 그대로여야 한다 — 회수 포기가 아니다.
+    // 위에서 재발급하며 기한이 미래로 밀렸으므로 다시 넘긴다.
+    await admin
+        .from("payments")
+        .update({
+            token_expires_at: new Date(Date.now() - 60_000).toISOString(),
+        })
+        .eq("id", due.payment_id);
+
+    const stillUnpaid = await admin.rpc("has_unpaid_charge", {
+        p_user_id: customerId,
+    });
+    check(
+        "이관해도 미납 상태와 예약 제한은 유지된다 (약관 제22조 ③)",
+        stillUnpaid.data === true,
+    );
+
     console.log("\n▶ 포인트 원장");
 
     // memo 로 표시해 이 스크립트가 만든 행만 지운다.
