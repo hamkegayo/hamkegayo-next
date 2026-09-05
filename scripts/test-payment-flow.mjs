@@ -893,6 +893,145 @@ async function main() {
     });
     check("고객은 스스로 추가결제를 확정할 수 없다", !!userFin);
 
+    console.log("\n▶ 추가결제 미납 관리 (약관 제22조 · #75)");
+
+    const r9 = await makeReservation(customerId, partnerId, "R9", "9시", 120);
+    await admin.from("payments").insert({
+        reservation_id: r9,
+        type: "BASE",
+        status: "PAID",
+        order_id: `${CODE_PREFIX}-ORD-9`,
+        gross_amount: 40000,
+        discount_amount: 0,
+        commission_amount: 8000,
+        payout_amount: 32000,
+        commission_rate: 0.2,
+        paid_at: new Date().toISOString(),
+    });
+
+    const dueAt = new Date(Date.now() + 86_400_000).toISOString();
+    const { data: due } = await admin.rpc("create_extension_payment", {
+        p_reservation_id: r9,
+        p_amount: 12000,
+        p_reason: "EXTENSION",
+        p_order_id: `${CODE_PREFIX}-ORD-9-E`,
+        p_token: `tok-${CODE_PREFIX}-9`,
+        p_token_expires: dueAt,
+        p_review_threshold: 150000,
+    });
+
+    // 아직 보내지 않았다. 우리가 안 보낸 건을 미납으로 볼 수는 없다.
+    const notSent = await admin.rpc("has_unpaid_charge", {
+        p_user_id: customerId,
+    });
+    check("링크를 보내기 전에는 미납이 아니다", notSent.data === false);
+
+    await admin
+        .from("payments")
+        .update({ link_sent_at: new Date().toISOString() })
+        .eq("id", due.payment_id);
+
+    const inTime = await admin.rpc("has_unpaid_charge", {
+        p_user_id: customerId,
+    });
+    check(
+        "기한 안에는 미납이 아니다 (결제할 시간을 준다)",
+        inTime.data === false,
+    );
+
+    // 기한을 넘긴다.
+    await admin
+        .from("payments")
+        .update({
+            token_expires_at: new Date(Date.now() - 60_000).toISOString(),
+        })
+        .eq("id", due.payment_id);
+
+    const overdue = await admin.rpc("has_unpaid_charge", {
+        p_user_id: customerId,
+    });
+    check("기한이 지나면 미납이다 (약관 제22조 ③)", overdue.data === true);
+
+    const { data: myList } = await user.rpc("list_my_unpaid_charges");
+    const myUnpaid = (myList ?? []).find(
+        (x) => x.payment_id === due.payment_id,
+    );
+    check(
+        "본인 미결제 목록에서 보인다",
+        !!myUnpaid && myUnpaid.amount === 12000 && myUnpaid.overdue === true,
+        JSON.stringify(myUnpaid),
+    );
+
+    // 기한이 지나면 링크가 죽는다. 본인은 여기서 다시 받아야 낼 수 있다.
+    const { data: newToken, error: reissueErr } = await user.rpc(
+        "reissue_extension_token",
+        {
+            p_payment_id: due.payment_id,
+            p_token: `tok-${CODE_PREFIX}-9-re`,
+            p_expires: dueAt,
+        },
+    );
+    check(
+        "본인은 링크를 재발급받을 수 있다",
+        !reissueErr && newToken === `tok-${CODE_PREFIX}-9-re`,
+        reissueErr?.message,
+    );
+
+    const { data: afterReissue } = await user.rpc("get_extension_charge", {
+        p_token: `tok-${CODE_PREFIX}-9-re`,
+    });
+    check(
+        "재발급해도 금액은 그대로다",
+        (afterReissue ?? [])[0]?.amount === 12000,
+    );
+
+    // 소유자가 아니면 거절해야 한다. service_role 은 auth.uid() 가 없어
+    // 소유자 판정에서 걸린다 — 세션 없는 호출이 통과하지 않는지 본다.
+    const { error: notOwner } = await admin.rpc("reissue_extension_token", {
+        p_payment_id: due.payment_id,
+        p_token: "hack",
+        p_expires: dueAt,
+    });
+    check("소유자가 아니면 재발급할 수 없다", !!notOwner, notOwner?.message);
+
+    // 독촉 — 발송 당일에는 다시 나가지 않아야 한다.
+    await admin
+        .from("payments")
+        .update({
+            link_sent_at: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+        })
+        .eq("id", due.payment_id);
+
+    const { data: claimed } = await admin.rpc("claim_extension_reminders", {
+        p_limit: 100,
+    });
+    check(
+        "독촉 대상으로 선정된다",
+        (claimed ?? []).some((c) => c.payment_id === due.payment_id),
+    );
+
+    const { data: claimedAgain } = await admin.rpc(
+        "claim_extension_reminders",
+        { p_limit: 100 },
+    );
+    check(
+        "같은 날 두 번 나가지 않는다",
+        !(claimedAgain ?? []).some((c) => c.payment_id === due.payment_id),
+    );
+
+    const { data: reminded } = await admin
+        .from("payments")
+        .select("reminder_count, reminded_at")
+        .eq("id", due.payment_id)
+        .single();
+    check(
+        "독촉 횟수가 기록된다",
+        reminded?.reminder_count === 1 && !!reminded?.reminded_at,
+    );
+
+    const { error: adminDenied } = await user.rpc("admin_list_unpaid_charges");
+    check("일반 사용자는 미수 목록을 볼 수 없다", !!adminDenied);
+
     console.log("\n▶ 포인트 원장");
 
     // memo 로 표시해 이 스크립트가 만든 행만 지운다.
