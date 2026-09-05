@@ -6,14 +6,17 @@ import { ChevronRight, FileText, ReceiptText, Star } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
+import { useRouter } from "next/navigation";
+
+import { maskAccount } from "@/lib/banks";
 import type { Settlement, SettlementSummary } from "../../_lib/settlement";
 import { SettlementDetailModal } from "../../_components/settlement-detail-modal";
+import { AccountChangeModal } from "../../_components/account-change-modal";
+import type { PayoutAccount } from "../_actions/payout-account";
 
 const HISTORY = "/partner/settlement/history";
 
 // 정산일은 아직 DB 소스가 없어 정적 표시다.
-// 정산 계좌는 저장할 곳 자체가 없어(#51) 예시 값을 지웠다 —
-// 등록되지도 않은 계좌를 진짜처럼 보여주면 파트너가 등록됐다고 믿는다.
 const NEXT_PAYOUT = "매월 15일";
 
 const QUICK_MENU: {
@@ -45,12 +48,17 @@ const QUICK_MENU: {
 export function SettlementDashboardView({
     settlements,
     summary,
+    account,
 }: {
     settlements: Settlement[];
     summary: SettlementSummary;
+    /** 등록 전이면 null. 계좌번호는 뒷 4자리만 내려온다(#51). */
+    account: PayoutAccount | null;
 }) {
+    const router = useRouter();
     const s = summary;
     const [selected, setSelected] = useState<Settlement | null>(null);
+    const [accountOpen, setAccountOpen] = useState(false);
 
     const recent = settlements.slice(0, 4);
 
@@ -107,9 +115,16 @@ export function SettlementDashboardView({
                             <span className="text-muted-foreground">
                                 정산 계좌
                             </span>
-                            <span className="text-muted-foreground font-bold">
-                                등록 전
-                            </span>
+                            {account ? (
+                                <span className="text-foreground text-right font-bold">
+                                    {account.bankName}{" "}
+                                    {maskAccount(account.last4)}
+                                </span>
+                            ) : (
+                                <span className="text-muted-foreground font-bold">
+                                    등록 전
+                                </span>
+                            )}
                         </div>
                         <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">
@@ -138,16 +153,31 @@ export function SettlementDashboardView({
                     </div>
 
                     {/*
-                      정산 계좌 등록은 아직 없다 (#51).
-                      이전에는 예시 계좌를 진짜처럼 보여주고, 변경 모달이 화면 문자열만
-                      바꾼 뒤 "변경되었습니다" 를 띄웠다. 파트너가 등록했다고 믿게 되는
-                      상태라 안내로 바꿨다. 실제 등록 기능이 들어오면 이 블록을 걷어낸다.
+                      계좌가 없는데 받을 돈이 쌓여 있는 상태가 가장 나쁘다.
+                      그때만 눈에 띄게 알린다 — 등록을 마친 사람에게는 조용한
+                      변경 버튼이면 충분하다.
                     */}
-                    <p className="border-border text-muted-foreground mt-4 rounded-xl border border-dashed px-4 py-3 text-xs leading-relaxed">
-                        정산 계좌 등록 기능은 준비 중입니다. 첫 정산 전에 등록
-                        안내를 드리며, 그때까지는 담당자가 개별 연락으로
-                        확인합니다.
-                    </p>
+                    {!account && s.totalAmount > 0 && (
+                        <p className="border-destructive/30 text-destructive mt-4 rounded-xl border border-dashed px-4 py-3 text-xs leading-relaxed">
+                            정산 계좌가 등록되지 않아 정산금을 보내드릴 수
+                            없습니다. 정산일 전에 등록해 주세요.
+                        </p>
+                    )}
+
+                    <button
+                        type="button"
+                        onClick={() => setAccountOpen(true)}
+                        className="border-border text-foreground hover:bg-muted mt-4 w-full rounded-lg border px-4 py-2.5 text-sm font-bold transition-colors"
+                    >
+                        {account ? "정산 계좌 변경" : "정산 계좌 등록"}
+                    </button>
+
+                    {account && !account.verifiedAt && (
+                        <p className="text-muted-foreground mt-2.5 text-xs leading-relaxed">
+                            예금주 {account.holderName} · 예금주명이 통장과
+                            다르면 이체가 실패합니다.
+                        </p>
+                    )}
                 </section>
 
                 {/* 최근 정산 내역 */}
@@ -243,7 +273,16 @@ export function SettlementDashboardView({
                 </section>
             </div>
 
-            {/* AccountChangeModal 은 #51 에서 실제 저장과 함께 다시 붙인다. */}
+            {/* 열 때마다 새로 마운트 → 이전 입력(특히 계좌번호)이 남지 않는다 */}
+            {accountOpen && (
+                <AccountChangeModal
+                    open
+                    onClose={() => setAccountOpen(false)}
+                    onSaved={() => router.refresh()}
+                    defaultBankCode={account?.bankCode}
+                    defaultHolder={account?.holderName}
+                />
+            )}
             <SettlementDetailModal
                 open={selected !== null}
                 onClose={() => setSelected(null)}
