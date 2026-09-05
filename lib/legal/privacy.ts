@@ -12,6 +12,7 @@ import { COMPANY } from "./company";
 export const PRIVACY: LegalDocument = {
     title: "개인정보처리방침",
     effectiveDate: "2026년 9월 3일",
+    version: "2026-09-03",
     articles: [
         {
             no: "제1조",

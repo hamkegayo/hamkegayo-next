@@ -31,7 +31,13 @@ export type LegalArticle = {
 export type LegalDocument = {
     /** "이용약관" · "개인정보처리방침" */
     title: string;
-    /** "2026년 9월 3일" — 원문 표기를 그대로 쓴다 */
+    /** "2026년 9월 3일" — 원문 표기를 그대로 쓴다 (화면 표시용) */
     effectiveDate: string;
+    /**
+     * 시행일 ISO 표기. 동의 이력의 버전 값으로 쓴다(#58).
+     * 화면용 표기와 분리해 두는 이유는, 표기가 바뀌어도 버전이 흔들리면
+     * 이미 저장된 동의 이력과 대조가 안 되기 때문이다.
+     */
+    version: string;
     articles: LegalArticle[];
 };
