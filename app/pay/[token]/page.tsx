@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { createClient } from "@/utils/supabase/server";
 import { ExtensionPayView } from "./extension-pay-view";
+import { COMPANY } from "@/lib/legal/company";
 
 /**
  * 추가결제 링크 페이지 (#75) — 약관 제21조 ⑤.
@@ -54,7 +55,7 @@ function Notice({ title, body }: { title: string; body: string }) {
                 {body}
             </p>
             <p className="text-muted-foreground mt-6 text-xs">
-                문의 : 함께가요 고객센터 010-9345-2328 (06:00~18:00)
+                문의 : 함께가요 고객센터 {COMPANY.tel} ({COMPANY.hours})
             </p>
         </Shell>
     );

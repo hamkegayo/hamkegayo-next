@@ -6,11 +6,20 @@ import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
+import { COMPANY } from "@/lib/legal/company";
 
+/**
+ * 고객센터 연락처 (#60).
+ *
+ *  전에는 전화 1588-1024, 카카오톡 채널, help@hamkkegayo.co.kr 이 적혀 있었다.
+ *  **셋 다 운영하지 않는 창구**였고, 이메일은 도메인 오타(hamkkegayo)까지 있어
+ *  보낸 문의가 아무 데도 닿지 않았다.
+ *
+ *  값은 COMPANY 한 곳에서 읽는다 — 푸터·약관 부칙과 어긋날 수 없게.
+ */
 const CONTACTS = [
-    { label: "전화 상담", value: "1588-1024", tel: "1588-1024" },
-    { label: "카카오톡 채널", value: "함께가요 고객센터" },
-    { label: "이메일", value: "help@hamkkegayo.co.kr" },
+    { label: "전화 상담", value: COMPANY.tel, tel: COMPANY.tel },
+    { label: "상담 시간", value: COMPANY.hours },
     {
         label: "문의 유형",
         value: "예약 변경 / 파트너 검증 / 리포트 / 환불 / 개인정보",
@@ -35,7 +44,7 @@ const FAQS: { q: string; a: string }[] = [
     },
     {
         q: "파트너 경력은 어디까지 확인하나요?",
-        a: "자격, 동행 경험 건수, 평점, 검증 배지, 시간 준수율 등 상세 지표를 예약 화면에서 직접 확인하실 수 있습니다.",
+        a: "자격 확인과 신원 검증을 거친 분만 활동합니다. 예약 화면에서는 수락한 파트너의 평점과 후기 수를 보고 고르실 수 있습니다.",
     },
     {
         q: "긴급 상황이면 어떻게 하나요?",

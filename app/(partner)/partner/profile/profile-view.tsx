@@ -44,6 +44,7 @@ import {
     type QualificationInput,
 } from "../../_components/qualification-add-modal";
 import { ProfilePreviewModal } from "../../_components/profile-preview-modal";
+import { COMPANY } from "@/lib/legal/company";
 
 const QUAL_ICON: Record<QualificationIcon, LucideIcon> = {
     license: IdCard,
@@ -316,10 +317,10 @@ export function PartnerProfileView({
                             파트너 고객센터
                         </p>
                         <p className="text-foreground mt-3 text-xl font-extrabold">
-                            02-1234-5678
+                            {COMPANY.tel}
                         </p>
                         <p className="text-muted-foreground mt-1 text-xs">
-                            평일 09:00 ~ 18:00
+                            {COMPANY.hours}
                         </p>
                         <Link
                             href="/partner"

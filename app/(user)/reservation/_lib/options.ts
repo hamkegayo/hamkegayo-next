@@ -1,11 +1,21 @@
 /** 예약 폼 셀렉트 옵션 (합리적 기본값) */
 
-/** 09:00 ~ 18:00, 30분 단위 → "9시 30분" 형식 */
+/**
+ * 서비스 운영시간 — 약관 제13조 ③ "오전 6시부터 오후 6시까지".
+ *
+ *  09시부터 열어 두고 있었다. 약관이 06시를 공개하고 있으므로 **화면이
+ *  좁은 쪽**이었다 — 06~09시 예약을 받겠다고 공개해 놓고 고를 수가 없었다.
+ *  운영시간을 바꾸려면 약관을 먼저 고쳐야 한다(#60).
+ */
+export const OPEN_HOUR = 6;
+export const CLOSE_HOUR = 18;
+
+/** 06:00 ~ 18:00, 30분 단위 → "9시 30분" 형식 */
 export const TIME_OPTIONS: string[] = (() => {
     const out: string[] = [];
-    for (let h = 9; h <= 18; h++) {
+    for (let h = OPEN_HOUR; h <= CLOSE_HOUR; h++) {
         for (const m of [0, 30]) {
-            if (h === 18 && m === 30) break;
+            if (h === CLOSE_HOUR && m === 30) break;
             out.push(`${h}시 ${String(m).padStart(2, "0")}분`);
         }
     }
