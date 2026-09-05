@@ -1,6 +1,4 @@
-import Link from "next/link";
-
-import { CookieSettingsButton } from "@/components/analytics/cookie-settings-button";
+import { FooterLinks } from "@/components/layout/footer-links";
 import { NonMedicalNotice } from "@/components/non-medical-notice";
 import { COMPANY, mailOrderLabel } from "@/lib/legal/company";
 
@@ -11,8 +9,8 @@ import { COMPANY, mailOrderLabel } from "@/lib/legal/company";
  *     값은 `lib/legal/company.ts` 한 곳에서 읽는다 — 약관 부칙과
  *     어긋나면 PG 심사에서 지적된다.
  *
- *  개인정보처리방침은 개인정보보호법 제30조 ②에 따라 다른 링크보다
- *  눈에 띄게 표시해야 하므로 굵게 둔다.
+ *  링크 줄은 현재 경로를 알아야 해서 클라이언트 컴포넌트로 분리했다
+ *  (components/layout/footer-links.tsx). 나머지는 서버에서 그린다.
  */
 
 /** 사업자정보 한 항목 — 라벨과 값을 한 덩어리로 묶어 줄바꿈이 어색하지 않게 한다 */
@@ -29,27 +27,7 @@ export function UserFooter() {
     return (
         <footer className="border-border bg-background text-muted-foreground mt-auto w-full border-t text-sm">
             <div className="mx-auto max-w-6xl px-4 py-8">
-                <nav className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                    <Link
-                        href="/faq"
-                        className="hover:text-foreground underline-offset-4 hover:underline"
-                    >
-                        FAQ
-                    </Link>
-                    <Link
-                        href="/terms"
-                        className="hover:text-foreground underline-offset-4 hover:underline"
-                    >
-                        이용약관
-                    </Link>
-                    <Link
-                        href="/privacy"
-                        className="text-foreground font-semibold underline-offset-4 hover:underline"
-                    >
-                        개인정보처리방침
-                    </Link>
-                    <CookieSettingsButton />
-                </nav>
+                <FooterLinks />
 
                 <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs">
                     <InfoItem label="상호" value={COMPANY.name} />
