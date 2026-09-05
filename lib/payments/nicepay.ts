@@ -22,8 +22,30 @@ import {
  *  ⚠️ 이 파일은 시크릿 키를 읽는다. 클라이언트 컴포넌트에서 import 하지 말 것.
  */
 
-/** 승인 API 읽기 타임아웃. 초과 시 재시도가 아니라 조회·망취소로 정리한다. */
-const REQUEST_TIMEOUT_MS = 20_000;
+/**
+ * 승인 API 읽기 타임아웃. 초과 시 재시도가 아니라 조회·망취소로 정리한다.
+ *
+ *  ⚠️ **서버리스 함수 실행 제한보다 짧아야 한다.** 20초였을 때는 Vercel Hobby
+ *     의 10초 제한이 먼저 걸려 함수가 통째로 죽었다 — 그러면 이 타임아웃이
+ *     아예 발화하지 않아 아래의 망취소·사고기록 경로가 **한 번도 실행되지
+ *     않는다.** 돈은 빠지고 아무 기록도 남지 않는 상태가 된다.
+ *
+ *  10초 안에 승인·복구·DB 확정이 모두 끝나도록 나눈 예산이다.
+ *    승인 5초 + 복구(망취소/조회) 3초 + DB·직렬화 ≈ 1초 = 9초
+ *
+ *  Fluid Compute(제한 300초)에서도 이 값이면 충분하다 — NICEPAY 승인은
+ *  정상 응답이 1~3초다. 넉넉하게 잡아 얻는 것이 없다.
+ */
+const APPROVE_TIMEOUT_MS = 5_000;
+
+/**
+ * 복구 호출(망취소·조회·취소) 타임아웃.
+ *
+ *  승인이 이미 5초를 쓴 뒤에 도는 경로다. 여기서 또 길게 기다리면 복구
+ *  도중에 함수가 잘려 사고 기록이 남지 않는다. 짧게 끊고 실패로 넘긴다 —
+ *  망취소가 실패해도 사고 원장에는 남는다.
+ */
+const RECOVERY_TIMEOUT_MS = 3_000;
 
 /** 나이스페이 성공 결과코드 */
 const RESULT_OK = "0000";
@@ -132,6 +154,7 @@ class NicepayGateway implements PaymentGateway {
                 body: { amount: params.amount, ediDate, signData },
                 // 승인은 재시도가 금지된다. 타임아웃이면 조회·망취소로 정리한다.
                 indeterminateOnTimeout: true,
+                timeoutMs: APPROVE_TIMEOUT_MS,
             },
         );
     }
@@ -187,10 +210,15 @@ class NicepayGateway implements PaymentGateway {
             method: "GET" | "POST";
             body?: Record<string, unknown>;
             indeterminateOnTimeout?: boolean;
+            /** 생략하면 복구용 짧은 타임아웃. 승인만 길게 잡는다. */
+            timeoutMs?: number;
         },
     ): Promise<GatewayPayment> {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        const timer = setTimeout(
+            () => controller.abort(),
+            options.timeoutMs ?? RECOVERY_TIMEOUT_MS,
+        );
 
         let res: Response;
         try {

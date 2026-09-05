@@ -23,6 +23,15 @@ import { createAdminClient } from "@/utils/supabase/admin";
  *  브라우저가 POST 로 이동해 오므로 응답은 JSON 이 아니라 **redirect** 다.
  *  결제창을 거치며 클라이언트 스토어가 날아갔으므로 `rid` 를 실어 보내
  *  예약 플로우가 DB 에서 상태를 복원하게 한다 (#54).
+ *
+ *  ⏱ **실행 시간 예산 — 9초.** 이 라우트만은 서버리스 함수 제한(레거시
+ *     Hobby 10초) 안에서 ⑤~⑦ 이 전부 끝나야 한다. 중간에 잘리면 승인은
+ *     났는데 ⑥ 이 안 돌아 "돈은 빠지고 예약은 미확정" 이 되고, ⑦ 의 되돌림도
+ *     사고 기록도 남지 않는다.
+ *       승인 5초(APPROVE_TIMEOUT_MS) + 복구 3초(RECOVERY_TIMEOUT_MS) + DB ≈ 1초
+ *     `maxDuration` 은 일부러 지정하지 않는다 — 플랫폼 기본 상한을 그대로
+ *     받고, 예산은 어댑터 타임아웃으로 강제한다. Fluid Compute(300초)로
+ *     바뀌면 여유만 늘고 동작은 같다.
  */
 export const dynamic = "force-dynamic";
 
