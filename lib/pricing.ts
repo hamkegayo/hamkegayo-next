@@ -45,6 +45,18 @@ export const SURCHARGE_RATE = 0.3;
  */
 export const PAYMENT_DEADLINE_MIN = 30;
 
+/**
+ * 추가결제 관리자 검토 기준액(원) — **총액** 기준.
+ *
+ *  종료 시각을 잘못 눌러 연장이 크게 잡히면 그대로 청구된다. 넘는 건은
+ *  링크를 바로 보내지 않고 사람이 한 번 본다.
+ *
+ *  10만~15만 범위에서 **15만으로 잡았다**(2026-09-05 기획). Basic 기준
+ *  7.5시간에 해당한다. 수술·투석처럼 긴 일정이 정상적으로 이 아래에
+ *  들어와야 오탐이 나지 않는다. 운영하며 조정한다.
+ */
+export const EXTENSION_REVIEW_THRESHOLD = 150_000;
+
 /** 결제액 대비 포인트 적립률 (1P = 1원). 약관 표기는 '크레딧'이나 제품 용어는 포인트다. */
 export const POINT_EARN_RATE = 0.01;
 
@@ -334,6 +346,23 @@ export type CancelFee = {
  *  같은 표현을 쓰는 최소청구(제11조 ③)를 calcFinalCharge 가 할증 포함으로
  *  계산하고 있어 그쪽과 맞췄다. → 🔸 기획 확인 항목
  */
+/**
+ * "해당 상품 1시간 이용요금" — 약관이 여러 곳에서 같은 표현을 쓴다.
+ *
+ *   · 제11조 ②③ 최소 청구금액
+ *   · 제19조    2시간 전 이내 취소 · 이용자 노쇼
+ *   · 제17조 ②  이용자 귀책 중단
+ *
+ *  할증을 포함한다 — calcFinalCharge 가 최소청구를 할증 포함으로 계산하므로
+ *  같은 표현이 다른 금액이 되지 않게 맞춘다.
+ */
+export function oneHourCharge(plan: PlanCode, isSurcharge: boolean): number {
+    return withSurcharge(
+        baseAmountFor(plan, MIN_BILLABLE_MIN),
+        surchargeRateOf(isSurcharge),
+    );
+}
+
 export function calcCancelFee(params: {
     plan: PlanCode;
     /** 서비스 시작 예정시각 (epoch ms) */
@@ -360,12 +389,11 @@ export function calcCancelFee(params: {
         return { amount: CANCEL_FLAT_FEE, bracket: "FLAT", minutesUntilStart };
     }
 
-    const rate = surchargeRateOf(params.isSurcharge);
-    const amount = withSurcharge(
-        baseAmountFor(params.plan, MIN_BILLABLE_MIN),
-        rate,
-    );
-    return { amount, bracket: "ONE_HOUR", minutesUntilStart };
+    return {
+        amount: oneHourCharge(params.plan, params.isSurcharge),
+        bracket: "ONE_HOUR",
+        minutesUntilStart,
+    };
 }
 
 /**
