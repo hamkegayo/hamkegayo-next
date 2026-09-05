@@ -111,6 +111,15 @@ export function SignupForm() {
         if (submitting) return;
         setSubmitting(true);
         try {
+            // 동의 이력으로 남긴다(#58). 스키마가 4종 전부 필수로 검증하므로
+            // 여기까지 왔다면 모두 true 다.
+            const agreements = {
+                agreeService: v.agreeService,
+                agreePrivacy: v.agreePrivacy,
+                agreePersonal: v.agreePersonal,
+                agreeSensitive: v.agreeSensitive,
+            };
+
             const res =
                 typeRef.current === "user"
                     ? await signUpUser({
@@ -118,6 +127,7 @@ export function SignupForm() {
                           password: v.password,
                           name: v.name,
                           phone: v.phone,
+                          agreements,
                       })
                     : await activatePartner({
                           loginId: v.loginId,
@@ -125,6 +135,7 @@ export function SignupForm() {
                           password: v.password,
                           name: v.name,
                           phone: v.phone,
+                          agreements,
                       });
 
             if (!res.ok) {
