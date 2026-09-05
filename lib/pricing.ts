@@ -286,6 +286,100 @@ export function actualMinutesBetween(startMs: number, endMs: number): number {
 }
 
 // =============================================================
+// 예약 취소 수수료 (약관 제19조)
+//
+//  조문의 표는 8행이지만 **서비스 시작 전 취소** 로 도달 가능한 것은 4행이다.
+//  나머지(조기 종료 · 노쇼 · 이용자 귀책 중단)는 서비스가 시작된 뒤의 정산
+//  경로이고 제17조·제21조가 금액을 정한다 — 여기서 다루지 않는다.
+// =============================================================
+
+/** 취소수수료가 0 이 되는 시점(분) — 제19조 "서비스 시작 24시간 이전" */
+export const CANCEL_FREE_BEFORE_MIN = 24 * 60;
+
+/** 정액 수수료 구간의 하한(분) — 제19조 "24시간 이내 ~ 2시간 전" */
+export const CANCEL_FLAT_BEFORE_MIN = 2 * 60;
+
+/** 정액 취소수수료(원) — 제19조 */
+export const CANCEL_FLAT_FEE = 10_000;
+
+export type CancelFeeBracket =
+    /** 24시간 이전 — 수수료 없음 */
+    | "FREE"
+    /** 24시간 이내 ~ 2시간 전 — 10,000원 */
+    | "FLAT"
+    /** 2시간 전 이내 ~ 시작 전 — 1시간 이용요금 */
+    | "ONE_HOUR"
+    /** 회사 또는 파트너 귀책 — 이용요금 및 취소수수료 없음 */
+    | "PROVIDER_FAULT";
+
+export type CancelFee = {
+    /** 환불하지 않고 남기는 금액(원). 별도 청구가 아니다 — 제19조 ② */
+    amount: number;
+    bracket: CancelFeeBracket;
+    /** 서비스 시작 예정시각까지 남은 분. 음수면 예정시각이 지났다 */
+    minutesUntilStart: number;
+};
+
+/**
+ * 서비스 시작 전 예약 취소의 취소수수료 — 약관 제19조.
+ *
+ *  ⚠️ 이 값은 **환불하지 않는 금액**이지 별도로 청구하는 금액이 아니다(제19조 ②).
+ *     선결제액에서 이만큼을 빼고 나머지를 환불한다.
+ *
+ *  경계는 고객에게 유리한 쪽으로 잡았다. 정확히 24시간 전이면 "24시간 이전"으로
+ *  보아 무료이고, 정확히 2시간 전이면 정액 구간이다. 조문이 "24시간 이내"·
+ *  "2시간 전 이내" 라고 쓰고 있어 그 경계값 자체는 이내에 들지 않는다.
+ *
+ *  "해당 상품 1시간 이용요금" 에 할증을 적용한다. 제19조가 명시하지는 않지만,
+ *  같은 표현을 쓰는 최소청구(제11조 ③)를 calcFinalCharge 가 할증 포함으로
+ *  계산하고 있어 그쪽과 맞췄다. → 🔸 기획 확인 항목
+ */
+export function calcCancelFee(params: {
+    plan: PlanCode;
+    /** 서비스 시작 예정시각 (epoch ms) */
+    startAtMs: number;
+    /** 취소 시각 (epoch ms) */
+    nowMs: number;
+    isSurcharge: boolean;
+    /** 회사 또는 파트너 귀책이면 수수료를 받지 않는다 (제19조 · 제16조 ⑦) */
+    providerFault?: boolean;
+}): CancelFee {
+    const minutesUntilStart = Math.floor(
+        (params.startAtMs - params.nowMs) / 60_000,
+    );
+
+    if (params.providerFault) {
+        return { amount: 0, bracket: "PROVIDER_FAULT", minutesUntilStart };
+    }
+
+    if (minutesUntilStart >= CANCEL_FREE_BEFORE_MIN) {
+        return { amount: 0, bracket: "FREE", minutesUntilStart };
+    }
+
+    if (minutesUntilStart >= CANCEL_FLAT_BEFORE_MIN) {
+        return { amount: CANCEL_FLAT_FEE, bracket: "FLAT", minutesUntilStart };
+    }
+
+    const rate = surchargeRateOf(params.isSurcharge);
+    const amount = withSurcharge(
+        baseAmountFor(params.plan, MIN_BILLABLE_MIN),
+        rate,
+    );
+    return { amount, bracket: "ONE_HOUR", minutesUntilStart };
+}
+
+/**
+ * 취소 시 실제 환불액 — 선결제액에서 취소수수료를 뺀 나머지.
+ * 수수료가 선결제액을 넘으면 환불액은 0 이다(추가 청구하지 않는다).
+ */
+export function calcCancelRefund(
+    prepaidAmount: number,
+    cancelFee: number,
+): number {
+    return Math.max(0, prepaidAmount - cancelFee);
+}
+
+// =============================================================
 // 정산 차액 · 파트너 지급액
 // =============================================================
 
