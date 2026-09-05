@@ -380,6 +380,38 @@ async function main() {
         `${lateRow?.status} · 차이 ${lateDiffMin.toFixed(1)}분`,
     );
 
+    // 정기 배치가 자동 마감을 실제로 부르는지 본다. 함수만 있고 아무도
+    // 부르지 않으면 종료 누락 건이 영영 "진행 중" 으로 남는다.
+    const orphan = await makeService(
+        customerId,
+        partnerId,
+        "ORPHAN",
+        todayKst(),
+        "00:00",
+    );
+    await admin
+        .from("services")
+        .update({
+            status: "IN_PROGRESS",
+            started_at: new Date(Date.now() - 6 * 3600_000).toISOString(),
+        })
+        .eq("id", orphan.serviceId);
+
+    const sweep = await admin.rpc("run_expiry_sweep");
+    const { data: orphanRow } = await admin
+        .from("services")
+        .select("status, auto_closed_at")
+        .eq("id", orphan.serviceId)
+        .single();
+    check(
+        "정기 배치가 종료 누락 건을 마감한다",
+        !sweep.error &&
+            typeof sweep.data?.closed === "number" &&
+            orphanRow?.status === "ENDED" &&
+            !!orphanRow?.auto_closed_at,
+        sweep.error?.message ?? JSON.stringify(sweep.data),
+    );
+
     const byUser = await user.rpc("auto_close_stale_services");
     check("일반 사용자는 자동 마감을 호출할 수 없다", !!byUser.error);
 
