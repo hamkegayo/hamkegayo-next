@@ -22,8 +22,30 @@ import {
  *  ⚠️ 이 파일은 시크릿 키를 읽는다. 클라이언트 컴포넌트에서 import 하지 말 것.
  */
 
-/** 승인 API 읽기 타임아웃. 초과 시 재시도가 아니라 조회·망취소로 정리한다. */
-const REQUEST_TIMEOUT_MS = 20_000;
+/**
+ * 승인 API 읽기 타임아웃. 초과 시 재시도가 아니라 조회·망취소로 정리한다.
+ *
+ *  **짧게 잡을 이유가 없다.** 여기서 잘린 승인은 실패가 아니라 *모르는 상태*가
+ *  되고, 망취소로 정리하는 순간 카드가 나갔을 거래까지 되돌린다. 결제가
+ *  안 되는 편보다 나쁜 결과다. 느려도 답을 받는 쪽이 낫다.
+ *
+ *  ⚠️ 다만 **함수 실행 제한 안에서만** 유효하다. 제한이 먼저 걸려 함수가
+ *     죽으면 이 타임아웃은 발화조차 못 하고, 아래 망취소·사고기록 경로가
+ *     한 번도 실행되지 않는다 — 돈은 빠지고 기록은 없는 상태다.
+ *     이 프로젝트는 Fluid Compute 라 제한이 300초다(2026-09-06 확인).
+ *     승인 20초 + 복구 10초 + DB ≈ 1초 = 31초로, 라우트에 건 maxDuration
+ *     60초 안에 들어간다. 셋 중 하나를 늘리면 나머지도 같이 본다.
+ */
+const APPROVE_TIMEOUT_MS = 20_000;
+
+/**
+ * 복구 호출(망취소·조회·취소) 타임아웃.
+ *
+ *  승인이 이미 20초를 쓴 뒤에 도는 경로다. 승인보다 짧게 잡되 너무 짧으면
+ *  안 된다 — 여기서 실패하면 망취소가 통했는지 아무도 모르는 채 사람이
+ *  PG 콘솔을 뒤져야 한다. 복구는 성공하는 편이 훨씬 싸다.
+ */
+const RECOVERY_TIMEOUT_MS = 10_000;
 
 /** 나이스페이 성공 결과코드 */
 const RESULT_OK = "0000";
@@ -132,6 +154,7 @@ class NicepayGateway implements PaymentGateway {
                 body: { amount: params.amount, ediDate, signData },
                 // 승인은 재시도가 금지된다. 타임아웃이면 조회·망취소로 정리한다.
                 indeterminateOnTimeout: true,
+                timeoutMs: APPROVE_TIMEOUT_MS,
             },
         );
     }
@@ -187,10 +210,15 @@ class NicepayGateway implements PaymentGateway {
             method: "GET" | "POST";
             body?: Record<string, unknown>;
             indeterminateOnTimeout?: boolean;
+            /** 생략하면 복구용 짧은 타임아웃. 승인만 길게 잡는다. */
+            timeoutMs?: number;
         },
     ): Promise<GatewayPayment> {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        const timer = setTimeout(
+            () => controller.abort(),
+            options.timeoutMs ?? RECOVERY_TIMEOUT_MS,
+        );
 
         let res: Response;
         try {
