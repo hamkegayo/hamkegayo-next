@@ -358,6 +358,143 @@ async function main() {
     );
 
     // =============================================================
+    console.log("\n▶ 파트너 탈퇴 — 정산 원장이 끊기지 않는다");
+    // =============================================================
+    //  withdraw_member 는 partner_accounts 행을 지운다. 정산이 그 테이블을
+    //  참조했다면 지우는 순간 정산 원장이 함께 무너진다.
+    //
+    //  실제로는 settlements.partner_id 가 profiles 를 가리키고 profiles 행은
+    //  남기므로 끊기지 않는다. 정적으로도 확인되지만(마이그레이션 전체에
+    //  `references public.partner_accounts` 가 없다) 그 사실은 누군가
+    //  파트너 전용 FK 를 새로 달면 조용히 깨진다. 여기서 못으로 박아 둔다.
+    const partner = await makeMember("partner");
+    const loginId = `${PREFIX}-LOGIN-${stamp}`;
+    await admin
+        .from("partner_accounts")
+        .insert({ profile_id: partner.id, login_id: loginId });
+
+    const client = await makeMember("client");
+    const { data: doneReservation, error: drErr } = await admin
+        .from("reservations")
+        .insert({
+            code: `${PREFIX}-D`,
+            customer_id: client.id,
+            status: "COMPLETED",
+            confirmed_partner_id: partner.id,
+            plan: "basic",
+            patient_name: "홍길동",
+            patient_birth: "1950-01-01",
+            patient_gender: "male",
+            patient_phone: "010-0000-0000",
+            guardian_name: "보호자",
+            guardian_phone: "010-1111-1111",
+            relation: "자녀",
+            treatment: "내과",
+            purpose: "검진",
+            use_date: "2026-09-07",
+            arrive_time: "9시 00분",
+            reserve_time: "10시 00분",
+            duration: "2시간",
+            depart_address: "출발지",
+            hospital_address: "병원",
+            duration_minutes: 120,
+            hourly_rate: 20000,
+            fee_rate: 0.2,
+            surcharge_rate: 0,
+            prepaid_amount: 40000,
+        })
+        .select("id")
+        .single();
+    if (drErr) throw drErr;
+
+    // 정산은 서비스가 COMPLETED 로 "전이" 할 때 트리거가 만든다(after update).
+    const { data: svc, error: svcErr } = await admin
+        .from("services")
+        .insert({
+            reservation_id: doneReservation.id,
+            partner_id: partner.id,
+            status: "SCHEDULED",
+        })
+        .select("id")
+        .single();
+    if (svcErr) throw svcErr;
+
+    await admin
+        .from("services")
+        .update({
+            status: "COMPLETED",
+            started_at: new Date(Date.now() - 7_200_000).toISOString(),
+            ended_at: new Date().toISOString(),
+        })
+        .eq("id", svc.id);
+
+    const { data: born } = await admin
+        .from("settlements")
+        .select("id, net, status")
+        .eq("service_id", svc.id)
+        .maybeSingle();
+
+    // 받을 돈을 남긴 채로는 나갈 수 없다.
+    const { error: dueErr } = await admin.rpc("withdraw_member", {
+        p_user_id: partner.id,
+    });
+    check(
+        "미지급 정산이 있으면 파트너 탈퇴가 거절된다",
+        dueErr?.message?.includes("PENDING_SETTLEMENT") === true,
+        dueErr?.message ?? JSON.stringify(born),
+    );
+
+    await admin
+        .from("settlements")
+        .update({ status: "PAID", settled_at: new Date().toISOString() })
+        .eq("id", born.id);
+
+    const { error: pwErr } = await admin.rpc("withdraw_member", {
+        p_user_id: partner.id,
+    });
+    check("지급이 끝나면 파트너도 탈퇴할 수 있다", !pwErr, pwErr?.message);
+
+    const { data: keptSettlement } = await admin
+        .from("settlements")
+        .select("id, partner_id, net, status")
+        .eq("id", born.id)
+        .maybeSingle();
+    check(
+        "정산 원장이 그대로 남는다 (FK 가 profiles 를 가리켜 끊기지 않는다)",
+        keptSettlement?.net === born.net &&
+            keptSettlement?.partner_id === partner.id,
+        JSON.stringify(keptSettlement),
+    );
+
+    const { data: keptService } = await admin
+        .from("services")
+        .select("id, status")
+        .eq("id", svc.id)
+        .maybeSingle();
+    check(
+        "수행기록이 남는다 (제4조 — 서비스 수행기록 5년)",
+        keptService?.status === "COMPLETED",
+    );
+
+    const { data: goneLogin } = await admin
+        .from("partner_accounts")
+        .select("profile_id")
+        .eq("profile_id", partner.id)
+        .maybeSingle();
+    check("파트너 로그인 아이디는 지워진다", !goneLogin);
+
+    // 지우는 이유가 이것이다 — 아이디를 남기면 재발급이 막힌다.
+    const reissue = await makeMember("reissue");
+    const { error: reissueErr } = await admin
+        .from("partner_accounts")
+        .insert({ profile_id: reissue.id, login_id: loginId });
+    check(
+        "지웠으므로 같은 로그인 아이디를 다시 발급할 수 있다",
+        !reissueErr,
+        reissueErr?.message,
+    );
+
+    // =============================================================
     console.log("\n▶ 보존기간 파기 (제11조 ①)");
     // =============================================================
     // 파기 예정일을 과거로 당겨 배치가 실제로 지우는지 본다.
