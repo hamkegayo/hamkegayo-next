@@ -18,6 +18,7 @@
         "test:nicepay": "node --env-file=.env.local scripts/test-nicepay.mjs",
         "test:payapi": "node --env-file=.env.local scripts/test-payment-api.mjs",
         "test:withdrawal": "node --env-file=.env.local scripts/test-withdrawal.mjs",
+        "test:payout": "node --env-file=.env.local scripts/test-payout-account.mjs",
         "prepare": "husky"
     },
     "dependencies": {
