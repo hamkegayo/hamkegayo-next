@@ -563,6 +563,16 @@ async function main() {
         ["admin_get_reservation", { p_id: seededRes.id, p_reason: "x" }],
         ["admin_grant_role", { p_target: userId }],
         ["admin_set_account_status", { p_target: userId, p_status: "SUSPENDED" }],
+        ["admin_list_service_notices", {}],
+        [
+            "admin_correct_service_time",
+            {
+                p_service_id: seededRes.id,
+                p_field: "started_at",
+                p_at: new Date().toISOString(),
+                p_reason: "권한 없이 정정 시도",
+            },
+        ],
     ]) {
         const r = await userClient.rpc(name, args);
         check(`일반 사용자는 ${name}() 거절됨`, !!r.error);
@@ -700,7 +710,147 @@ async function main() {
     }
 
     // =============================================================
-    section("9. 정지된 관리자는 즉시 차단된다");
+    section("9. 현장 고지·오류 처리 (매뉴얼 대응카드 13 · 26)");
+    // =============================================================
+    //  파트너는 신고만 하고 판단은 운영센터가 한다. 시각 정정도 관리자만
+    //  할 수 있고 사유가 access_logs 에 남는다 — #50 과 같은 형태다.
+    // 앞 섹션이 이미 이 예약의 서비스를 만들었을 수 있다(reservation_id 유일).
+    const { data: existingSvc } = await admin
+        .from("services")
+        .select("id")
+        .eq("reservation_id", seededRes.id)
+        .maybeSingle();
+
+    let noticeSvc = existingSvc;
+    if (!noticeSvc) {
+        const { data: created, error: createErr } = await admin
+            .from("services")
+            .insert({
+                reservation_id: seededRes.id,
+                partner_id: partnerId,
+                status: "IN_PROGRESS",
+            })
+            .select("id")
+            .single();
+        if (createErr) throw createErr;
+        noticeSvc = created;
+    }
+    await admin
+        .from("services")
+        .update({
+            partner_id: partnerId,
+            started_at: new Date(Date.now() - 3_600_000).toISOString(),
+        })
+        .eq("id", noticeSvc.id);
+
+    const { data: noticeId, error: noticeIdErr } = await admin
+        .from("service_notices")
+        .insert({
+            service_id: noticeSvc.id,
+            partner_id: partnerId,
+            kind: "BUTTON_ERROR",
+            occurred_at: new Date(Date.now() - 3_500_000).toISOString(),
+            error_text: "처리에 실패했습니다",
+            detail: "지하 1층, 데이터 끊김",
+        })
+        .select("id")
+        .single();
+    if (noticeIdErr) throw noticeIdErr;
+
+    const listed = await adminClient.rpc("admin_list_service_notices", {
+        p_only_open: true,
+    });
+    check(
+        "관리자는 처리 대기 신고를 볼 수 있다",
+        !listed.error &&
+            (listed.data ?? []).some((n) => n.id === noticeId.id),
+        listed.error?.message,
+    );
+
+    const noMemo = await adminClient.rpc("admin_resolve_service_notice", {
+        p_id: noticeId.id,
+        p_memo: "확인",
+    });
+    check(
+        "운영센터 안내 없이는 닫을 수 없다 (대응카드 26 종료 기준)",
+        !!noMemo.error,
+        "짧은 메모로 닫혔다",
+    );
+
+    const resolved = await adminClient.rpc("admin_resolve_service_notice", {
+        p_id: noticeId.id,
+        p_memo: "실제 시각으로 시작시각을 정정했습니다.",
+    });
+    check("안내를 남기면 닫힌다", resolved.data === true, resolved.error?.message);
+
+    // ---------- 시각 정정 ----------
+    const shortReason = await adminClient.rpc("admin_correct_service_time", {
+        p_service_id: noticeSvc.id,
+        p_field: "started_at",
+        p_at: new Date(Date.now() - 3_500_000).toISOString(),
+        p_reason: "오타",
+    });
+    check("사유가 짧으면 정정이 거절된다", !!shortReason.error);
+
+    const badField = await adminClient.rpc("admin_correct_service_time", {
+        p_service_id: noticeSvc.id,
+        p_field: "partner_id",
+        p_at: new Date().toISOString(),
+        p_reason: "화이트리스트 밖 컬럼을 노린다",
+    });
+    check("화이트리스트 밖 컬럼은 고칠 수 없다", !!badField.error);
+
+    const future = await adminClient.rpc("admin_correct_service_time", {
+        p_service_id: noticeSvc.id,
+        p_field: "started_at",
+        p_at: new Date(Date.now() + 3_600_000).toISOString(),
+        p_reason: "아직 오지 않은 시각으로 바꿔본다",
+    });
+    check("미래 시각으로는 고칠 수 없다", !!future.error);
+
+    const corrected = new Date(Date.now() - 3_400_000).toISOString();
+    const fix = await adminClient.rpc("admin_correct_service_time", {
+        p_service_id: noticeSvc.id,
+        p_field: "started_at",
+        p_at: corrected,
+        p_reason: "버튼 오류 신고에 따라 실제 시각으로 정정",
+    });
+    check(
+        "사유를 남기면 시각이 정정된다",
+        !fix.error && fix.data?.field === "started_at",
+        fix.error?.message,
+    );
+
+    const { data: fixedSvc } = await admin
+        .from("services")
+        .select("started_at")
+        .eq("id", noticeSvc.id)
+        .maybeSingle();
+    check(
+        "정정한 값이 실제로 들어간다",
+        new Date(fixedSvc.started_at).getTime() ===
+            new Date(corrected).getTime(),
+        fixedSvc?.started_at,
+    );
+
+    const { data: fixLogs } = await admin
+        .from("access_logs")
+        .select("action, target_table, reason")
+        .eq("actor_id", adminId)
+        .eq("target_table", "services");
+    check(
+        "정정 사실이 접속기록에 남는다 (바꾸기 전 값 포함)",
+        (fixLogs ?? []).some(
+            (l) =>
+                l.action === "UPDATE" &&
+                (l.reason ?? "").includes("started_at") &&
+                (l.reason ?? "").includes("→"),
+        ),
+        JSON.stringify(fixLogs),
+    );
+
+    // =============================================================
+    section("10. 정지된 관리자는 즉시 차단된다");
     // =============================================================
     await admin.from("profiles").update({ status: "SUSPENDED" }).eq("id", adminId);
 

@@ -268,6 +268,90 @@ async function main() {
     );
 
     // =============================================================
+    section("현장 고지·오류 기록 (대응카드 13 · 26)");
+    // =============================================================
+    //  매뉴얼은 파트너가 현장에서 판단하는 것을 막는다.
+    //    대응카드 13 — "추가시간을 현장에서 확정하지 않는다"
+    //    대응카드 26 — "임의의 시각을 입력하지 않는다"
+    //  그래서 파트너는 사실만 남기고, 반영은 운영센터가 한다.
+
+    const overrun = await partner.rpc("report_service_notice", {
+        p_service_id: past.serviceId,
+        p_kind: "OVERRUN_NOTICE",
+        p_occurred_at: new Date().toISOString(),
+        p_notified_to: "BOTH",
+        p_detail: "검사 순서가 밀려 40분 지연",
+    });
+    check(
+        "예정 종료 초과 고지가 기록된다",
+        !overrun.error && !!overrun.data,
+        overrun.error?.message,
+    );
+
+    const btnErr = await partner.rpc("report_service_notice", {
+        p_service_id: past.serviceId,
+        p_kind: "BUTTON_ERROR",
+        p_occurred_at: new Date().toISOString(),
+        p_error_text: "처리에 실패했습니다",
+        p_detail: "지하 1층, 데이터 끊김",
+    });
+    check("버튼 오류가 신고된다", !btnErr.error, btnErr.error?.message);
+
+    const futureNotice = await partner.rpc("report_service_notice", {
+        p_service_id: past.serviceId,
+        p_kind: "BUTTON_ERROR",
+        p_occurred_at: new Date(Date.now() + 3_600_000).toISOString(),
+        p_error_text: "미래 시각",
+    });
+    check(
+        "아직 오지 않은 시각은 신고할 수 없다",
+        !!futureNotice.error &&
+            futureNotice.error.message.includes("future_time"),
+        futureNotice.error?.message,
+    );
+
+    const badKind = await partner.rpc("report_service_notice", {
+        p_service_id: past.serviceId,
+        p_kind: "WHATEVER",
+        p_occurred_at: new Date().toISOString(),
+    });
+    check("정해진 종류만 신고할 수 있다", !!badKind.error);
+
+    const otherPartner = await user.rpc("report_service_notice", {
+        p_service_id: past.serviceId,
+        p_kind: "BUTTON_ERROR",
+        p_occurred_at: new Date().toISOString(),
+        p_error_text: "남의 서비스",
+    });
+    check("남의 서비스에는 신고할 수 없다", !!otherPartner.error);
+
+    // 파트너는 자기 기록을 확인할 수 있어야 한다 — 현장 확인표가 요구한다.
+    const mine = await partner
+        .from("service_notices")
+        .select("id")
+        .eq("service_id", past.serviceId);
+    check(
+        "파트너는 자기가 남긴 기록을 볼 수 있다",
+        !mine.error && (mine.data ?? []).length >= 2,
+        `${(mine.data ?? []).length}건`,
+    );
+
+    const notMine = await user.from("service_notices").select("id");
+    check(
+        "다른 사람은 그 기록을 읽지 못한다",
+        !notMine.error && (notMine.data ?? []).length === 0,
+    );
+
+    // 정정은 파트너의 일이 아니다 — 관리자 RPC 로만 열린다.
+    const partnerFix = await partner.rpc("admin_correct_service_time", {
+        p_service_id: past.serviceId,
+        p_field: "started_at",
+        p_at: new Date().toISOString(),
+        p_reason: "파트너가 직접 고쳐본다",
+    });
+    check("파트너는 시각을 직접 정정할 수 없다", !!partnerFix.error);
+
+    // =============================================================
     section("이용자 미도착 종료 — 약관 제15조 ③④");
     // =============================================================
 

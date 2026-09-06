@@ -29,7 +29,10 @@ import {
 } from "@/lib/handover";
 
 import { cn } from "@/lib/utils";
-import type { PartnerServiceView } from "../../../_lib/services.server";
+import type {
+    PartnerServiceView,
+    ServiceNoticeView,
+} from "../../../_lib/services.server";
 import {
     arriveService,
     completeService,
@@ -42,16 +45,31 @@ import {
 } from "../../_actions/services";
 import { EndServiceModal } from "../../../_components/end-service-modal";
 import { ServiceFeedbackModal } from "../../../_components/service-feedback-modal";
+import {
+    ServiceNoticeModal,
+    type NoticeKind,
+} from "../../../_components/service-notice-modal";
 
 type MemoTab = "start" | "end";
 
+const NOTICE_LABEL: Record<NoticeKind, string> = {
+    OVERRUN_NOTICE: "예정 종료 초과 알림",
+    BUTTON_ERROR: "버튼 오류",
+};
+
 export function ServiceDetailView({
     service,
+    notices,
 }: {
     service: PartnerServiceView;
+    notices: ServiceNoticeView[];
 }) {
     const router = useRouter();
     const item = service;
+
+    // 신고 모달 — 열려 있는 종류가 곧 상태다. 닫으면 컴포넌트가 사라져
+    // 입력값도 함께 사라진다(useEffect 로 되돌리지 않는다).
+    const [noticeKind, setNoticeKind] = useState<NoticeKind | null>(null);
 
     // 초기 진행 상태를 서비스 상태(state)로부터 파생
     const initial = useMemo(() => {
@@ -649,6 +667,112 @@ export function ServiceDetailView({
                         </p>
                     )}
                 </div>
+            )}
+
+            {/*
+             * 현장 기록 (#55) — 매뉴얼 대응카드 13 · 26.
+             *
+             *  둘 다 파트너가 현장에서 판단하지 않고 사실만 남기는 자리다.
+             *  대응카드 13 은 "추가시간을 현장에서 확정하지 않는다" 고
+             *  금지하고, 26 은 "임의의 시각을 입력하지 않는다" 고 정한다.
+             *
+             *  버튼 오류는 시작 전에도, 완료된 뒤에도 신고할 수 있어야 한다.
+             *  시작 버튼이 안 눌리는 경우가 있고, 종료 버튼 오류는 결과보고를
+             *  쓰다가 뒤늦게 발견되는 일이 많다. 그래서 이 카드는 started
+             *  안에 넣지 않고 상태와 무관하게 둔다.
+             */}
+            <div className="border-border bg-background mt-5 rounded-2xl border p-6 md:p-7">
+                <h2 className="text-foreground text-lg font-bold">현장 기록</h2>
+                <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
+                    예정 종료시각을 넘기거나 버튼이 눌리지 않을 때 운영센터에
+                    알립니다. 현장에서 추가시간이나 시각을 직접 정하지 않습니다.
+                </p>
+
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    {started && !ended && (
+                        <button
+                            type="button"
+                            onClick={() => setNoticeKind("OVERRUN_NOTICE")}
+                            className="border-border bg-background text-foreground hover:bg-muted rounded-xl border px-4 py-3 text-left text-sm font-bold transition-colors"
+                        >
+                            예정 종료시각을 넘길 것 같아요
+                            <span className="text-muted-foreground mt-0.5 block text-xs font-normal">
+                                이용자·보호자에게 알린 사실을 남깁니다
+                            </span>
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setNoticeKind("BUTTON_ERROR")}
+                        className="border-border bg-background text-foreground hover:bg-muted rounded-xl border px-4 py-3 text-left text-sm font-bold transition-colors"
+                    >
+                        버튼이 눌리지 않아요
+                        <span className="text-muted-foreground mt-0.5 block text-xs font-normal">
+                            실제 시각과 오류 문구를 남깁니다
+                        </span>
+                    </button>
+                </div>
+
+                {/*
+                      현장 확인표가 "기록했다" 를 확인하라고 요구한다.
+                      확인할 자리가 없으면 규정이 지켜졌는지 알 수 없다.
+                    */}
+                {notices.length > 0 && (
+                    <ul className="divide-border border-border mt-4 divide-y rounded-xl border">
+                        {notices.map((n) => (
+                            <li key={n.id} className="px-4 py-3 text-sm">
+                                <div className="flex items-center justify-between gap-3">
+                                    <span className="text-foreground font-semibold">
+                                        {NOTICE_LABEL[n.kind]}
+                                        {n.occurredAtLabel && (
+                                            <span className="text-muted-foreground ml-2 font-normal">
+                                                {n.occurredAtLabel}
+                                            </span>
+                                        )}
+                                    </span>
+                                    <span
+                                        className={cn(
+                                            "shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold",
+                                            n.status === "RESOLVED"
+                                                ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15"
+                                                : "bg-amber-100 text-amber-600 dark:bg-amber-500/15",
+                                        )}
+                                    >
+                                        {n.status === "RESOLVED"
+                                            ? "확인됨"
+                                            : "전달됨"}
+                                    </span>
+                                </div>
+                                {(n.errorText || n.detail) && (
+                                    <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                                        {[n.errorText, n.detail]
+                                            .filter(Boolean)
+                                            .join(" · ")}
+                                    </p>
+                                )}
+                                {n.memo && (
+                                    <p className="text-foreground mt-1.5 text-xs leading-relaxed">
+                                        운영센터 : {n.memo}
+                                    </p>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+
+            {noticeKind && (
+                <ServiceNoticeModal
+                    open
+                    kind={noticeKind}
+                    serviceId={service.id}
+                    baseDate={service.plannedStartAt}
+                    onClose={() => setNoticeKind(null)}
+                    onDone={() => {
+                        setNoticeKind(null);
+                        router.refresh();
+                    }}
+                />
             )}
 
             <div className="mt-5 grid gap-5 lg:grid-cols-2">

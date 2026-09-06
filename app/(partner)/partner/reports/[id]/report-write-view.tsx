@@ -285,9 +285,10 @@ export function ReportWriteView({ context }: { context: ReportContext }) {
                         )}
 
                         <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
-                            시각이 사실과 다르면 직접 고치지 마시고 고객센터로
-                            알려 주세요. 이 값은 요금 계산과 분쟁 확인에 함께
-                            쓰이는 기록입니다.
+                            시각이 사실과 다르면 직접 고치지 마시고, 진행 관리
+                            화면의 &lsquo;버튼이 눌리지 않아요&rsquo;로 알려
+                            주세요. 운영센터가 확인 후 정정합니다. 이 값은 요금
+                            계산과 분쟁 확인에 함께 쓰이는 기록입니다.
                         </p>
                     </section>
 

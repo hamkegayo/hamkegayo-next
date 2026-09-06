@@ -22,6 +22,9 @@ const ERROR_MESSAGE: Record<string, string> = {
     // 매뉴얼 4단계 — 일찍 도착해도 예약시각 정각에 시작한다.
     too_early: "예약시각 이후에 진행할 수 있습니다.",
     invalid_field: "기록할 수 없는 항목입니다.",
+    invalid_kind: "신고할 수 없는 종류입니다.",
+    // 대응카드 26 — "실제 시각" 은 이미 지난 일이다.
+    future_time: "아직 오지 않은 시각은 적을 수 없습니다.",
 };
 
 /** 서비스 행에 연결된 고객 id (알림 수신자) */
@@ -42,7 +45,8 @@ async function callRpc(
         | "complete_service"
         | "arrive_service"
         | "record_service_time"
-        | "end_service_no_show",
+        | "end_service_no_show"
+        | "report_service_notice",
     args: Record<string, unknown>,
     serviceId: string,
 ): Promise<ServiceActionResult> {
@@ -133,6 +137,74 @@ export async function recordServiceTime(
     return callRpc(
         "record_service_time",
         { p_service_id: serviceId, p_field: field },
+        serviceId,
+    );
+}
+
+/**
+ * 예정 종료시각 초과 고지 — 매뉴얼 대응카드 13.
+ *
+ *  ⚠️ 이것은 "연장 동의" 가 아니다. 매뉴얼은 **추가시간을 현장에서
+ *     확정하는 것을 금지**하고, 이용자·보호자에게 예상 종료시각을 알린 뒤
+ *     운영센터에 보고하라고만 정한다. 약관에도 연장 동의 절차는 없다 —
+ *     제11조 ⑥ 은 8분을 넘기면 실제 시간으로 산정한다고만 한다.
+ *
+ *  남기는 이유는 분쟁이다. 서비스가 끝난 뒤 추가결제 링크가 나갔을 때
+ *  보호자가 "들은 적 없다" 고 하면 지금은 반박할 자료가 하나도 없다.
+ */
+export async function reportOverrunNotice(
+    serviceId: string,
+    input: {
+        /** 알린 실제 시각 (ISO) */
+        occurredAt: string;
+        notifiedTo: "USER" | "GUARDIAN" | "BOTH";
+        /** 알린 예상 종료시각 (ISO). 모르면 null */
+        expectedEndAt: string | null;
+        /** 지연 사유와 남은 업무. ⚠️ 개인정보를 적지 않는다. */
+        detail: string;
+    },
+): Promise<ServiceActionResult> {
+    return callRpc(
+        "report_service_notice",
+        {
+            p_service_id: serviceId,
+            p_kind: "OVERRUN_NOTICE",
+            p_occurred_at: input.occurredAt,
+            p_notified_to: input.notifiedTo,
+            p_expected_end_at: input.expectedEndAt,
+            p_detail: input.detail,
+        },
+        serviceId,
+    );
+}
+
+/**
+ * 시작·종료 버튼 오류 신고 — 매뉴얼 대응카드 26.
+ *
+ *  파트너는 신고만 한다. 시각 정정은 운영센터가 사유를 남기고 한다
+ *  (admin_correct_service_time). 매뉴얼이 "임의의 시각을 입력하지
+ *  않는다" 고 정하므로 파트너에게 정정 경로를 열지 않는다.
+ */
+export async function reportButtonError(
+    serviceId: string,
+    input: {
+        /** 버튼을 누른 실제 시각 (ISO) */
+        occurredAt: string;
+        /** 화면에 표시된 오류 문구 */
+        errorText: string;
+        /** 통신상태 등. ⚠️ 개인정보를 적지 않는다. */
+        detail: string;
+    },
+): Promise<ServiceActionResult> {
+    return callRpc(
+        "report_service_notice",
+        {
+            p_service_id: serviceId,
+            p_kind: "BUTTON_ERROR",
+            p_occurred_at: input.occurredAt,
+            p_error_text: input.errorText,
+            p_detail: input.detail,
+        },
         serviceId,
     );
 }
