@@ -1,5 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
-import { toHhmm } from "@/lib/format";
+import { kstStamp, toHhmm, weekdayOf } from "@/lib/format";
 import { createAdminClient } from "@/utils/supabase/admin";
 import {
     PLAN_INFO,
@@ -77,8 +77,6 @@ export type ReservationDetailView = {
     partner: DetailPartner | null;
 };
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-
 /** 플랜별 서비스 포함 내용(제품 정의 — 정적) */
 const PLAN_INCLUDES: Record<PlanCode, string[]> = {
     basic: [
@@ -103,7 +101,7 @@ function formatDateTime(useDate: string, time: string): string {
     const hhmm = toHhmm(time);
     const t = /^(\d{1,2}):(\d{2})/.exec(hhmm);
     if (!y || !mo || !d || !t) return `${useDate} ${time}`;
-    const weekday = WEEKDAYS[new Date(y, mo - 1, d).getDay()] ?? "";
+    const weekday = weekdayOf(useDate);
     const h24 = Number(t[1]);
     const meridiem = h24 < 12 ? "오전" : "오후";
     const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
@@ -117,16 +115,9 @@ function formatDate(useDate: string): string {
     return `${y}.${String(mo).padStart(2, "0")}.${String(d).padStart(2, "0")}`;
 }
 
-/** ISO → "MM.DD HH:mm" */
+/** ISO → "MM.DD HH:mm" (KST). 서버는 UTC 로 도므로 시간대를 명시한다. */
 function formatStamp(iso: string | null): string | null {
-    if (!iso) return null;
-    const dt = new Date(iso);
-    if (Number.isNaN(dt.getTime())) return null;
-    const mm = String(dt.getMonth() + 1).padStart(2, "0");
-    const dd = String(dt.getDate()).padStart(2, "0");
-    const hh = String(dt.getHours()).padStart(2, "0");
-    const mi = String(dt.getMinutes()).padStart(2, "0");
-    return `${mm}.${dd} ${hh}:${mi}`;
+    return kstStamp(iso);
 }
 
 type ReservationRow = {

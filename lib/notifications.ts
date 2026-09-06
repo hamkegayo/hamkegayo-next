@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { kstDateDot } from "@/lib/format";
 
 export type NotificationType =
     | "PARTNER_APPLIED"
@@ -33,7 +34,7 @@ function timeAgo(iso: string): string {
     if (hr < 24) return `${hr}시간 전`;
     const day = Math.floor(hr / 24);
     if (day < 7) return `${day}일 전`;
-    return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+    return kstDateDot(d) ?? "";
 }
 
 /**

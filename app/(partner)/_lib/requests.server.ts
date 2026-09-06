@@ -14,7 +14,7 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { runExpirySweep } from "@/lib/expire-matchings";
-import { toHhmm } from "@/lib/format";
+import { formatUseDate, kstToday, toHhmm, weekdayOf } from "@/lib/format";
 import { planDisplay, type PlanCode } from "@/lib/reservation";
 import { calcPartnerPayout, calcPrepayment } from "@/lib/pricing";
 
@@ -60,8 +60,6 @@ export type PartnerMatchingItem = {
     duration: string;
 };
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-
 /** basic/plus → Basic/Plus (공용 헬퍼 래핑, 알 수 없는 값은 Basic) */
 function planLabel(plan: string): "Basic" | "Plus" {
     return planDisplay(plan === "plus" ? "plus" : "basic");
@@ -89,15 +87,19 @@ function formatDateLabel(useDate: string): string {
     if (!y || !mo || !d) return useDate;
 
     const target = new Date(y, mo - 1, d);
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // 오늘/내일 판정은 KST 기준이다. 서버(UTC)의 오늘을 쓰면 KST 09시
+    // 이전에 하루가 밀린다.
+    const [ty, tmo, td] = kstToday()
+        .split("-")
+        .map((n) => Number(n));
+    const today = new Date(ty, tmo - 1, td);
     const diffDays = Math.round(
         (target.getTime() - today.getTime()) / 86_400_000,
     );
 
     if (diffDays === 0) return "오늘";
     if (diffDays === 1) return "내일";
-    return `${mo}월 ${d}일 (${WEEKDAYS[target.getDay()] ?? ""})`;
+    return `${mo}월 ${d}일 (${weekdayOf(useDate)})`;
 }
 
 /** 단계 1 목록을 가져와 아직 지원하지 않은 건만 남긴다 */
@@ -200,12 +202,7 @@ export type PartnerRequestDetail = {
 
 /** "YYYY-MM-DD" → "YYYY.MM.DD (요일)" */
 function formatDate(useDate: string): string {
-    const [y, mo, d] = useDate.split("-").map((n) => Number(n));
-    if (!y || !mo || !d) return useDate;
-    const weekday = WEEKDAYS[new Date(y, mo - 1, d).getDay()] ?? "";
-    const mm = String(mo).padStart(2, "0");
-    const dd = String(d).padStart(2, "0");
-    return `${y}.${mm}.${dd} (${weekday})`;
+    return formatUseDate(useDate);
 }
 
 /**

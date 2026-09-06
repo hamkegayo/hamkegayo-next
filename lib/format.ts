@@ -1,4 +1,134 @@
 /**
+ * 서비스 기준 시간대.
+ *
+ *  ⚠️ **서버에서 `getHours()` · `getDate()` 를 쓰지 않는다.** 그 값은 실행
+ *     환경의 시간대를 따르는데, Vercel 은 UTC 로 돈다. 개발 기계가 KST 라
+ *     로컬에서는 맞아 보이고 프로덕션에서만 9시간 어긋난다.
+ *
+ *  이 파일의 kst* 함수는 시간대를 명시하므로 어디서 돌든 같은 값을 낸다.
+ */
+export const KST = "Asia/Seoul";
+
+const KST_PARTS = new Intl.DateTimeFormat("en-US", {
+    timeZone: KST,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+});
+
+type Parts = { y: string; mo: string; d: string; h: string; mi: string };
+
+function parts(value: string | number | Date | null): Parts | null {
+    if (value === null || value === "") return null;
+    const at = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(at.getTime())) return null;
+
+    const found: Record<string, string> = {};
+    for (const p of KST_PARTS.formatToParts(at)) found[p.type] = p.value;
+    // hour12:false 는 자정을 "24" 로 내는 구현이 있다.
+    const h = found.hour === "24" ? "00" : found.hour;
+    return {
+        y: found.year,
+        mo: found.month,
+        d: found.day,
+        h,
+        mi: found.minute,
+    };
+}
+
+/** ISO → "HH:mm" (KST). 값이 없거나 잘못된 형식이면 null. */
+export function kstTime(value: string | number | Date | null): string | null {
+    const p = parts(value);
+    return p && `${p.h}:${p.mi}`;
+}
+
+/** ISO → "YYYY-MM-DD" (KST). 날짜 계산·쿼리 기준값에 쓴다. */
+export function kstDate(value: string | number | Date | null): string | null {
+    const p = parts(value);
+    return p && `${p.y}-${p.mo}-${p.d}`;
+}
+
+/** ISO → "YYYY.MM.DD" (KST). 화면 표시용. */
+export function kstDateDot(
+    value: string | number | Date | null,
+): string | null {
+    const p = parts(value);
+    return p && `${p.y}.${p.mo}.${p.d}`;
+}
+
+/** ISO → "YYYY.MM.DD HH:mm" (KST). 화면 표시용. */
+export function kstDateTime(
+    value: string | number | Date | null,
+): string | null {
+    const p = parts(value);
+    return p && `${p.y}.${p.mo}.${p.d} ${p.h}:${p.mi}`;
+}
+
+/** ISO → "MM.DD HH:mm" (KST). 목록·타임라인처럼 연도가 필요 없는 자리. */
+export function kstStamp(value: string | number | Date | null): string | null {
+    const p = parts(value);
+    return p && `${p.mo}.${p.d} ${p.h}:${p.mi}`;
+}
+
+/** 오늘 날짜 "YYYY-MM-DD" (KST). 만 나이·오늘 일정 판정의 기준. */
+export function kstToday(): string {
+    return kstDate(new Date())!;
+}
+
+/** ISO → "YYYYMMDD" (KST). 예약번호처럼 구분자 없는 자리. */
+export function kstCompactDate(
+    value: string | number | Date | null,
+): string | null {
+    const p = parts(value);
+    return p && `${p.y}${p.mo}${p.d}`;
+}
+
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
+
+/**
+ * "YYYY-MM-DD" 의 요일.
+ *
+ *  날짜 문자열에서 바로 계산한다. `new Date(y, mo-1, d).getDay()` 는
+ *  실행 환경의 자정을 만들어 읽는 방식이라 시간대에 걸리기 쉬운데,
+ *  `Date.UTC` 로 만들어 `getUTCDay()` 를 읽으면 어디서 돌든 같다.
+ */
+export function weekdayOf(useDate: string): string {
+    const [y, mo, d] = useDate.split("-").map((n) => Number(n));
+    if (!y || !mo || !d) return "";
+    return WEEKDAYS[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()] ?? "";
+}
+
+/** "YYYY-MM-DD" → "YYYY.MM.DD (요일)". 형식이 아니면 원본 그대로. */
+export function formatUseDate(useDate: string): string {
+    const [y, mo, d] = useDate.split("-").map((n) => Number(n));
+    if (!y || !mo || !d) return useDate;
+    const mm = String(mo).padStart(2, "0");
+    const dd = String(d).padStart(2, "0");
+    return `${y}.${mm}.${dd} (${weekdayOf(useDate)})`;
+}
+
+/**
+ * 생년월일("YYYY-MM-DD") → "N세" (만 나이). 값이 없으면 빈 문자열.
+ *
+ *  기준일은 KST 의 오늘이다. 서버가 UTC 로 돌면 생일 당일 오전에 한 살
+ *  적게 나온다.
+ */
+export function koreanAgeLabel(birth: string | null): string {
+    if (!birth) return "";
+    const [y, mo, d] = birth.split("-").map((n) => Number(n));
+    if (!y) return "";
+    const [ty, tmo, td] = kstToday()
+        .split("-")
+        .map((n) => Number(n));
+    let age = ty - y;
+    if (tmo < mo || (tmo === mo && td < d)) age -= 1;
+    return `${age}세`;
+}
+
+/**
  * 휴대폰번호 자동 하이픈 포맷.
  * 숫자만 추출해 최대 11자리로 자르고 3-4-4(휴대폰) 형태로 변환한다.
  *  예) "01012341234" → "010-1234-1234"

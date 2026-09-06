@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { planDisplay, type PlanCode } from "@/lib/reservation";
+import { formatUseDate, kstDate } from "@/lib/format";
 
 export type ReviewPlan = "Basic" | "Plus";
 
@@ -23,19 +24,14 @@ export type ReviewableService = {
     dateLabel: string;
 };
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-
 function formatDate(iso: string): string {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return kstDate(d) ?? iso.slice(0, 10);
 }
 
 function formatServiceDate(useDate: string): string {
-    const [y, mo, d] = useDate.split("-").map((n) => Number(n));
-    if (!y || !mo || !d) return useDate;
-    const weekday = WEEKDAYS[new Date(y, mo - 1, d).getDay()] ?? "";
-    return `${y}.${String(mo).padStart(2, "0")}.${String(d).padStart(2, "0")} (${weekday})`;
+    return formatUseDate(useDate);
 }
 
 type ReviewRow = {

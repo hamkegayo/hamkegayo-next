@@ -1,3 +1,4 @@
+import { kstCompactDate } from "@/lib/format";
 /**
  * 예약 도메인 공용 단일 소스 (서버/클라 공용).
  *  - plan 표기·가격, 예약번호(code) 포맷, 상태값/라벨을 여기 한 곳에서 관리.
@@ -79,7 +80,7 @@ export function isReservationCode(code: string): boolean {
 
 /** 예약번호 생성 — R{yyyymmdd}-{4자리 랜덤} */
 export function generateReservationCode(date: Date = new Date()): string {
-    const ymd = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+    const ymd = kstCompactDate(date) ?? "00000000";
     const rand = String(Math.floor(1000 + Math.random() * 9000));
     return `R${ymd}-${rand}`;
 }

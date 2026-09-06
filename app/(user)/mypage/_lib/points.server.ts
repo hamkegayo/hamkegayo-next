@@ -6,6 +6,7 @@
  */
 
 import { createClient } from "@/utils/supabase/server";
+import { kstDateDot } from "@/lib/format";
 
 /** 소멸 예정으로 안내할 기간(일) */
 const EXPIRING_SOON_DAYS = 30;
@@ -49,7 +50,7 @@ const EMPTY: PointSummary = { balance: 0, expiring: 0, entries: [] };
 function formatDate(iso: string): string {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+    return kstDateDot(d) ?? "";
 }
 
 /** 로그인 사용자의 포인트 요약 + 내역. 비로그인/조회 실패 시 0. */

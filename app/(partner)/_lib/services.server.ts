@@ -1,5 +1,11 @@
 import { createClient } from "@/utils/supabase/server";
-import { toHhmm } from "@/lib/format";
+import {
+    formatUseDate,
+    koreanAgeLabel,
+    kstTime,
+    kstToday,
+    toHhmm,
+} from "@/lib/format";
 import {
     planDisplay,
     type PlanCode,
@@ -120,13 +126,8 @@ type ServiceRow = {
     } | null;
 };
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-
 function formatDate(useDate: string): string {
-    const [y, mo, d] = useDate.split("-").map((n) => Number(n));
-    if (!y || !mo || !d) return useDate;
-    const weekday = WEEKDAYS[new Date(y, mo - 1, d).getDay()] ?? "";
-    return `${y}.${String(mo).padStart(2, "0")}.${String(d).padStart(2, "0")} (${weekday})`;
+    return formatUseDate(useDate);
 }
 
 /** ISO → "HH:mm" (기록 시각 표시용) */
@@ -134,21 +135,11 @@ function toTimeLabel(iso: string | null): string | null {
     if (!iso) return null;
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return null;
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    return kstTime(d);
 }
 
 function ageLabel(birth: string): string {
-    const [y, mo, d] = birth.split("-").map((n) => Number(n));
-    if (!y) return "";
-    const now = new Date();
-    let age = now.getFullYear() - y;
-    if (
-        now.getMonth() + 1 < mo ||
-        (now.getMonth() + 1 === mo && now.getDate() < d)
-    ) {
-        age -= 1;
-    }
-    return `${age}세`;
+    return koreanAgeLabel(birth);
 }
 
 const SELECT =
@@ -276,10 +267,14 @@ export async function getPartnerServices(): Promise<PartnerServiceView[]> {
     }
 }
 
-/** 로컬 기준 오늘 날짜(YYYY-MM-DD) */
+/**
+ * 오늘 날짜(YYYY-MM-DD · KST).
+ *
+ *  서버가 UTC 로 돌면 KST 09시 이전에는 어제가 나온다 — "오늘 일정" 에
+ *  전날 건이 뜨고 오늘 건이 빠진다.
+ */
 function localToday(): string {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return kstToday();
 }
 
 /**
