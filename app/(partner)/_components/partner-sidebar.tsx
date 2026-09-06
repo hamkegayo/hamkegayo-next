@@ -16,6 +16,7 @@ import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { usePartnerNav } from "./partner-nav-context";
+import { COMPANY } from "@/lib/legal/company";
 
 const ITEMS: {
     href: string;
@@ -100,10 +101,10 @@ function SidebarContent({
                     파트너 고객센터
                 </p>
                 <p className="text-foreground mt-3 text-xl font-extrabold">
-                    02-1234-5678
+                    {COMPANY.tel}
                 </p>
                 <p className="text-muted-foreground mt-1 text-xs">
-                    평일 09:00 ~ 18:00
+                    {COMPANY.hours}
                 </p>
             </div>
         </>

@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createAdminClient } from "@/utils/supabase/admin";
+import { recordAgreements, type AgreementInput } from "@/lib/legal/agreements";
 import {
     VERIFIED_VALID_MS,
     isValidEmail,
@@ -49,6 +50,7 @@ export async function signUpUser(input: {
     password: string;
     name: string;
     phone: string;
+    agreements: AgreementInput;
 }): Promise<SignUpResult> {
     const admin = createAdminClient();
     const email = normalizeEmail(input.email);
@@ -124,6 +126,17 @@ export async function signUpUser(input: {
         };
     }
 
+    // 동의 이력이 없으면 동의를 받았다는 사실을 증명할 수 없다(#58).
+    // 이력 없는 계정을 남기느니 가입을 되돌린다 — profiles 는 cascade 로 지워진다.
+    if (!(await recordAgreements(admin, userId, input.agreements))) {
+        await admin.auth.admin.deleteUser(userId);
+        return {
+            ok: false,
+            field: "form",
+            message: "회원가입에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        };
+    }
+
     return { ok: true };
 }
 
@@ -138,6 +151,7 @@ export async function activatePartner(input: {
     password: string;
     name: string;
     phone: string;
+    agreements: AgreementInput;
 }): Promise<SignUpResult> {
     const admin = createAdminClient();
     const email = normalizeEmail(input.email);
@@ -199,6 +213,19 @@ export async function activatePartner(input: {
         { password: input.password },
     );
     if (pwErr) {
+        return {
+            ok: false,
+            field: "form",
+            message: "회원가입에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        };
+    }
+
+    // ACTIVE 로 바꾸기 **전에** 적재한다. 여기서 실패하면 계정이 비활성으로
+    // 남아 사용자가 다시 시도할 수 있다 — 활성화한 뒤 실패하면 동의 이력
+    // 없는 파트너가 그대로 서비스에 들어온다.
+    if (
+        !(await recordAgreements(admin, account.profile_id, input.agreements))
+    ) {
         return {
             ok: false,
             field: "form",

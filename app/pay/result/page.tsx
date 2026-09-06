@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { COMPANY } from "@/lib/legal/company";
 
 /**
  * 추가결제 결과 화면 (#75).
@@ -67,7 +68,7 @@ export default async function PayResultPage({
                 )}
 
                 <p className="text-muted-foreground mt-6 text-xs">
-                    문의 : 함께가요 고객센터 010-9345-2328 (06:00~18:00)
+                    문의 : 함께가요 고객센터 {COMPANY.tel} ({COMPANY.hours})
                 </p>
             </div>
         </main>

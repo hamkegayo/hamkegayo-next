@@ -19,6 +19,7 @@
         "test:payapi": "node --env-file=.env.local scripts/test-payment-api.mjs",
         "test:withdrawal": "node --env-file=.env.local scripts/test-withdrawal.mjs",
         "test:payout": "node --env-file=.env.local scripts/test-payout-account.mjs",
+        "test:agreements": "node --env-file=.env.local scripts/test-agreements.mjs",
         "prepare": "husky"
     },
     "dependencies": {
