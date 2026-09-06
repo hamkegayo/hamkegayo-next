@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { createClient } from "@/utils/supabase/server";
 import { ExtensionPayView } from "./extension-pay-view";
 import { COMPANY } from "@/lib/legal/company";
+import { PayShell } from "../_components/pay-shell";
 
 /**
  * 추가결제 링크 페이지 (#75) — 약관 제21조 ⑤.
@@ -37,19 +39,9 @@ const REASON_LABEL: Record<string, string> = {
     NO_SHOW: "이용자 미도착",
 };
 
-function Shell({ children }: { children: React.ReactNode }) {
-    return (
-        <main className="flex min-h-screen items-center justify-center px-4 py-16">
-            <div className="border-border bg-background w-full max-w-md rounded-2xl border p-7 md:p-8">
-                {children}
-            </div>
-        </main>
-    );
-}
-
 function Notice({ title, body }: { title: string; body: string }) {
     return (
-        <Shell>
+        <PayShell>
             <h1 className="text-foreground text-xl font-extrabold">{title}</h1>
             <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
                 {body}
@@ -57,7 +49,7 @@ function Notice({ title, body }: { title: string; body: string }) {
             <p className="text-muted-foreground mt-6 text-xs">
                 문의 : 함께가요 고객센터 {COMPANY.tel} ({COMPANY.hours})
             </p>
-        </Shell>
+        </PayShell>
     );
 }
 
@@ -104,7 +96,7 @@ export default async function ExtensionPayPage({
     const clientId = process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY ?? "";
 
     return (
-        <Shell>
+        <PayShell>
             <p className="text-muted-foreground text-xs font-semibold">
                 함께가요 병원동행
             </p>
@@ -151,6 +143,27 @@ export default async function ExtensionPayPage({
                 카드 정보는 결제사가 직접 처리하며 함께가요는 저장하지 않습니다.
                 이 화면에는 이용자 정보가 표시되지 않습니다.
             </p>
-        </Shell>
+
+            {/*
+              푸터에도 있지만 결제 버튼 옆에 한 번 더 둔다. 이 링크는 메일로
+              전달되어 홈페이지를 거치지 않고 바로 열리므로, 결제 직전에
+              기준을 확인할 수 있어야 한다.
+            */}
+            <p className="text-muted-foreground mt-2.5 text-xs">
+                <Link
+                    href="/terms"
+                    className="hover:text-foreground underline underline-offset-4"
+                >
+                    이용약관
+                </Link>
+                <span className="mx-1.5">·</span>
+                <Link
+                    href="/refund-policy"
+                    className="hover:text-foreground underline underline-offset-4"
+                >
+                    취소·환불 정책
+                </Link>
+            </p>
+        </PayShell>
     );
 }
