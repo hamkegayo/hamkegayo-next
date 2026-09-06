@@ -1,7 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { planDisplay, type PlanCode } from "@/lib/reservation";
 import type { Settlement, SettlementSummary } from "./settlement";
-import { kstDateDot } from "@/lib/format";
+import { formatUseDate, kstDateDot } from "@/lib/format";
 
 /**
  * 정산 이력은 partner_list_settlements() RPC 로 읽는다 — #66 · #67
@@ -23,13 +23,8 @@ type SettlementRow = {
     created_at: string;
 };
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-
 function formatDate(useDate: string): string {
-    const [y, mo, d] = useDate.split("-").map((n) => Number(n));
-    if (!y || !mo || !d) return useDate;
-    const weekday = WEEKDAYS[new Date(y, mo - 1, d).getDay()] ?? "";
-    return `${y}.${String(mo).padStart(2, "0")}.${String(d).padStart(2, "0")} (${weekday})`;
+    return formatUseDate(useDate);
 }
 
 /** ISO → "YYYY.MM.DD" */

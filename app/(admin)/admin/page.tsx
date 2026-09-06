@@ -20,10 +20,7 @@ const ACTION_LABEL: Record<string, string> = {
 };
 
 function formatAt(iso: string): string {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso;
-    const p = (n: number) => String(n).padStart(2, "0");
-    return kstDateTime(d) ?? "";
+    return kstDateTime(iso) ?? iso;
 }
 
 export default async function AdminHome() {

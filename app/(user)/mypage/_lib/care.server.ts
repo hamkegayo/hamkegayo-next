@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { koreanAgeLabel } from "@/lib/format";
 
 export type CareRecipient = {
     id: string;
@@ -22,20 +23,9 @@ type Row = {
     phone: string | null;
 };
 
-/** birth("YYYY-MM-DD") → "N세" (만 나이) */
+/** birth("YYYY-MM-DD") → "N세" (만 나이 · KST 기준) */
 function ageLabel(birth: string | null): string {
-    if (!birth) return "";
-    const [y, mo, d] = birth.split("-").map((n) => Number(n));
-    if (!y) return "";
-    const now = new Date();
-    let age = now.getFullYear() - y;
-    if (
-        now.getMonth() + 1 < mo ||
-        (now.getMonth() + 1 === mo && now.getDate() < d)
-    ) {
-        age -= 1;
-    }
-    return `${age}세`;
+    return koreanAgeLabel(birth);
 }
 
 function toView(r: Row): CareRecipient {

@@ -78,6 +78,56 @@ export function kstToday(): string {
     return kstDate(new Date())!;
 }
 
+/** ISO → "YYYYMMDD" (KST). 예약번호처럼 구분자 없는 자리. */
+export function kstCompactDate(
+    value: string | number | Date | null,
+): string | null {
+    const p = parts(value);
+    return p && `${p.y}${p.mo}${p.d}`;
+}
+
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
+
+/**
+ * "YYYY-MM-DD" 의 요일.
+ *
+ *  날짜 문자열에서 바로 계산한다. `new Date(y, mo-1, d).getDay()` 는
+ *  실행 환경의 자정을 만들어 읽는 방식이라 시간대에 걸리기 쉬운데,
+ *  `Date.UTC` 로 만들어 `getUTCDay()` 를 읽으면 어디서 돌든 같다.
+ */
+export function weekdayOf(useDate: string): string {
+    const [y, mo, d] = useDate.split("-").map((n) => Number(n));
+    if (!y || !mo || !d) return "";
+    return WEEKDAYS[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()] ?? "";
+}
+
+/** "YYYY-MM-DD" → "YYYY.MM.DD (요일)". 형식이 아니면 원본 그대로. */
+export function formatUseDate(useDate: string): string {
+    const [y, mo, d] = useDate.split("-").map((n) => Number(n));
+    if (!y || !mo || !d) return useDate;
+    const mm = String(mo).padStart(2, "0");
+    const dd = String(d).padStart(2, "0");
+    return `${y}.${mm}.${dd} (${weekdayOf(useDate)})`;
+}
+
+/**
+ * 생년월일("YYYY-MM-DD") → "N세" (만 나이). 값이 없으면 빈 문자열.
+ *
+ *  기준일은 KST 의 오늘이다. 서버가 UTC 로 돌면 생일 당일 오전에 한 살
+ *  적게 나온다.
+ */
+export function koreanAgeLabel(birth: string | null): string {
+    if (!birth) return "";
+    const [y, mo, d] = birth.split("-").map((n) => Number(n));
+    if (!y) return "";
+    const [ty, tmo, td] = kstToday()
+        .split("-")
+        .map((n) => Number(n));
+    let age = ty - y;
+    if (tmo < mo || (tmo === mo && td < d)) age -= 1;
+    return `${age}세`;
+}
+
 /**
  * 휴대폰번호 자동 하이픈 포맷.
  * 숫자만 추출해 최대 11자리로 자르고 3-4-4(휴대폰) 형태로 변환한다.

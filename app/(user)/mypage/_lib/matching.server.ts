@@ -1,5 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
-import { kstStamp, toHhmm } from "@/lib/format";
+import { kstStamp, toHhmm, weekdayOf } from "@/lib/format";
 import {
     planDisplay,
     RESERVATION_STATUS_LABEL,
@@ -39,13 +39,11 @@ type ReservationRow = {
     confirmed_partner_id: string | null;
 };
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-
 /** "YYYY-MM-DD" → "YYYY.MM.DD (요일)" */
 function formatDate(useDate: string): string {
     const [y, mo, d] = useDate.split("-").map((n) => Number(n));
     if (!y || !mo || !d) return useDate;
-    const weekday = WEEKDAYS[new Date(y, mo - 1, d).getDay()] ?? "";
+    const weekday = weekdayOf(useDate);
     const mm = String(mo).padStart(2, "0");
     const dd = String(d).padStart(2, "0");
     return `${y}.${mm}.${dd} (${weekday})`;

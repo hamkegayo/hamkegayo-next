@@ -1,6 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { planDisplay, type PlanCode } from "@/lib/reservation";
-import { kstTime } from "@/lib/format";
+import { formatUseDate, koreanAgeLabel, kstTime } from "@/lib/format";
 
 /** 리포트 목록 항목 — 완료된 서비스 기준 */
 export type ReportListItem = {
@@ -68,27 +68,12 @@ export type ReportContext = {
     attachments: ReportAttachmentView[];
 };
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-
 function formatDate(useDate: string): string {
-    const [y, mo, d] = useDate.split("-").map((n) => Number(n));
-    if (!y || !mo || !d) return useDate;
-    const weekday = WEEKDAYS[new Date(y, mo - 1, d).getDay()] ?? "";
-    return `${y}.${String(mo).padStart(2, "0")}.${String(d).padStart(2, "0")} (${weekday})`;
+    return formatUseDate(useDate);
 }
 
 function ageLabel(birth: string): string {
-    const [y, mo, d] = birth.split("-").map((n) => Number(n));
-    if (!y) return "";
-    const now = new Date();
-    let age = now.getFullYear() - y;
-    if (
-        now.getMonth() + 1 < mo ||
-        (now.getMonth() + 1 === mo && now.getDate() < d)
-    ) {
-        age -= 1;
-    }
-    return `${age}세`;
+    return koreanAgeLabel(birth);
 }
 
 type ListRow = {

@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { runExpirySweep } from "@/lib/expire-matchings";
+import { weekdayOf } from "@/lib/format";
 import {
     PLAN_INFO,
     RESERVATION_STATUS_LABEL,
@@ -39,15 +40,13 @@ type Row = {
     created_at: string;
 };
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-
 /** "YYYY-MM-DD" + "HH:mm" → "YYYY.MM.DD (요일) 오전/오후 h:mm" */
 function formatDateTime(useDate: string, reserveTime: string): string {
     const [y, mo, d] = useDate.split("-").map((n) => Number(n));
     const t = /^(\d{1,2}):(\d{2})/.exec(reserveTime.trim());
     if (!y || !mo || !d || !t) return `${useDate} ${reserveTime}`;
 
-    const weekday = WEEKDAYS[new Date(y, mo - 1, d).getDay()] ?? "";
+    const weekday = weekdayOf(useDate);
     const mm = String(mo).padStart(2, "0");
     const dd = String(d).padStart(2, "0");
 

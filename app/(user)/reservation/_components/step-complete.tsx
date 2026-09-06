@@ -16,18 +16,14 @@ import type { LucideIcon } from "lucide-react";
 import { Section } from "@/app/(user)/_components/home/section";
 import { useReservationStore, PLAN_INFO } from "../_store/reservation-store";
 import { StepBand } from "./step-band";
-
-const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
+import { kstCompactDate, kstDate, weekdayOf } from "@/lib/format";
 
 function formatVisit(dateStr: string, time: string) {
     if (!dateStr) return "-";
-    const d = new Date(dateStr);
-    if (Number.isNaN(d.getTime())) return time || "-";
-    const wd = WEEKDAY[d.getDay()];
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}. ${m}. ${day} (${wd}) ${time}`.trim();
+    const ymd = kstDate(dateStr);
+    if (!ymd) return time || "-";
+    const [y, m, day] = ymd.split("-");
+    return `${y}. ${m}. ${day} (${weekdayOf(ymd)}) ${time}`.trim();
 }
 
 const NEXT_STEPS: { icon: LucideIcon; title: string; desc: string }[] = [
@@ -79,8 +75,7 @@ export function StepComplete() {
     // 서버가 발급한 예약번호 사용 (없으면 표시용 임시 생성)
     const [reservationNo] = useState(() => {
         if (data.reservationCode) return data.reservationCode;
-        const now = new Date();
-        const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+        const ymd = kstCompactDate(new Date()) ?? "00000000";
         const rand = String(Math.floor(1000 + Math.random() * 9000));
         return `R${ymd}-${rand}`;
     });
