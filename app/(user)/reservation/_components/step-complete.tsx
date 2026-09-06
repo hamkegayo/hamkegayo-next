@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
     CalendarDays,
@@ -65,9 +65,16 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
 }
 
 export function StepComplete() {
-    const { data } = useReservationStore();
+    const { data, finish } = useReservationStore();
     const plan = PLAN_INFO[data.plan || "basic"];
     const partnerName = data.confirmedPartnerName;
+
+    // 예약이 완료된 시점부터 이 플로우는 끝난 것으로 본다.
+    // 표시만 해두면 홈·예약현황 링크는 물론 브라우저 뒤로가기로 빠져나가도
+    // 다음 진입 때 ReservationFlow 가 STEP1 부터 다시 시작한다.
+    useEffect(() => {
+        finish();
+    }, [finish]);
 
     // 서버가 발급한 예약번호 사용 (없으면 표시용 임시 생성)
     const [reservationNo] = useState(() => {
@@ -85,7 +92,7 @@ export function StepComplete() {
     return (
         <>
             <StepBand
-                index={7}
+                index={8}
                 title="예약이 확정되었습니다."
                 subtitles={[
                     "선택하신 파트너와의 매칭이 확정되었습니다.",
@@ -161,7 +168,9 @@ export function StepComplete() {
                             />
                             <InfoRow
                                 label="병원"
-                                value={data.hospitalAddress}
+                                value={
+                                    data.hospitalName || data.hospitalAddress
+                                }
                             />
                             <InfoRow label="이용자" value={data.userName} />
                             <InfoRow label="연락처" value={data.userPhone} />

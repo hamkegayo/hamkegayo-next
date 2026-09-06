@@ -46,8 +46,15 @@ let sender: EmailSender | null = null;
  */
 export function getEmailSender(): EmailSender {
     if (sender) return sender;
-    const apiKey = process.env.RESEND_API_KEY;
-    const from = process.env.EMAIL_FROM ?? "함께가요 <no-reply@hamkegayo.kr>";
+
+    // ⚠️ `??` 를 쓰면 안 된다. .env 에 `EMAIL_FROM=` 처럼 **빈 값**으로 적힌 경우
+    //    `??` 는 폴백하지 않아 발신자가 "" 로 나가고, Resend 가
+    //    "The domain is invalid"(422) 로 거부한다 — 메일이 통째로 안 나간다.
+    //    키도 마찬가지다. 빈 문자열이면 Mock 으로 떨어져야 한다.
+    const apiKey = process.env.RESEND_API_KEY?.trim();
+    const from =
+        process.env.EMAIL_FROM?.trim() || "함께가요 <no-reply@hamkegayo.kr>";
+
     sender = apiKey
         ? new ResendEmailSender(apiKey, from)
         : new MockEmailSender();

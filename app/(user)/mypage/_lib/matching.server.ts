@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { toHhmm } from "@/lib/format";
 import {
     planDisplay,
     RESERVATION_STATUS_LABEL,
@@ -48,12 +49,6 @@ function formatDate(useDate: string): string {
     const mm = String(mo).padStart(2, "0");
     const dd = String(d).padStart(2, "0");
     return `${y}.${mm}.${dd} (${weekday})`;
-}
-
-/** "HH:mm:ss"/"HH:mm" → "HH:mm" */
-function toHhmm(time: string): string {
-    const m = /^(\d{1,2}):(\d{2})/.exec(time.trim());
-    return m ? `${m[1].padStart(2, "0")}:${m[2]}` : time;
 }
 
 /** 지원 시각 라벨 (MM.DD HH:mm) */

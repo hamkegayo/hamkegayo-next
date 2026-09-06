@@ -115,16 +115,21 @@ export function trackAddToCart(plan: PlanCode): void {
 
 /**
  * 예약 신청 완료 (서버가 성공 응답을 반환한 직후 콜백에서 호출).
- * GA generate_lead 유지 + Pixel Schedule/Lead (금액은 선택 상품에서).
+ * GA generate_lead 유지 + Pixel Schedule/Lead.
  * 단순 신청 접수이므로 Purchase 는 사용하지 않는다.
+ *
+ * @param amount 선결제 예상액(원). 없으면 시간당 기본요금으로 갈음한다.
  */
-export function trackReservationComplete(plan: PlanCode): void {
+export function trackReservationComplete(
+    plan: PlanCode,
+    amount?: number,
+): void {
     gaEvent("generate_lead");
     const info = PLAN_INFO[plan];
     const params: PixelParams = {
         content_name: info.label,
         content_ids: [plan],
-        value: info.price,
+        value: amount ?? info.price,
         currency: "KRW",
     };
     pixel("Schedule", params);

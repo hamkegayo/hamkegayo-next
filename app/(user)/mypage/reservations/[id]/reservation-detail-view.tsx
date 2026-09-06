@@ -17,7 +17,12 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ConfirmModal } from "@/components/ui/modal";
 import type { ReservationDetailView } from "../../_lib/detail.server";
-import { cancelConfirmedReservation } from "../../_actions/matching";
+import {
+    cancelConfirmedReservation,
+    getCancelPreview,
+} from "../../_actions/matching";
+import type { RefundPreview } from "@/lib/payments/refund";
+import { CancelRefundNotice } from "./cancel-refund-notice";
 
 const STEPS: { label: string; icon: LucideIcon }[] = [
     { label: "파트너 확정", icon: UserRound },
@@ -58,6 +63,28 @@ export function ReservationDetailView({ r }: { r: ReservationDetailView }) {
     const [cancelOpen, setCancelOpen] = useState(false);
     const [pending, startTransition] = useTransition();
 
+    // 취소수수료는 남은 시간에 따라 달라진다(제19조). 모달을 열 때 그 시점
+    // 기준으로 받아온다 — 상세 페이지 로드 시점에 미리 받아두면 오래 열어둔
+    // 화면에서 구간이 바뀌어 안내와 실제가 어긋난다.
+    const [preview, setPreview] = useState<RefundPreview | null>(null);
+    const [previewLoading, setPreviewLoading] = useState(false);
+
+    const openCancel = () => {
+        setCancelOpen(true);
+        setPreview(null);
+        setPreviewLoading(true);
+        startTransition(async () => {
+            const res = await getCancelPreview(r.id);
+            setPreviewLoading(false);
+            if (res.ok) {
+                setPreview(res.preview);
+            } else {
+                setCancelOpen(false);
+                toast.error(res.message);
+            }
+        });
+    };
+
     const isCancelled = r.status === "CANCELLED";
     const stepTimes = [r.confirmedAtLabel, r.startedAtLabel, r.endedAtLabel];
 
@@ -66,7 +93,13 @@ export function ReservationDetailView({ r }: { r: ReservationDetailView }) {
             const res = await cancelConfirmedReservation(r.id);
             setCancelOpen(false);
             if (res.ok) {
-                toast.success("예약을 취소했습니다.");
+                // 금액을 다시 말해 준다. 모달에서 본 예상액과 실제가 같은지
+                // 확인할 수 있어야 한다.
+                toast.success(
+                    res.refundedCash
+                        ? `예약을 취소했습니다. ${res.refundedCash.toLocaleString()}원이 환불됩니다.`
+                        : "예약을 취소했습니다.",
+                );
                 router.push("/mypage");
                 router.refresh();
             } else {
@@ -182,32 +215,85 @@ export function ReservationDetailView({ r }: { r: ReservationDetailView }) {
                     </Card>
 
                     {/* 결제 정보 */}
-                    <Card title="결제 정보">
+                    <Card
+                        title={
+                            r.payment.isFinal ? "결제 정보" : "예상 결제 정보"
+                        }
+                    >
                         <div className="space-y-3 text-sm">
                             <div className="flex items-center justify-between">
                                 <span className="text-muted-foreground">
-                                    서비스 금액
+                                    이용요금 ({r.payment.durationLabel})
                                 </span>
                                 <span className="text-foreground font-semibold">
-                                    {r.amount.toLocaleString()}원
+                                    {r.payment.baseAmount.toLocaleString()}원
                                 </span>
                             </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">
-                                    추가 옵션
-                                </span>
-                                <span className="text-foreground font-semibold">
-                                    {r.extra.toLocaleString()}원
-                                </span>
-                            </div>
+
+                            {r.payment.surchargeAmount > 0 && (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground">
+                                        주말·공휴일 할증 30%
+                                    </span>
+                                    <span className="text-foreground font-semibold">
+                                        +
+                                        {r.payment.surchargeAmount.toLocaleString()}
+                                        원
+                                    </span>
+                                </div>
+                            )}
+
                             <div className="border-border mt-2 flex items-center justify-between border-t pt-3">
                                 <span className="text-foreground font-bold">
-                                    총 결제 금액
+                                    {r.payment.isFinal
+                                        ? "최종 이용요금"
+                                        : "예상 이용요금"}
                                 </span>
                                 <span className="text-foreground text-lg font-extrabold">
-                                    {r.total.toLocaleString()}원
+                                    {r.payment.total.toLocaleString()}원
                                 </span>
                             </div>
+
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">
+                                    선결제 금액
+                                </span>
+                                <span className="text-foreground font-semibold">
+                                    {r.payment.prepaidAmount.toLocaleString()}원
+                                </span>
+                            </div>
+
+                            {r.payment.additional > 0 && (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-destructive font-bold">
+                                        추가 결제 필요
+                                    </span>
+                                    <span className="text-destructive font-extrabold">
+                                        {r.payment.additional.toLocaleString()}
+                                        원
+                                    </span>
+                                </div>
+                            )}
+
+                            {r.payment.refund > 0 && (
+                                <div className="flex items-center justify-between">
+                                    <span className="text-brand font-bold">
+                                        환불 예정
+                                    </span>
+                                    <span className="text-brand font-extrabold">
+                                        {r.payment.refund.toLocaleString()}원
+                                    </span>
+                                </div>
+                            )}
+
+                            {!r.payment.isFinal && (
+                                <p className="text-muted-foreground border-border border-t pt-3 text-xs leading-relaxed">
+                                    선결제 후 서비스가 종료되면 실제
+                                    이용시간으로 최종 요금을 산정합니다. 남는
+                                    금액은 환불하고, 모자란 금액은 추가결제를
+                                    안내드립니다. 최소 1시간분은 청구됩니다.
+                                </p>
+                            )}
                         </div>
                     </Card>
 
@@ -215,7 +301,7 @@ export function ReservationDetailView({ r }: { r: ReservationDetailView }) {
                         <div className="flex justify-end">
                             <button
                                 type="button"
-                                onClick={() => setCancelOpen(true)}
+                                onClick={openCancel}
                                 disabled={pending}
                                 className="border-destructive/40 text-destructive hover:bg-destructive/5 inline-flex items-center gap-1.5 rounded-lg border px-5 py-2.5 text-sm font-bold transition-colors disabled:opacity-60"
                             >
@@ -308,12 +394,18 @@ export function ReservationDetailView({ r }: { r: ReservationDetailView }) {
                 title="예약을 취소할까요?"
                 cancelLabel="돌아가기"
                 confirmLabel="예약 취소"
-                confirmDisabled={pending}
+                // 금액을 보기 전에는 누를 수 없다. 보여 주지 않고 받는 동의는
+                // 동의가 아니다.
+                confirmDisabled={pending || previewLoading}
             >
                 <p className="text-muted-foreground mt-3 text-left text-sm leading-relaxed">
                     확정된 예약이 취소되며, 배정된 파트너에게 취소가 안내됩니다.
                     되돌릴 수 없습니다.
                 </p>
+                <CancelRefundNotice
+                    preview={preview}
+                    loading={previewLoading}
+                />
             </ConfirmModal>
         </div>
     );

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { getSessionProfile } from "./_lib/profile";
 import { getMyReservations } from "./_lib/reservations.server";
+import { UnpaidCharges } from "./_components/unpaid-charges";
 
 const STEPS: { label: string; icon: LucideIcon }[] = [
     { label: "파트너 확정", icon: UserRound },
@@ -32,6 +33,9 @@ export default async function MypageHome() {
             <p className="text-muted-foreground mt-2">
                 현재 예약 현황과 내 정보를 확인하세요.
             </p>
+
+            {/* 미결제 안내 — 있을 때만 뜬다 (#75 · 약관 제22조) */}
+            <UnpaidCharges />
 
             {/* 현재 진행 중인 예약 */}
             <h2 className="text-foreground mt-10 text-lg font-bold">

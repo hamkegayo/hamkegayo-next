@@ -299,9 +299,12 @@ auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
 max_enrolled_factors = 10
 
 # Control MFA via App Authenticator (TOTP)
+# 관리자 계정 2단계 인증에 사용한다 (#50). is_admin() 이 aal2 를 요구하므로
+# 이걸 끄면 관리자가 아무 데이터도 읽지 못한다.
+# ⚠️ 운영 프로젝트는 Supabase 대시보드에서도 MFA(TOTP)를 켜야 한다.
 [auth.mfa.totp]
-enroll_enabled = false
-verify_enabled = false
+enroll_enabled = true
+verify_enabled = true
 
 # Configure MFA via Phone Messaging
 [auth.mfa.phone]

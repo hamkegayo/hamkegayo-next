@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -10,31 +10,66 @@ import {
     FileText,
     Hourglass,
     House,
+    MapPin,
     Play,
     Square,
     Upload,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+    END_METHOD_LABEL,
+    HANDOVER_FAIL_WAIT_MIN,
+    NOTIFY_TARGET_LABEL,
+    NO_SHOW_WAIT_MIN,
+    REPORT_CHANNEL,
+    TRANSPORT_LABEL,
+    type EndMethodCode,
+    type NotifyTargetCode,
+    type TransportCode,
+} from "@/lib/handover";
 
 import { cn } from "@/lib/utils";
-import type { PartnerServiceView } from "../../../_lib/services.server";
+import type {
+    PartnerServiceView,
+    ServiceNoticeView,
+} from "../../../_lib/services.server";
 import {
+    arriveService,
     completeService,
     endService,
+    endServiceNoShow,
+    recordServiceTime,
+    SERVICE_TIME_FIELDS,
     startService,
+    type ServiceTimeField,
 } from "../../_actions/services";
 import { EndServiceModal } from "../../../_components/end-service-modal";
 import { ServiceFeedbackModal } from "../../../_components/service-feedback-modal";
+import {
+    ServiceNoticeModal,
+    type NoticeKind,
+} from "../../../_components/service-notice-modal";
 
 type MemoTab = "start" | "end";
 
+const NOTICE_LABEL: Record<NoticeKind, string> = {
+    OVERRUN_NOTICE: "예정 종료 초과 알림",
+    BUTTON_ERROR: "버튼 오류",
+};
+
 export function ServiceDetailView({
     service,
+    notices,
 }: {
     service: PartnerServiceView;
+    notices: ServiceNoticeView[];
 }) {
     const router = useRouter();
     const item = service;
+
+    // 신고 모달 — 열려 있는 종류가 곧 상태다. 닫으면 컴포넌트가 사라져
+    // 입력값도 함께 사라진다(useEffect 로 되돌리지 않는다).
+    const [noticeKind, setNoticeKind] = useState<NoticeKind | null>(null);
 
     // 초기 진행 상태를 서비스 상태(state)로부터 파생
     const initial = useMemo(() => {
@@ -50,6 +85,9 @@ export function ServiceDetailView({
         }
     }, [service.state]);
 
+    const [arrived, setArrived] = useState(
+        !!service.arrivedAtLabel || initial.started,
+    );
     const [started, setStarted] = useState(initial.started);
     const [ended, setEnded] = useState(initial.ended);
     const [done, setDone] = useState(initial.done);
@@ -62,7 +100,65 @@ export function ServiceDetailView({
     const [startMemo, setStartMemo] = useState(service.startMemo ?? "");
     const [endMemo, setEndMemo] = useState(service.endMemo ?? "");
 
+    const cond = service.conditions;
     const startAt = `${item.dateLabel} ${service.startedAtLabel ?? "-"}`;
+
+    /**
+     * 예약시각까지 남은 시간. 1초마다 다시 센다.
+     *
+     *  서버가 예약시각 전 시작을 거절하므로(매뉴얼 4단계) 화면에서도 막는다.
+     *  막기만 하면 파트너는 왜 안 눌리는지 모른다.
+     */
+    const plannedStartMs = service.plannedStartAt
+        ? new Date(service.plannedStartAt).getTime()
+        : null;
+    const [now, setNow] = useState(() => Date.now());
+
+    useEffect(() => {
+        if (plannedStartMs === null || started) return;
+        const id = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(id);
+    }, [plannedStartMs, started]);
+
+    // 시계 오차 여유는 서버(1분)와 맞춘다.
+    const canStart = plannedStartMs === null || now >= plannedStartMs - 60_000;
+    const countdown =
+        canStart || plannedStartMs === null
+            ? null
+            : remainingLabel(plannedStartMs - now);
+
+    const onRecord = (field: ServiceTimeField, label: string) => {
+        startTransition(async () => {
+            const res = await recordServiceTime(service.id, field);
+            if (!res.ok) {
+                toast.error(res.message);
+                return;
+            }
+            toast.success(`${label} 시각을 기록했어요.`);
+            router.refresh();
+        });
+    };
+
+    // 기록된 것 / 다음 차례 하나 / 아직 남은 것으로 가른다.
+    const recorded = SERVICE_TIME_FIELDS.filter((f) => service.times[f.field]);
+    const pendingFields = SERVICE_TIME_FIELDS.filter(
+        (f) => !service.times[f.field],
+    );
+    const next = pendingFields[0] ?? null;
+    const others = pendingFields.slice(1);
+
+    const onNoShow = () => {
+        startTransition(async () => {
+            const res = await endServiceNoShow(service.id);
+            if (!res.ok) {
+                toast.error(res.message);
+                return;
+            }
+            toast.success("이용자 미도착으로 종료했어요.");
+            router.refresh();
+        });
+    };
+
     const endAt = `${item.dateLabel} ${service.endedAtLabel ?? "-"}`;
     const serviceName = `${item.hospital} ${item.type}`;
 
@@ -86,6 +182,19 @@ export function ServiceDetailView({
                   cls: "bg-blue-100 text-blue-600 dark:bg-blue-500/15",
                   dot: "bg-blue-500",
               };
+
+    const onArrive = () => {
+        startTransition(async () => {
+            const res = await arriveService(service.id);
+            if (res.ok) {
+                setArrived(true);
+                toast.success("도착이 기록되고 보호자에게 안내되었습니다.");
+                router.refresh();
+            } else {
+                toast.error(res.message);
+            }
+        });
+    };
 
     const onStart = () => {
         startTransition(async () => {
@@ -160,7 +269,15 @@ export function ServiceDetailView({
                         <SummaryRow label="서비스 시작" value={startAt} />
                         <SummaryRow label="서비스 종료" value={endAt} />
                         <SummaryRow
-                            label="예상 정산 금액"
+                            label="청구 이용시간"
+                            value={item.durationLabel}
+                        />
+                        <SummaryRow
+                            label={
+                                item.amountProvisional
+                                    ? "예상 정산 금액"
+                                    : "정산 금액"
+                            }
                             value={`${item.amount.toLocaleString()}원`}
                             valueClass="text-brand"
                         />
@@ -278,16 +395,385 @@ export function ServiceDetailView({
                 </div>
                 <div className="border-border shrink-0 border-t pt-4 text-right md:border-t-0 md:border-l md:pt-0 md:pl-8">
                     <p className="text-muted-foreground text-sm">
-                        예상 정산 금액
+                        {item.amountProvisional
+                            ? "예상 정산 금액"
+                            : "정산 금액"}
                     </p>
                     <p className="text-brand mt-1 text-3xl font-extrabold">
                         {item.amount.toLocaleString()}원
                     </p>
                     <p className="text-muted-foreground text-xs">
-                        (기본 요금 포함)
+                        {item.durationLabel} 기준 · 수수료 차감 후
+                        {item.surcharged ? " · 주말·공휴일 할증 적용" : ""}
                     </p>
+                    {item.amountProvisional && (
+                        <p className="text-muted-foreground text-xs">
+                            (실제 이용시간에 따라 종료 후 확정)
+                        </p>
+                    )}
                 </div>
             </div>
+
+            {/*
+             * 수행 조건 — 매뉴얼 1장이 업무 시작 조건으로 정한 항목 (#77).
+             * 인계자 성명·연락처는 제3자 개인정보라 **확정 후에만** 내려온다
+             * (처리방침 제5조 ②③). 수락 검토 화면에는 나오지 않는다.
+             */}
+            <div className="border-border bg-background mt-5 rounded-2xl border p-6 md:p-7">
+                <h2 className="text-foreground text-lg font-bold">수행 조건</h2>
+                <p className="text-muted-foreground mt-1 text-sm">
+                    업무 시작 전에 아래 항목을 확인해 주세요. 비어 있거나 현장
+                    상황과 다르면 운영센터에 확인합니다.
+                </p>
+
+                <div className="divide-border mt-5 grid gap-x-10 divide-y md:grid-cols-2 md:divide-y-0">
+                    <div className="divide-border divide-y">
+                        <PlanRow
+                            label="병원까지 이동"
+                            value={transportLabel(cond.transportTo)}
+                        />
+                        <PlanRow
+                            label="귀가수단"
+                            value={transportLabel(cond.transportHome)}
+                        />
+                        <PlanRow
+                            label="종료 방식"
+                            value={
+                                cond.endMethod
+                                    ? (END_METHOD_LABEL[
+                                          cond.endMethod as EndMethodCode
+                                      ] ?? MISSING)
+                                    : MISSING
+                            }
+                        />
+                    </div>
+                    <div className="divide-border divide-y">
+                        <PlanRow
+                            label="통보 대상"
+                            value={
+                                cond.notifyTarget
+                                    ? (NOTIFY_TARGET_LABEL[
+                                          cond.notifyTarget as NotifyTargetCode
+                                      ] ?? MISSING)
+                                    : MISSING
+                            }
+                        />
+                        {/*
+                         * 약관 제8조 ①·대응카드 16 — 이용자가 동의하지 않았으면
+                         * 보호자에게 진료 내용을 전달하지 않는다.
+                         */}
+                        <PlanRow
+                            label="진료정보 전달"
+                            value={
+                                cond.shareMedicalInfo
+                                    ? "보호자에게 전달 동의"
+                                    : "전달 불가 (이용자 미동의)"
+                            }
+                            valueClass={
+                                cond.shareMedicalInfo
+                                    ? undefined
+                                    : "text-destructive"
+                            }
+                        />
+                        <PlanRow label="결과보고 경로" value={REPORT_CHANNEL} />
+                    </div>
+                </div>
+
+                {cond.handover && (
+                    <div className="border-border mt-5 border-t pt-5">
+                        <p className="text-foreground text-sm font-bold">
+                            인계자
+                        </p>
+                        <p className="text-muted-foreground mt-1 text-sm">
+                            현장에서 성함·관계·연락처를 대조한 뒤 인계합니다
+                            (매뉴얼 12단계).
+                        </p>
+                        <div className="divide-border mt-3 divide-y">
+                            <PlanRow
+                                label="성함"
+                                value={`${cond.handover.name}${
+                                    cond.handover.relation
+                                        ? ` (${cond.handover.relation})`
+                                        : ""
+                                }`}
+                            />
+                            <PlanRow
+                                label="연락처"
+                                value={cond.handover.phone ?? MISSING}
+                            />
+                            {cond.backupHandover && (
+                                <PlanRow
+                                    label="대체 인계자"
+                                    value={`${cond.backupHandover.name}${
+                                        cond.backupHandover.relation
+                                            ? ` (${cond.backupHandover.relation})`
+                                            : ""
+                                    }${
+                                        cond.backupHandover.phone
+                                            ? ` · ${cond.backupHandover.phone}`
+                                            : ""
+                                    }`}
+                                />
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/*
+                 * 대기 기준은 예약별 값이 아니다 — 미도착은 약관 제15조 ③④ 가,
+                 * 인계 실패는 회사 정책이 정한다. 파트너가 현장에서 임의로
+                 * 판단하지 않도록 숫자를 그대로 보여 준다.
+                 */}
+                <p className="text-muted-foreground border-border mt-5 rounded-xl border border-dashed px-4 py-3 text-xs leading-relaxed">
+                    이용자가 약속 장소에 나오지 않으면 예약시각부터{" "}
+                    <b className="text-foreground">{NO_SHOW_WAIT_MIN}분</b>,
+                    인계자가 오지 않으면{" "}
+                    <b className="text-foreground">
+                        {HANDOVER_FAIL_WAIT_MIN}분
+                    </b>{" "}
+                    기다린 뒤 종료합니다. 그 전에는 현장을 떠나지 않습니다.
+                </p>
+            </div>
+
+            {/*
+             * 진행 시각 기록 (#55) — 매뉴얼이 각 단계에서 기록하라고 정한 항목.
+             * 약관 제12조 ④ 는 이용시간 분쟁 시 시작·종료시각 **외에** 도착
+             * 안내시각과 진행기록을 함께 확인한다고 정한다.
+             *
+             * 시각은 서버가 찍는다. 매뉴얼이 임의 시각 입력을 금지하므로
+             * 화면에는 "지금 눌렀다" 는 버튼만 둔다.
+             */}
+            {started && (
+                <div className="border-border bg-background mt-5 rounded-2xl border p-6 md:p-7">
+                    <h2 className="text-foreground text-lg font-bold">
+                        진행 기록
+                    </h2>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                        각 단계가 끝날 때 눌러주세요. 누른 시각이 그대로
+                        기록되고 결과보고에 반영됩니다. 이미 기록된 항목은 다시
+                        눌러도 바뀌지 않습니다.
+                    </p>
+
+                    {/* 이미 기록한 단계 — 한 줄씩 조용히 쌓인다 */}
+                    {recorded.length > 0 && (
+                        <ul className="divide-border border-border mt-5 divide-y rounded-xl border">
+                            {recorded.map((f) => (
+                                <li
+                                    key={f.field}
+                                    className="flex items-center justify-between px-4 py-2.5 text-sm"
+                                >
+                                    <span className="text-muted-foreground">
+                                        {f.label}
+                                    </span>
+                                    <span className="text-foreground font-bold">
+                                        {timeLabel(service.times[f.field]!)}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+
+                    {/*
+                      다음 단계 하나만 크게 띄운다. 11개를 한꺼번에 늘어놓으면
+                      현장에서 무엇을 누를 차례인지 매번 찾아야 한다.
+                    */}
+                    {next && (
+                        <button
+                            type="button"
+                            disabled={pending}
+                            onClick={() => onRecord(next.field, next.label)}
+                            className="border-brand/40 bg-brand/5 text-foreground hover:bg-brand/10 mt-3 flex w-full items-center justify-between rounded-xl border px-4 py-3.5 text-left transition-colors disabled:opacity-60"
+                        >
+                            <span>
+                                <span className="text-muted-foreground block text-xs">
+                                    다음 단계
+                                </span>
+                                <span className="text-sm font-bold">
+                                    {next.label}
+                                </span>
+                            </span>
+                            <span className="text-brand text-sm font-bold">
+                                지금 기록
+                            </span>
+                        </button>
+                    )}
+
+                    {/*
+                      순서를 건너뛰는 일이 실제로 있다. 대기 없이 바로 진료로
+                      들어가거나 약국을 들르지 않는 경우다. 접어두되 막지 않는다.
+                    */}
+                    {others.length > 0 && (
+                        <details className="border-border group mt-3 rounded-xl border">
+                            <summary className="text-muted-foreground hover:bg-muted/40 flex cursor-pointer list-none items-center justify-between rounded-xl px-4 py-2.5 text-sm select-none [&::-webkit-details-marker]:hidden">
+                                <span>다른 단계 기록하기</span>
+                                <span
+                                    aria-hidden
+                                    className="text-xs transition-transform group-open:rotate-180"
+                                >
+                                    ▼
+                                </span>
+                            </summary>
+                            <div className="border-border grid gap-2 border-t p-3 sm:grid-cols-2">
+                                {others.map((f) => (
+                                    <button
+                                        key={f.field}
+                                        type="button"
+                                        disabled={pending}
+                                        onClick={() =>
+                                            onRecord(f.field, f.label)
+                                        }
+                                        className="border-border bg-background text-foreground hover:bg-muted flex items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm transition-colors disabled:opacity-60"
+                                    >
+                                        <span className="font-semibold">
+                                            {f.label}
+                                        </span>
+                                        <span className="text-muted-foreground text-xs">
+                                            기록
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        </details>
+                    )}
+
+                    {/*
+                     * 대응카드 03 — 이용자가 나타나지 않으면 예약시각 정각에
+                     * 시작을 누르고 미도착 종료시각까지 기다린 뒤 종료한다.
+                     * 20분 전에는 서버가 거절한다.
+                     */}
+                    {!ended && (
+                        <div className="border-border mt-5 border-t pt-5">
+                            <p className="text-muted-foreground text-xs leading-relaxed">
+                                이용자를 만나지 못했다면 예약시각부터{" "}
+                                {NO_SHOW_WAIT_MIN}분간 기다린 뒤 아래로
+                                종료하세요. 그 전에는 현장을 떠나지 않습니다.
+                            </p>
+                            <button
+                                type="button"
+                                disabled={pending}
+                                onClick={onNoShow}
+                                className="border-destructive/40 text-destructive hover:bg-destructive/5 mt-3 w-full rounded-xl border px-4 py-3 text-sm font-bold transition-colors disabled:opacity-50"
+                            >
+                                이용자 미도착으로 종료
+                            </button>
+                        </div>
+                    )}
+
+                    {service.autoClosedAt && (
+                        <p className="border-border text-muted-foreground mt-5 rounded-xl border border-dashed px-4 py-3 text-xs leading-relaxed">
+                            종료 처리가 되지 않아 <b>시스템이 마감</b>했습니다.
+                            청구는 예정 종료시각까지만 반영됩니다. 실제 수행
+                            내용이 다르면 운영센터에 알려주세요.
+                        </p>
+                    )}
+                </div>
+            )}
+
+            {/*
+             * 현장 기록 (#55) — 매뉴얼 대응카드 13 · 26.
+             *
+             *  둘 다 파트너가 현장에서 판단하지 않고 사실만 남기는 자리다.
+             *  대응카드 13 은 "추가시간을 현장에서 확정하지 않는다" 고
+             *  금지하고, 26 은 "임의의 시각을 입력하지 않는다" 고 정한다.
+             *
+             *  버튼 오류는 시작 전에도, 완료된 뒤에도 신고할 수 있어야 한다.
+             *  시작 버튼이 안 눌리는 경우가 있고, 종료 버튼 오류는 결과보고를
+             *  쓰다가 뒤늦게 발견되는 일이 많다. 그래서 이 카드는 started
+             *  안에 넣지 않고 상태와 무관하게 둔다.
+             */}
+            <div className="border-border bg-background mt-5 rounded-2xl border p-6 md:p-7">
+                <h2 className="text-foreground text-lg font-bold">현장 기록</h2>
+                <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
+                    예정 종료시각을 넘기거나 버튼이 눌리지 않을 때 운영센터에
+                    알립니다. 현장에서 추가시간이나 시각을 직접 정하지 않습니다.
+                </p>
+
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    {started && !ended && (
+                        <button
+                            type="button"
+                            onClick={() => setNoticeKind("OVERRUN_NOTICE")}
+                            className="border-border bg-background text-foreground hover:bg-muted rounded-xl border px-4 py-3 text-left text-sm font-bold transition-colors"
+                        >
+                            예정 종료시각을 넘길 것 같아요
+                            <span className="text-muted-foreground mt-0.5 block text-xs font-normal">
+                                이용자·보호자에게 알린 사실을 남깁니다
+                            </span>
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setNoticeKind("BUTTON_ERROR")}
+                        className="border-border bg-background text-foreground hover:bg-muted rounded-xl border px-4 py-3 text-left text-sm font-bold transition-colors"
+                    >
+                        버튼이 눌리지 않아요
+                        <span className="text-muted-foreground mt-0.5 block text-xs font-normal">
+                            실제 시각과 오류 문구를 남깁니다
+                        </span>
+                    </button>
+                </div>
+
+                {/*
+                      현장 확인표가 "기록했다" 를 확인하라고 요구한다.
+                      확인할 자리가 없으면 규정이 지켜졌는지 알 수 없다.
+                    */}
+                {notices.length > 0 && (
+                    <ul className="divide-border border-border mt-4 divide-y rounded-xl border">
+                        {notices.map((n) => (
+                            <li key={n.id} className="px-4 py-3 text-sm">
+                                <div className="flex items-center justify-between gap-3">
+                                    <span className="text-foreground font-semibold">
+                                        {NOTICE_LABEL[n.kind]}
+                                        {n.occurredAtLabel && (
+                                            <span className="text-muted-foreground ml-2 font-normal">
+                                                {n.occurredAtLabel}
+                                            </span>
+                                        )}
+                                    </span>
+                                    <span
+                                        className={cn(
+                                            "shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold",
+                                            n.status === "RESOLVED"
+                                                ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15"
+                                                : "bg-amber-100 text-amber-600 dark:bg-amber-500/15",
+                                        )}
+                                    >
+                                        {n.status === "RESOLVED"
+                                            ? "확인됨"
+                                            : "전달됨"}
+                                    </span>
+                                </div>
+                                {(n.errorText || n.detail) && (
+                                    <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                                        {[n.errorText, n.detail]
+                                            .filter(Boolean)
+                                            .join(" · ")}
+                                    </p>
+                                )}
+                                {n.memo && (
+                                    <p className="text-foreground mt-1.5 text-xs leading-relaxed">
+                                        운영센터 : {n.memo}
+                                    </p>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+
+            {noticeKind && (
+                <ServiceNoticeModal
+                    open
+                    kind={noticeKind}
+                    serviceId={service.id}
+                    baseDate={service.plannedStartAt}
+                    onClose={() => setNoticeKind(null)}
+                    onDone={() => {
+                        setNoticeKind(null);
+                        router.refresh();
+                    }}
+                />
+            )}
 
             <div className="mt-5 grid gap-5 lg:grid-cols-2">
                 {/* 서비스 진행 */}
@@ -299,9 +785,43 @@ export function ServiceDetailView({
                         서비스 시작과 종료 시간을 기록해주세요.
                     </p>
 
-                    {/* STEP 1 - 시작 */}
+                    {/* STEP 1 - 도착 통보 */}
                     <StepBlock
                         index={1}
+                        title="현장 도착 통보"
+                        icon={MapPin}
+                        done={arrived}
+                    >
+                        {arrived ? (
+                            <RecordedBox
+                                label="도착 통보 완료"
+                                date={item.dateLabel}
+                                timeLabel="도착 시간"
+                                time={service.arrivedAtLabel ?? "-"}
+                            />
+                        ) : (
+                            <>
+                                <p className="text-muted-foreground text-sm">
+                                    약속 장소에 도착하면 눌러주세요. 보호자에게
+                                    도착이 안내되고, 이 시각부터 이용시간이
+                                    계산됩니다.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={onArrive}
+                                    disabled={pending}
+                                    className="bg-brand text-brand-foreground hover:bg-brand/90 mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-3 text-sm font-bold transition-colors disabled:opacity-60"
+                                >
+                                    <MapPin className="size-4" />
+                                    도착 통보
+                                </button>
+                            </>
+                        )}
+                    </StepBlock>
+
+                    {/* STEP 2 - 시작 */}
+                    <StepBlock
+                        index={2}
                         title="서비스 시작"
                         icon={Play}
                         done={started}
@@ -314,20 +834,43 @@ export function ServiceDetailView({
                                 time={service.startedAtLabel ?? "-"}
                             />
                         ) : (
-                            <button
-                                type="button"
-                                onClick={onStart}
-                                disabled={pending}
-                                className="bg-brand text-brand-foreground hover:bg-brand/90 w-full rounded-lg px-4 py-3 text-sm font-bold transition-colors disabled:opacity-60"
-                            >
-                                ▶ 서비스 시작
-                            </button>
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={onStart}
+                                    disabled={pending || !canStart}
+                                    className="bg-brand text-brand-foreground hover:bg-brand/90 inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-3 text-sm font-bold transition-colors disabled:opacity-60"
+                                >
+                                    <Play className="size-4" />
+                                    서비스 시작
+                                </button>
+                                {/*
+                                  매뉴얼 4단계 — 일찍 도착해도 예약시각 정각에
+                                  시작한다. 서버가 거절하므로 화면에서도 막고,
+                                  왜 못 누르는지와 언제 눌리는지를 알린다.
+                                */}
+                                {!canStart && (
+                                    <p className="text-muted-foreground mt-2.5 text-center text-xs leading-relaxed">
+                                        예약시각 <b>{item.timeLabel}</b> 부터
+                                        시작할 수 있어요.
+                                        {countdown && (
+                                            <>
+                                                {" "}
+                                                <b className="text-foreground">
+                                                    {countdown}
+                                                </b>{" "}
+                                                남았습니다.
+                                            </>
+                                        )}
+                                    </p>
+                                )}
+                            </>
                         )}
                     </StepBlock>
 
-                    {/* STEP 2 - 종료 */}
+                    {/* STEP 3 - 종료 */}
                     <StepBlock
-                        index={2}
+                        index={3}
                         title="서비스 종료"
                         icon={Square}
                         done={ended}
@@ -348,13 +891,14 @@ export function ServiceDetailView({
                                     disabled={!started}
                                     onClick={() => setEndOpen(true)}
                                     className={cn(
-                                        "mt-3 w-full rounded-lg border px-4 py-3 text-sm font-bold transition-colors",
+                                        "mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border px-4 py-3 text-sm font-bold transition-colors",
                                         started
                                             ? "border-destructive/50 text-destructive hover:bg-destructive/5"
                                             : "border-border text-muted-foreground cursor-not-allowed",
                                     )}
                                 >
-                                    ☐ 서비스 종료
+                                    <Square className="size-4" />
+                                    서비스 종료
                                 </button>
                             </>
                         )}
@@ -647,4 +1191,54 @@ function SummaryRow({
             </span>
         </div>
     );
+}
+
+/** 값이 없을 때의 표시. 매뉴얼상 "확인되지 않음" 은 운영센터 확인 신호다. */
+const MISSING = "정보 없음";
+
+function transportLabel(code: string | null): string {
+    if (!code) return MISSING;
+    return TRANSPORT_LABEL[code as TransportCode] ?? MISSING;
+}
+
+function PlanRow({
+    label,
+    value,
+    valueClass,
+}: {
+    label: string;
+    value: string;
+    valueClass?: string;
+}) {
+    return (
+        <div className="flex items-start justify-between gap-4 py-2.5 text-sm">
+            <span className="text-muted-foreground shrink-0">{label}</span>
+            <span
+                className={cn("font-semibold", valueClass ?? "text-foreground")}
+            >
+                {value}
+            </span>
+        </div>
+    );
+}
+
+/** ISO → "14:20" (KST). 기록 버튼에 표시한다. */
+function timeLabel(iso: string): string {
+    return new Date(iso).toLocaleTimeString("ko-KR", {
+        timeZone: "Asia/Seoul",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+    });
+}
+
+/** 남은 밀리초 → "12분 30초" / "1시간 5분". 카운트다운 표시용. */
+function remainingLabel(ms: number): string {
+    const total = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const sec = total % 60;
+    if (h > 0) return `${h}시간 ${m}분`;
+    if (m > 0) return `${m}분 ${sec}초`;
+    return `${sec}초`;
 }

@@ -3,10 +3,15 @@
 import { createClient } from "@/utils/supabase/server";
 import { generateReservationCode } from "@/lib/reservation";
 import { reservationServerSchema } from "../_lib/schema";
+import { quoteReservation } from "../_lib/quote.server";
 
 export type CreateReservationResult =
     | { ok: true; code: string; id: string }
-    | { ok: false; reason: "auth" | "validation" | "error"; message: string };
+    | {
+          ok: false;
+          reason: "auth" | "validation" | "error" | "unpaid";
+          message: string;
+      };
 
 /**
  * 예약 등록 (STEP4 매칭 신청 시점).
@@ -34,6 +39,32 @@ export async function createReservation(
         return { ok: false, reason: "auth", message: "로그인이 필요합니다." };
     }
 
+    // 약관 제22조 ③ — 미납금이 전액 지급될 때까지 신규 예약을 제한한다.
+    // 기한이 지난 건만 걸린다. 링크를 보낸 직후부터 막으면 결제할 시간을
+    // 주지 않고 제재하는 셈이 된다.
+    const { data: unpaid } = await supabase.rpc("has_unpaid_charge", {
+        p_user_id: user.id,
+    });
+    if (unpaid === true) {
+        return {
+            ok: false,
+            reason: "unpaid",
+            message:
+                "미결제 금액이 있어 새 예약을 신청할 수 없습니다. 마이페이지에서 결제를 완료해 주세요.",
+        };
+    }
+
+    // 요금 스냅샷 — 단가·할증률·선결제액을 예약 시점에 고정한다(#46).
+    // 이후 요금표가 바뀌어도 이미 접수된 예약의 금액은 흔들리지 않는다.
+    const quote = await quoteReservation(v.plan, v.useDate, v.duration);
+    if (!quote) {
+        return {
+            ok: false,
+            reason: "validation",
+            message: "예상 소요 시간을 다시 선택해 주세요.",
+        };
+    }
+
     const row = {
         customer_id: user.id,
         status: "MATCHING" as const,
@@ -48,6 +79,8 @@ export async function createReservation(
         treatment: v.treatment,
         purpose: v.purpose,
         cautions: v.cautions ?? null,
+        mobility_status: v.mobilityStatus,
+        cognitive_status: v.cognitiveStatus,
         doc_prescription: v.docPrescription ?? false,
         doc_receipt: v.docReceipt ?? false,
         doc_certificate: v.docCertificate ?? false,
@@ -57,7 +90,29 @@ export async function createReservation(
         reserve_time: v.reserveTime,
         duration: v.duration,
         depart_address: v.departAddress,
+        hospital_name: v.hospitalName,
         hospital_address: v.hospitalAddress,
+
+        // 매뉴얼 1장 업무 시작 조건 (#77)
+        notify_target: v.notifyTarget,
+        share_medical_info: v.shareMedicalInfo,
+        transport_to: v.transportTo,
+        transport_home: v.transportHome,
+        end_method: v.endMethod,
+        // 독립 귀가면 인계자를 받지 않았다. 빈 문자열 대신 null 로 넣어
+        // "등록되지 않음" 과 "빈 값" 이 구분되게 한다.
+        handover_name: v.handoverName?.trim() || null,
+        handover_relation: v.handoverRelation?.trim() || null,
+        handover_phone: v.handoverPhone?.trim() || null,
+        backup_handover_name: v.backupHandoverName?.trim() || null,
+        backup_handover_relation: v.backupHandoverRelation?.trim() || null,
+        backup_handover_phone: v.backupHandoverPhone?.trim() || null,
+
+        duration_minutes: quote.durationMinutes,
+        hourly_rate: quote.hourlyRate,
+        fee_rate: quote.feeRate,
+        surcharge_rate: quote.surchargeRate,
+        prepaid_amount: quote.amount,
     };
 
     // 예약번호 충돌(23505) 시 최대 5회 재시도

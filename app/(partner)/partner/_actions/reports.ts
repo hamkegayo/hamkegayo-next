@@ -9,9 +9,15 @@ const BUCKET = "report-attachments";
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED = ["image/jpeg", "image/png", "application/pdf"];
 
+/**
+ * 리포트 입력값.
+ *
+ *  **수행 시각은 여기 없다.** 시각은 파트너가 버튼을 누른 시점에 서버가
+ *  services 에 찍어 두고, 리포트는 그것을 읽어 보여주기만 한다. 매뉴얼
+ *  4·13단계·대응카드 26 이 임의 시각 입력을 금지하고, 손으로 칠 칸이
+ *  남아 있으면 보호자가 보는 시간과 청구되는 시간이 갈린다(#55).
+ */
 export type ReportInput = {
-    meetTime: string;
-    endTime: string;
     supports: string[];
     exam: string;
     guardianNote: string;
@@ -93,8 +99,6 @@ export async function saveReport(
         service_id: serviceId,
         partner_id: user.id,
         status: submit ? "SUBMITTED" : "DRAFT",
-        meet_time: input.meetTime || null,
-        end_time: input.endTime || null,
         supports: input.supports,
         exam: input.exam || null,
         guardian_note: input.guardianNote || null,

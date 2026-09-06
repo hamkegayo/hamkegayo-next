@@ -85,7 +85,23 @@ export function SettlementDetailModal({
 
             <div className="divide-border border-border mt-3 divide-y border-t pt-1">
                 <Row
-                    label="정산 금액"
+                    label="서비스 금액"
+                    value={
+                        settlement.grossAmount
+                            ? `${settlement.grossAmount.toLocaleString()}원`
+                            : "-"
+                    }
+                />
+                <Row
+                    label="플랫폼 수수료"
+                    value={
+                        settlement.fee
+                            ? `-${settlement.fee.toLocaleString()}원`
+                            : "-"
+                    }
+                />
+                <Row
+                    label="실지급액"
                     value={
                         settlement.amount
                             ? `${settlement.amount.toLocaleString()}원`

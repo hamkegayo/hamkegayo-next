@@ -5,12 +5,64 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createNotification } from "@/lib/notifications";
+import {
+    previewCancelRefund,
+    refundReservationPayment,
+    type RefundPreview,
+} from "@/lib/payments/refund";
 
-export type ConfirmPartnerResult =
-    { ok: true } | { ok: false; message: string };
+export type SelectPartnerResult =
+    { ok: true; paymentDeadline: string } | { ok: false; message: string };
 
 export type CancelConfirmedResult =
-    { ok: true } | { ok: false; message: string };
+    | {
+          ok: true;
+          /** 환불된 현금(원). 결제 전 취소였으면 undefined */
+          refundedCash?: number;
+          /** 환불하지 않고 남긴 취소수수료(원) — 약관 제19조 ② */
+          cancelFee?: number;
+          /** 복원된 포인트(원) */
+          restoredPoints?: number;
+      }
+    | { ok: false; message: string };
+
+export type CancelPreviewResult =
+    | { ok: true; preview: RefundPreview | null }
+    | { ok: false; message: string };
+
+/**
+ * 취소 전 환불 예상액 조회 (#76) — 약관 제19조.
+ *
+ *  취소 버튼을 누르기 전에 얼마가 남고 얼마가 돌아오는지 보여 주기 위한
+ *  것이다. **아무것도 바꾸지 않는다.**
+ *
+ *  `preview` 가 null 이면 환불할 선결제가 없다는 뜻이다(결제 전 취소).
+ *  그 자체는 오류가 아니므로 ok: true 로 돌려준다.
+ */
+export async function getCancelPreview(
+    reservationId: string,
+): Promise<CancelPreviewResult> {
+    const supabase = await createClient();
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, message: "로그인이 필요합니다." };
+
+    // RLS 로 본인 예약만 조회된다. 금액은 본인만 볼 정보다.
+    const { data: reservation } = await supabase
+        .from("reservations")
+        .select("id, status")
+        .eq("id", reservationId)
+        .maybeSingle();
+
+    if (!reservation) return { ok: false, message: "예약을 찾을 수 없습니다." };
+    if (reservation.status !== "CONFIRMED") {
+        return { ok: false, message: "취소할 수 없는 예약입니다." };
+    }
+
+    return { ok: true, preview: await previewCancelRefund(reservationId) };
+}
 
 /** RPC 예외 메시지 → 사용자 안내 문구 */
 const ERROR_MESSAGE: Record<string, string> = {
@@ -18,16 +70,27 @@ const ERROR_MESSAGE: Record<string, string> = {
     not_owner: "본인 예약만 선택할 수 있습니다.",
     not_matching: "이미 확정되었거나 마감된 예약입니다.",
     partner_not_applied: "선택할 수 없는 파트너입니다.",
+    partner_unavailable:
+        "선택하신 파트너가 같은 시간대에 다른 예약이 있습니다. 다른 파트너를 선택해 주세요.",
 };
 
 /**
- * 파트너 최종 선택(매칭 확정).
- *  - confirm_reservation_partner RPC 로 CONFIRMED + 나머지 NOT_SELECTED 를 원자적으로 처리.
+ * 파트너 선택 — **확정이 아니다.**
+ *
+ *  약관 제9조 ④ : 파트너를 고르고 **선결제를 완료한 시점**에 예약이 확정된다.
+ *  그래서 여기서는 상태를 MATCHING 으로 두고 결제 기한(30분)만 건다.
+ *  CONFIRMED 전이는 승인 라우트가 finalize_payment() 로 처리한다.
+ *
+ *  ⚠️ #54 이전에는 `confirm_reservation_partner` 를 불러 이 자리에서 바로
+ *     CONFIRMED 로 넘겼다(결제 없이 확정 = 제9조 ④ 위반). 그 RPC 는 이제 쓰지 않는다.
+ *
+ *  파트너 확정 알림도 여기서 보내지 않는다 — 결제가 끝나야 확정이므로
+ *  알림은 승인 시점(#53)으로 옮겼다.
  */
-export async function confirmPartner(
+export async function selectPartner(
     reservationId: string,
     partnerId: string,
-): Promise<ConfirmPartnerResult> {
+): Promise<SelectPartnerResult> {
     const supabase = await createClient();
 
     const {
@@ -37,7 +100,7 @@ export async function confirmPartner(
         return { ok: false, message: "로그인이 필요합니다." };
     }
 
-    const { error } = await supabase.rpc("confirm_reservation_partner", {
+    const { data, error } = await supabase.rpc("select_reservation_partner", {
         p_reservation_id: reservationId,
         p_partner_id: partnerId,
     });
@@ -54,17 +117,11 @@ export async function confirmPartner(
         };
     }
 
-    await createNotification(partnerId, {
-        type: "RESERVATION_CONFIRMED",
-        title: "예약이 확정되었어요",
-        body: "고객이 회원님을 파트너로 선택했습니다. 진행 관리에서 확인해 주세요.",
-        link: "/partner/management",
-    });
-
     revalidatePath(`/mypage/reservations/${reservationId}`);
     revalidatePath("/mypage");
 
-    return { ok: true };
+    // RPC 가 결제 기한(선택 시점 +30분)을 돌려준다.
+    return { ok: true, paymentDeadline: (data as string) ?? "" };
 }
 
 /**
@@ -114,15 +171,30 @@ export async function cancelConfirmedReservation(
         };
     }
 
-    const { error: upErr } = await admin
-        .from("reservations")
-        .update({ status: "CANCELLED" })
-        .eq("id", reservationId);
-    if (upErr) {
-        return {
-            ok: false,
-            message: "취소에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-        };
+    // 선결제를 먼저 환불한다(#76). 예약 상태 변경은 환불 RPC 가 같은 트랜잭션에서 한다 —
+    // 둘이 갈라지면 "돈은 돌려줬는데 예약은 살아 있는" 상태가 남는다.
+    const refund = await refundReservationPayment(reservationId, {
+        memo: "고객 예약 취소",
+    });
+
+    if (!refund.ok && refund.code !== "NO_PAYMENT") {
+        // PG 취소 실패거나 기록 실패다. 어느 쪽이든 사고로 적재됐고,
+        // 예약을 취소하지 않는다 — 취소해 버리면 환불받을 근거가 사라진다.
+        return { ok: false, message: refund.message };
+    }
+
+    if (!refund.ok) {
+        // 결제가 없는 확정 예약(있어서는 안 되지만 방어). 예약만 취소한다.
+        const { error: upErr } = await admin
+            .from("reservations")
+            .update({ status: "CANCELLED" })
+            .eq("id", reservationId);
+        if (upErr) {
+            return {
+                ok: false,
+                message: "취소에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+            };
+        }
     }
 
     // 예약된(SCHEDULED) 서비스 행 제거
@@ -143,5 +215,11 @@ export async function cancelConfirmedReservation(
     revalidatePath(`/mypage/reservations/${reservationId}`);
     revalidatePath("/mypage");
 
-    return { ok: true };
+    if (!refund.ok) return { ok: true };
+    return {
+        ok: true,
+        refundedCash: refund.cash,
+        cancelFee: refund.cancelFee,
+        restoredPoints: refund.restoredPoints,
+    };
 }

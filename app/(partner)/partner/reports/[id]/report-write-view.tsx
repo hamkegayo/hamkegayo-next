@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Clock, FileText, Info, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 
+import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmModal } from "@/components/ui/modal";
 import { SUPPORT_OPTIONS } from "../../../_lib/reports";
@@ -49,8 +50,6 @@ export function ReportWriteView({ context }: { context: ReportContext }) {
         (s) => !SUPPORT_OPTIONS.includes(s as (typeof SUPPORT_OPTIONS)[number]),
     );
 
-    const [meetTime, setMeetTime] = useState(saved?.meetTime ?? "");
-    const [endTime, setEndTime] = useState(saved?.endTime ?? "");
     const [supports, setSupports] = useState<Set<string>>(() =>
         saved
             ? new Set(
@@ -77,8 +76,6 @@ export function ReportWriteView({ context }: { context: ReportContext }) {
     const fileRef = useRef<HTMLInputElement>(null);
 
     const buildInput = (): ReportInput => ({
-        meetTime,
-        endTime,
         supports: selectedSupports,
         exam,
         guardianNote,
@@ -140,7 +137,8 @@ export function ReportWriteView({ context }: { context: ReportContext }) {
         customerAge: item.customerAge,
         serviceDate: item.serviceDate,
         partnerName: item.partnerName,
-        timeRange: meetTime && endTime ? `${meetTime} ~ ${endTime}` : "미입력",
+        timeRange: item.timeRange || "기록 없음",
+        times: item.times,
         supports: selectedSupports,
         exam,
         guardianNote,
@@ -215,46 +213,83 @@ export function ReportWriteView({ context }: { context: ReportContext }) {
                             1. 서비스 수행 시간
                         </h2>
                         <p className="text-muted-foreground mt-1 text-sm">
-                            파트너가 이용자를 처음 만난 시간과 서비스 시간을
-                            입력해주세요.
+                            진행 중에 누르신 버튼 시각이 그대로 실립니다. 고쳐
+                            쓰지 않습니다.
                         </p>
-                        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-                            <label className="flex-1">
-                                <span className="text-foreground text-sm font-semibold">
-                                    만난 시간
-                                </span>
-                                <div className="border-input bg-background focus-within:border-ring focus-within:ring-ring/40 mt-1.5 flex items-center gap-2 rounded-lg border px-3.5 py-2.5 focus-within:ring-[3px]">
-                                    <Clock className="text-muted-foreground size-4" />
-                                    <input
-                                        type="time"
-                                        value={meetTime}
-                                        onChange={(e) =>
-                                            setMeetTime(e.target.value)
-                                        }
-                                        className="w-full bg-transparent text-sm outline-none"
-                                    />
-                                </div>
-                            </label>
-                            <span className="text-muted-foreground hidden pb-3 sm:block">
-                                →
-                            </span>
-                            <label className="flex-1">
-                                <span className="text-foreground text-sm font-semibold">
-                                    종료 시간
-                                </span>
-                                <div className="border-input bg-background focus-within:border-ring focus-within:ring-ring/40 mt-1.5 flex items-center gap-2 rounded-lg border px-3.5 py-2.5 focus-within:ring-[3px]">
-                                    <Clock className="text-muted-foreground size-4" />
-                                    <input
-                                        type="time"
-                                        value={endTime}
-                                        onChange={(e) =>
-                                            setEndTime(e.target.value)
-                                        }
-                                        className="w-full bg-transparent text-sm outline-none"
-                                    />
-                                </div>
-                            </label>
-                        </div>
+
+                        {item.times.length === 0 ? (
+                            <p className="border-border text-muted-foreground mt-4 rounded-lg border border-dashed px-4 py-6 text-center text-sm">
+                                기록된 시각이 없습니다. 진행 관리 화면에서
+                                단계를 누르지 않고 종료된 건입니다.
+                            </p>
+                        ) : (
+                            <>
+                                <ul className="border-border mt-4 divide-y rounded-lg border">
+                                    {item.times.map((t) => (
+                                        <li
+                                            key={t.label}
+                                            className={cn(
+                                                "flex items-center justify-between px-4 py-2.5 text-sm",
+                                                t.billing && "bg-muted/40",
+                                            )}
+                                        >
+                                            <span
+                                                className={cn(
+                                                    "text-muted-foreground",
+                                                    t.billing &&
+                                                        "text-foreground font-semibold",
+                                                )}
+                                            >
+                                                {t.label}
+                                                {t.billing && (
+                                                    <span className="text-brand ml-1.5 text-xs font-bold">
+                                                        청구 기준
+                                                    </span>
+                                                )}
+                                            </span>
+                                            <span
+                                                className={cn(
+                                                    "text-foreground tabular-nums",
+                                                    t.billing && "font-bold",
+                                                )}
+                                            >
+                                                {t.value}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+
+                                {item.timeRange && (
+                                    <p className="text-muted-foreground mt-3 flex items-center gap-1.5 text-sm">
+                                        <Clock className="size-4 shrink-0" />
+                                        청구 구간{" "}
+                                        <span className="text-foreground font-bold">
+                                            {item.timeRange}
+                                        </span>
+                                    </p>
+                                )}
+                            </>
+                        )}
+
+                        {item.autoClosed && (
+                            <p className="border-border text-muted-foreground mt-3 rounded-lg border border-dashed px-4 py-3 text-sm leading-relaxed">
+                                종료 버튼이 눌리지 않아 시스템이 마감한
+                                건입니다. 종료 시각은 예정 종료시각으로 기록되어
+                                있습니다.
+                            </p>
+                        )}
+                        {item.noShow && (
+                            <p className="border-border text-muted-foreground mt-3 rounded-lg border border-dashed px-4 py-3 text-sm leading-relaxed">
+                                이용자 미도착으로 종료된 건입니다.
+                            </p>
+                        )}
+
+                        <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
+                            시각이 사실과 다르면 직접 고치지 마시고, 진행 관리
+                            화면의 &lsquo;버튼이 눌리지 않아요&rsquo;로 알려
+                            주세요. 운영센터가 확인 후 정정합니다. 이 값은 요금
+                            계산과 분쟁 확인에 함께 쓰이는 기록입니다.
+                        </p>
                     </section>
 
                     {/* 2. 수행 지원 내용 */}

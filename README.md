@@ -54,6 +54,7 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_META_PIXEL_ID`     | –    | Meta Pixel. 값이 없으면 로드하지 않음                     |
 | `NEXT_PUBLIC_ANALYTICS_DEBUG`   | –    | 로컬에서 DebugView·Pixel Helper 검증할 때만 `true`        |
 | `CRON_SECRET`                   | –    | Vercel Cron 인증용. 미설정 시 keepalive 엔드포인트가 거부 |
+| `DATA_GO_KR_SERVICE_KEY`        | –    | 공휴일 판정(주말·공휴일 할증). 미설정 시 폴백 테이블 사용 |
 
 > ⚠️ `SUPABASE_SERVICE_ROLE_KEY`에는 **절대 `NEXT_PUBLIC_` 접두사를 붙이지 마세요.** 브라우저에 노출되면 DB 전체 권한이 뚫립니다. 서버 코드(Server Action, Route Handler)에서만 사용합니다.
 

@@ -17,6 +17,7 @@ import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
+import { TRANSPORT_LABEL, type TransportCode } from "@/lib/handover";
 import type { PartnerRequestDetail } from "../../../_lib/requests.server";
 import { RejectRequestModal } from "../../../_components/reject-request-modal";
 import { acceptRequest, rejectRequest } from "../../_actions/requests";
@@ -41,6 +42,14 @@ function Card({
     );
 }
 
+/** 값이 없을 때의 표시. 매뉴얼상 "확인되지 않음" 은 수락 보류 신호다. */
+const MISSING = "정보 없음";
+
+function transportLabel(code: string | null): string {
+    if (!code) return MISSING;
+    return TRANSPORT_LABEL[code as TransportCode] ?? MISSING;
+}
+
 function Row({ label, value }: { label: string; value: string }) {
     return (
         <div className="flex items-start justify-between gap-4 py-2 text-sm">
@@ -48,22 +57,6 @@ function Row({ label, value }: { label: string; value: string }) {
             <span className="text-foreground text-right font-bold">
                 {value}
             </span>
-        </div>
-    );
-}
-
-function BulletRow({ label, items }: { label: string; items: string[] }) {
-    return (
-        <div className="flex gap-4 py-2 text-sm">
-            <span className="text-muted-foreground w-24 shrink-0">{label}</span>
-            <ul className="flex-1 space-y-1.5">
-                {items.map((it) => (
-                    <li key={it} className="text-foreground flex gap-2">
-                        <span className="bg-brand mt-1.5 size-1 shrink-0 rounded-full" />
-                        {it}
-                    </li>
-                ))}
-            </ul>
         </div>
     );
 }
@@ -106,6 +99,9 @@ export function RequestDetailView({ r }: { r: PartnerRequestDetail }) {
     const [pending, startTransition] = useTransition();
 
     const isPlus = r.plan === "Plus";
+    const c = r.plan_conditions;
+    // 대응카드 01 — 셋 중 하나라도 비면 수락하지 않고 운영센터에 확인한다.
+    const missingCondition = !c.transportTo || !c.transportHome || !c.endMethod;
     const notReady = () => toast.info("준비 중인 기능입니다.");
 
     const onAccept = () => {
@@ -257,9 +253,7 @@ export function RequestDetailView({ r }: { r: PartnerRequestDetail }) {
                             </>
                         ) : (
                             <div className="border-border bg-muted/30 text-muted-foreground rounded-xl border px-5 py-4 text-center text-sm font-bold">
-                                {r.status === "MATCHING"
-                                    ? "이미 처리한 요청입니다."
-                                    : "마감된 요청입니다."}
+                                이미 처리한 요청입니다.
                             </div>
                         )}
                     </div>
@@ -282,35 +276,58 @@ export function RequestDetailView({ r }: { r: PartnerRequestDetail }) {
                             value={`${r.arriveDate} ${r.arriveTime}`}
                         />
                         <Row label="예상 소요 시간" value={r.estDuration} />
-                        <Row label="출발지" value={r.departure} />
+                        <Row label="출발지 지역" value={r.departRegion} />
                     </div>
                 </Card>
 
-                <Card title="고객 정보" icon={UserRound}>
+                {/*
+                 * 매칭 전에는 수행 가능 여부 판단에 필요한 최소 정보만 보인다.
+                 * 이용자 성명·연락처·상세주소·진료내용은 예약이 확정된 뒤 열린다.
+                 * — 개인정보처리방침 제5조 ②③④
+                 */}
+                <Card title="수행 조건" icon={UserRound}>
                     <div className="divide-border divide-y">
-                        <Row label="이용자 이름" value={r.customer.name} />
-                        <Row label="나이" value={r.customer.age} />
-                        <Row label="성별" value={r.customer.gender} />
-                        <Row label="예약된 진료" value={r.customer.treatment} />
-                        <Row label="진료 목적" value={r.customer.purpose} />
+                        <Row label="거동 상태" value={r.condition.mobility} />
+                        <Row label="인지 상태" value={r.condition.cognitive} />
+                        <Row label="병원 지역" value={r.hospitalRegion} />
+                        {/*
+                         * 매뉴얼 1단계·PART 4 확인표 — 수락 전에 이동수단·귀가수단·
+                         * 종료방식을 확인해야 한다. 개인정보가 아니라 수행 조건이라
+                         * 매칭 전에도 보인다(처리방침 제5조 ② "이동 관련 선택사항").
+                         */}
+                        <Row
+                            label="병원까지 이동"
+                            value={transportLabel(c.transportTo)}
+                        />
+                        <Row
+                            label="귀가수단"
+                            value={transportLabel(c.transportHome)}
+                        />
+                        <Row
+                            label="종료 방식"
+                            value={
+                                c.endMethod === "ADULT_HANDOVER"
+                                    ? c.hasBackupHandover
+                                        ? "성인 인계 (대체 인계자 등록됨)"
+                                        : "성인 인계"
+                                    : c.endMethod === "INDEPENDENT"
+                                      ? "독립 귀가"
+                                      : MISSING
+                            }
+                        />
                     </div>
-                    {(r.customer.cautions.length > 0 ||
-                        r.customer.requests.length > 0) && (
-                        <div className="divide-border mt-3 divide-y">
-                            {r.customer.cautions.length > 0 && (
-                                <BulletRow
-                                    label="동행 시 주의할 점"
-                                    items={r.customer.cautions}
-                                />
-                            )}
-                            {r.customer.requests.length > 0 && (
-                                <BulletRow
-                                    label="요청사항"
-                                    items={r.customer.requests}
-                                />
-                            )}
-                        </div>
+
+                    {missingCondition && (
+                        <p className="border-destructive/40 bg-destructive/5 text-destructive mt-4 rounded-xl border px-4 py-3 text-xs leading-relaxed">
+                            <b>수행 조건이 비어 있어요.</b>{" "}
+                            이동수단·귀가수단·종료 방식이 확인되지 않으면
+                            수락하지 말고 운영센터에 확인해 주세요.
+                        </p>
                     )}
+                    <p className="text-muted-foreground border-border mt-4 rounded-xl border border-dashed px-4 py-3 text-xs leading-relaxed">
+                        이용자 성명·연락처와 상세 주소, 진료 내용은 개인정보
+                        보호를 위해 <b>예약이 확정된 후</b>에 확인할 수 있어요.
+                    </p>
                 </Card>
             </div>
 

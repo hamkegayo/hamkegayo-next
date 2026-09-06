@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 
 import { Modal } from "@/components/ui/modal";
+import type { ReportTimeRow } from "../_lib/reports.server";
 
 export type ReportPreviewData = {
     hospital: string;
@@ -10,7 +11,10 @@ export type ReportPreviewData = {
     customerAge: string;
     serviceDate: string;
     partnerName: string;
+    /** 청구 기준 구간 "HH:mm ~ HH:mm" */
     timeRange: string;
+    /** 진행 단계별 기록 시각 (약관 제12조 ④ — 분쟁 시 함께 확인하는 자료) */
+    times: ReportTimeRow[];
     supports: string[];
     exam: string;
     guardianNote: string;
@@ -94,6 +98,26 @@ export function ReportPreviewModal({
                         <Field label="담당 파트너" value={data.partnerName} />
                         <Field label="서비스 시간" value={data.timeRange} />
                     </div>
+
+                    {data.times.length > 0 && (
+                        <Block title="진행 시각">
+                            <ul className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
+                                {data.times.map((t) => (
+                                    <li
+                                        key={t.label}
+                                        className="flex justify-between gap-2 text-sm"
+                                    >
+                                        <span className="text-muted-foreground">
+                                            {t.label}
+                                        </span>
+                                        <span className="text-foreground font-bold tabular-nums">
+                                            {t.value}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </Block>
+                    )}
 
                     <Block title="수행 지원 내용">
                         {data.supports.length ? (

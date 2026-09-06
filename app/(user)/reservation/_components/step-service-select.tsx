@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Check, Clock, House, Plus, Truck } from "lucide-react";
+import { Calendar, Check, Clock, Hospital, House, Truck } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,19 +19,27 @@ type PlanCard = {
     priceNote: string;
 };
 
+/*
+ * 아이콘은 **만나는 장소**를 나타낸다 — 두 플랜의 실제 차이가 그것이기 때문이다.
+ *   베이직 : 병원에서 만나 원내 절차만 동행
+ *   플러스 : 자택에서 만나 병원까지 왕복 동행
+ *
+ * 베이직에 Plus(＋) 를 쓰던 것을 바꿨다. 옆 카드 이름이 "플러스 서비스" 라
+ * ＋ 기호가 그쪽을 가리키는 것처럼 읽혔다.
+ */
 const PLANS: PlanCard[] = [
     {
         value: "basic",
         name: "베이직 서비스",
-        icon: Plus,
+        icon: Hospital,
         features: [
             "병원에서 파트너와 만남",
             "접수 및 수납 지원",
             "진료 및 검사 동행",
             "약국 동행 (선택)",
         ],
-        price: "이용금액 20,000원",
-        priceNote: "(30분 추가 시 10,000원)",
+        price: "시간당 20,000원",
+        priceNote: "(최소 2시간 · 15분 연장 시 5,000원)",
     },
     {
         value: "plus",
@@ -44,8 +52,8 @@ const PLANS: PlanCard[] = [
             "진료 및 검사 동행",
             "귀가 동행 지원",
         ],
-        price: "이용금액 25,000원",
-        priceNote: "(30분 추가 시 12,500원)",
+        price: "시간당 25,000원",
+        priceNote: "(최소 2시간 · 15분 연장 시 6,250원)",
     },
 ];
 
@@ -117,7 +125,8 @@ export function StepServiceSelect() {
                                     </div>
                                     <div className="border-brand/30 mt-4 border-b" />
 
-                                    <ul className="mt-6 flex flex-col gap-3">
+                                    {/* flex-1 — 항목 수가 달라도 가격·버튼이 카드 바닥에 맞춰지도록 */}
+                                    <ul className="mt-6 flex flex-1 flex-col gap-3">
                                         {plan.features.map((f) => (
                                             <li
                                                 key={f}

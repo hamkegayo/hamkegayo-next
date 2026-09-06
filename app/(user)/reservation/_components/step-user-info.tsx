@@ -1,12 +1,13 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { formatPhoneNumber } from "@/lib/format";
 import { Input } from "@/components/ui/input";
+import { DateField } from "@/components/ui/date-field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Section } from "@/app/(user)/_components/home/section";
 import {
@@ -14,7 +15,12 @@ import {
     type ReservationData,
 } from "../_store/reservation-store";
 import { step1Schema, type Step1Values } from "../_lib/schema";
-import { RELATION_OPTIONS } from "../_lib/options";
+import {
+    COGNITIVE_OPTIONS,
+    MOBILITY_OPTIONS,
+    RELATION_OPTIONS,
+} from "../_lib/options";
+import { NOTIFY_TARGET_OPTIONS } from "@/lib/handover";
 import { StepBand, StepNav } from "./step-band";
 import { FieldError, FieldLabel, NativeSelect, Textarea } from "./fields";
 
@@ -32,6 +38,7 @@ export function StepUserInfo() {
         handleSubmit,
         setValue,
         watch,
+        control,
         clearErrors,
         formState: { errors },
     } = useForm<Step1Values>({
@@ -48,11 +55,15 @@ export function StepUserInfo() {
             relation: data.relation,
             treatment: data.treatment,
             purpose: data.purpose,
+            mobilityStatus: data.mobilityStatus,
+            cognitiveStatus: data.cognitiveStatus,
             cautions: data.cautions,
             docPrescription: data.docPrescription,
             docReceipt: data.docReceipt,
             docCertificate: data.docCertificate,
             otherRequests: data.otherRequests,
+            notifyTarget: data.notifyTarget as "USER" | "GUARDIAN" | "BOTH",
+            shareMedicalInfo: data.shareMedicalInfo,
         },
     });
 
@@ -125,19 +136,28 @@ export function StepUserInfo() {
                                 <FieldLabel htmlFor="userBirth" required>
                                     이용자 생년월일
                                 </FieldLabel>
-                                <Input
-                                    id="userBirth"
-                                    type="date"
-                                    className="cursor-pointer"
-                                    onClick={(e) =>
-                                        e.currentTarget.showPicker?.()
-                                    }
-                                    aria-invalid={!!errors.userBirth}
-                                    {...register("userBirth", {
-                                        onChange: () =>
-                                            errors.userBirth &&
-                                            clearErrors("userBirth"),
-                                    })}
+                                {/*
+                                  키보드로 바로 치고, 달력이 필요하면 아이콘을 누른다.
+                                  생년월일은 과거 연도라 달력으로 고르는 편이 더 느리다.
+                                */}
+                                <Controller
+                                    control={control}
+                                    name="userBirth"
+                                    render={({ field }) => (
+                                        <DateField
+                                            id="userBirth"
+                                            value={field.value ?? ""}
+                                            onChange={(v) => {
+                                                field.onChange(v);
+                                                if (errors.userBirth)
+                                                    clearErrors("userBirth");
+                                            }}
+                                            max={new Date()
+                                                .toISOString()
+                                                .slice(0, 10)}
+                                            invalid={!!errors.userBirth}
+                                        />
+                                    )}
                                 />
                                 <FieldError>
                                     {errors.userBirth?.message}
@@ -272,6 +292,70 @@ export function StepUserInfo() {
                                     {errors.relation?.message}
                                 </FieldError>
                             </div>
+
+                            {/*
+                              통보대상 — 매뉴얼 4단계에서 파트너가 "도착했습니다"
+                              를 보낼 대상이다. 용어정의상 이용자 또는 보호자다.
+                            */}
+                            <div>
+                                <FieldLabel htmlFor="notifyTarget" required>
+                                    도착·진행상황을 알려드릴 대상
+                                </FieldLabel>
+                                <NativeSelect
+                                    id="notifyTarget"
+                                    aria-invalid={!!errors.notifyTarget}
+                                    {...register("notifyTarget", {
+                                        onChange: () =>
+                                            errors.notifyTarget &&
+                                            clearErrors("notifyTarget"),
+                                    })}
+                                >
+                                    {NOTIFY_TARGET_OPTIONS.map((o) => (
+                                        <option key={o.value} value={o.value}>
+                                            {o.label}
+                                        </option>
+                                    ))}
+                                </NativeSelect>
+                                <FieldError>
+                                    {errors.notifyTarget?.message}
+                                </FieldError>
+                            </div>
+
+                            {/*
+                              약관 제8조 ① — 진료내용을 보호자에게 전달할지는
+                              이용자 의사에 따른다. 동의하지 않으면 파트너는
+                              전달하지 않는다(대응카드 16).
+                            */}
+                            <div className="md:col-span-2">
+                                <Controller
+                                    control={control}
+                                    name="shareMedicalInfo"
+                                    render={({ field }) => (
+                                        <label className="flex cursor-pointer items-start gap-2.5">
+                                            <Checkbox
+                                                className="mt-0.5"
+                                                checked={field.value === true}
+                                                onCheckedChange={(checked) =>
+                                                    field.onChange(
+                                                        checked === true,
+                                                    )
+                                                }
+                                            />
+                                            <span className="text-sm leading-relaxed">
+                                                <span className="text-foreground">
+                                                    진료 내용을 보호자에게
+                                                    전달하는 데 동의합니다.
+                                                </span>
+                                                <span className="text-muted-foreground block">
+                                                    동의하지 않으시면 파트너가
+                                                    보호자에게 진료 내용을
+                                                    전달하지 않습니다.
+                                                </span>
+                                            </span>
+                                        </label>
+                                    )}
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -316,6 +400,62 @@ export function StepUserInfo() {
                                 />
                                 <FieldError>
                                     {errors.purpose?.message}
+                                </FieldError>
+                            </div>
+                        </div>
+
+                        {/*
+                         * 거동·인지 상태는 파트너가 수락 여부를 판단하는 근거라
+                         * 매칭 전에 제공된다 (개인정보처리방침 제5조 ④).
+                         * 아래 '주의해야 할 점' 은 예약 확정 후에만 전달된다.
+                         */}
+                        <div className="mt-5 grid gap-5 md:grid-cols-2">
+                            <div>
+                                <FieldLabel htmlFor="mobilityStatus" required>
+                                    거동 상태
+                                </FieldLabel>
+                                <NativeSelect
+                                    id="mobilityStatus"
+                                    aria-invalid={!!errors.mobilityStatus}
+                                    {...register("mobilityStatus", {
+                                        onChange: () =>
+                                            errors.mobilityStatus &&
+                                            clearErrors("mobilityStatus"),
+                                    })}
+                                >
+                                    <option value="">선택하세요</option>
+                                    {MOBILITY_OPTIONS.map((m) => (
+                                        <option key={m} value={m}>
+                                            {m}
+                                        </option>
+                                    ))}
+                                </NativeSelect>
+                                <FieldError>
+                                    {errors.mobilityStatus?.message}
+                                </FieldError>
+                            </div>
+                            <div>
+                                <FieldLabel htmlFor="cognitiveStatus" required>
+                                    인지 상태
+                                </FieldLabel>
+                                <NativeSelect
+                                    id="cognitiveStatus"
+                                    aria-invalid={!!errors.cognitiveStatus}
+                                    {...register("cognitiveStatus", {
+                                        onChange: () =>
+                                            errors.cognitiveStatus &&
+                                            clearErrors("cognitiveStatus"),
+                                    })}
+                                >
+                                    <option value="">선택하세요</option>
+                                    {COGNITIVE_OPTIONS.map((c) => (
+                                        <option key={c} value={c}>
+                                            {c}
+                                        </option>
+                                    ))}
+                                </NativeSelect>
+                                <FieldError>
+                                    {errors.cognitiveStatus?.message}
                                 </FieldError>
                             </div>
                         </div>

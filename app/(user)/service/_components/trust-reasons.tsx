@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { BadgeCheck, Clock, MapPin } from "lucide-react";
+import { BadgeCheck, Bell, Clock } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { Section } from "@/app/(user)/_components/home/section";
@@ -25,6 +25,37 @@ function Visual({
                 height={height}
                 className="h-auto w-full object-cover"
             />
+        </div>
+    );
+}
+
+/**
+ * 진행 알림 미리보기.
+ *
+ *  전에는 이 자리에 지도 이미지와 "실시간 위치 공유" 가 있었다. 위치 공유는
+ *  **구현된 적이 없는 기능**이라 내렸다(#60). 대신 실제로 나가는 알림을
+ *  그대로 보여 준다 — 문구가 코드보다 앞서 나가지 않게.
+ */
+function NotifyPreview() {
+    const items = [
+        "파트너가 예약을 수락했어요",
+        "파트너가 도착했어요",
+        "서비스가 완료되었어요",
+        "리포트가 도착했어요",
+    ];
+
+    return (
+        <div className="border-border bg-background w-full max-w-sm space-y-2 rounded-2xl border p-4 md:w-80">
+            {items.map((t) => (
+                <div key={t} className="flex items-center gap-2.5">
+                    <span className="bg-brand/10 text-brand flex size-7 shrink-0 items-center justify-center rounded-full">
+                        <Bell className="size-3.5" />
+                    </span>
+                    <span className="text-foreground text-xs font-semibold">
+                        {t}
+                    </span>
+                </div>
+            ))}
         </div>
     );
 }
@@ -62,17 +93,10 @@ const REASONS: {
         ),
     },
     {
-        icon: MapPin,
-        title: "위치 공유가 가능합니다.",
-        desc: "실시간 위치 공유로\n이동 과정을 안심하고 확인할 수 있습니다.",
-        visual: (
-            <Visual
-                src="/user/service-card-location.png"
-                alt="실시간 위치 공유 지도 예시"
-                width={358}
-                height={124}
-            />
-        ),
+        icon: Bell,
+        title: "진행 상황을 알려드립니다.",
+        desc: "파트너 수락부터 도착·완료·리포트까지\n단계마다 보호자에게 알림이 갑니다.",
+        visual: <NotifyPreview />,
     },
 ];
 
