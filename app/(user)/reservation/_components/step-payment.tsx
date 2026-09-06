@@ -2,11 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Script from "next/script";
+import Link from "next/link";
 import { AlertTriangle, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 import { Section } from "@/app/(user)/_components/home/section";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { formatUseDate, toHhmm } from "@/lib/format";
 import { useReservationStore, PLAN_INFO } from "../_store/reservation-store";
 import { StepBand } from "./step-band";
 
@@ -51,6 +54,18 @@ function formatRemain(ms: number): string {
     return `${m}:${s}`;
 }
 
+/** 주문 내용 한 줄 */
+function OrderRow({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="flex items-start justify-between gap-4">
+            <dt className="text-muted-foreground shrink-0">{label}</dt>
+            <dd className="text-foreground text-right font-semibold">
+                {value}
+            </dd>
+        </div>
+    );
+}
+
 export function StepPayment() {
     const { data, patch, goStep } = useReservationStore();
     const plan = PLAN_INFO[data.plan || "basic"];
@@ -58,6 +73,9 @@ export function StepPayment() {
     const [sdkReady, setSdkReady] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [pointsInput, setPointsInput] = useState("");
+    // 전자상거래법 제8조 ② — 청약 전에 계약 내용을 확인·정정할 수 있어야 한다.
+    // 체크 전에는 결제 버튼이 눌리지 않는다.
+    const [confirmed, setConfirmed] = useState(false);
     const [remain, setRemain] = useState<number | null>(null);
     const expiredRef = useRef(false);
 
@@ -315,10 +333,74 @@ export function StepPayment() {
                         </div>
                     )}
 
+                    {/*
+                      청약 내용 확인 — 전자상거래법 제8조 ②.
+                      결제 직전에 "무엇을" 사는지 한 번 더 보여준다. 금액만
+                      띄우고 결제시키면 나중에 "그 예약인 줄 몰랐다" 는 분쟁을
+                      막을 자료가 없다. 고칠 곳이 있으면 아래 버튼으로 돌아간다.
+                    */}
+                    <div className="border-border bg-background mt-4 rounded-2xl border p-5">
+                        <h2 className="text-foreground text-base font-bold">
+                            주문 내용 확인
+                        </h2>
+                        <dl className="mt-3 space-y-2 text-sm">
+                            <OrderRow label="서비스" value={plan.label} />
+                            <OrderRow
+                                label="이용일시"
+                                value={
+                                    data.useDate
+                                        ? `${formatUseDate(data.useDate)} ${toHhmm(data.reserveTime || data.arriveTime || "")}`.trim()
+                                        : "-"
+                                }
+                            />
+                            <OrderRow
+                                label="예상 이용시간"
+                                value={data.duration || "-"}
+                            />
+                            <OrderRow
+                                label="병원"
+                                value={
+                                    data.hospitalName ||
+                                    data.hospitalAddress ||
+                                    "-"
+                                }
+                            />
+                            {data.confirmedPartnerName && (
+                                <OrderRow
+                                    label="파트너"
+                                    value={data.confirmedPartnerName}
+                                />
+                            )}
+                        </dl>
+                    </div>
+
+                    <label className="border-border bg-muted/30 mt-3 flex cursor-pointer items-start gap-3 rounded-2xl border p-5">
+                        <Checkbox
+                            checked={confirmed}
+                            onCheckedChange={(v) => setConfirmed(v === true)}
+                            disabled={submitting}
+                            className="mt-0.5"
+                        />
+                        <span className="text-muted-foreground text-sm leading-relaxed">
+                            위 주문 내용을 확인했으며,{" "}
+                            <Link
+                                href="/refund-policy"
+                                target="_blank"
+                                className="text-brand underline underline-offset-4"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                취소·환불 정책
+                            </Link>
+                            에 동의합니다.
+                        </span>
+                    </label>
+
                     <button
                         type="button"
                         onClick={onPay}
-                        disabled={submitting || !sdkReady || charge <= 0}
+                        disabled={
+                            submitting || !sdkReady || charge <= 0 || !confirmed
+                        }
                         className="bg-brand text-brand-foreground hover:bg-brand/90 mt-6 w-full rounded-lg px-6 py-4 text-base font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         {submitting

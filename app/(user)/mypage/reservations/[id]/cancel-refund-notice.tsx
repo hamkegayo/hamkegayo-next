@@ -3,6 +3,7 @@
 import { AlertTriangle } from "lucide-react";
 
 import type { RefundPreview } from "@/lib/payments/refund";
+import { POINT_RESTORE_NOTE, REFUND_METHOD_NOTE } from "@/lib/legal/refund";
 
 /**
  * 취소 확인 모달의 환불 안내 (#76) — 약관 제19조.
@@ -110,11 +111,8 @@ export function CancelRefundNotice({
             )}
 
             <p className="text-muted-foreground mt-2 text-xs leading-relaxed">
-                {preview.usedPoints > 0
-                    ? "사용하신 포인트는 취소수수료와 무관하게 전액 복원됩니다. "
-                    : ""}
-                환불은 결제하신 수단으로 처리되며, 카드사에 따라 영업일 기준
-                3~5일이 걸릴 수 있습니다.
+                {preview.usedPoints > 0 ? `${POINT_RESTORE_NOTE} ` : ""}
+                {REFUND_METHOD_NOTE}
             </p>
         </div>
     );

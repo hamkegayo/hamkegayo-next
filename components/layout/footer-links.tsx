@@ -22,6 +22,9 @@ const LINKS = [
     { href: "/faq", label: "FAQ" },
     { href: "/terms", label: "이용약관" },
     { href: "/privacy", label: "개인정보처리방침" },
+    // 취소·환불 기준은 약관 안에도 있지만(제19~22조), 32개 조 중에서 찾아
+    // 읽기 어렵다. 별도 화면으로 상시 노출한다 (#52).
+    { href: "/refund-policy", label: "취소·환불 정책" },
 ];
 
 export function FooterLinks() {
