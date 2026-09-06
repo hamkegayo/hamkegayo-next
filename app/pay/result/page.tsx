@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { COMPANY } from "@/lib/legal/company";
+import { PayShell } from "../_components/pay-shell";
 
 /**
  * 추가결제 결과 화면 (#75).
@@ -38,8 +39,8 @@ export default async function PayResultPage({
     const done = status === "done";
 
     return (
-        <main className="flex min-h-screen items-center justify-center px-4 py-16">
-            <div className="border-border bg-background w-full max-w-md rounded-2xl border p-7 text-center md:p-8">
+        <PayShell className="text-center">
+            <>
                 <span
                     aria-hidden
                     className={
@@ -70,7 +71,7 @@ export default async function PayResultPage({
                 <p className="text-muted-foreground mt-6 text-xs">
                     문의 : 함께가요 고객센터 {COMPANY.tel} ({COMPANY.hours})
                 </p>
-            </div>
-        </main>
+            </>
+        </PayShell>
     );
 }
