@@ -5,7 +5,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createNotification } from "@/lib/notifications";
-import { refundReservationPayment } from "@/lib/payments/refund";
+import {
+    previewCancelRefund,
+    refundReservationPayment,
+    type RefundPreview,
+} from "@/lib/payments/refund";
 
 export type SelectPartnerResult =
     { ok: true; paymentDeadline: string } | { ok: false; message: string };
@@ -21,6 +25,44 @@ export type CancelConfirmedResult =
           restoredPoints?: number;
       }
     | { ok: false; message: string };
+
+export type CancelPreviewResult =
+    | { ok: true; preview: RefundPreview | null }
+    | { ok: false; message: string };
+
+/**
+ * 취소 전 환불 예상액 조회 (#76) — 약관 제19조.
+ *
+ *  취소 버튼을 누르기 전에 얼마가 남고 얼마가 돌아오는지 보여 주기 위한
+ *  것이다. **아무것도 바꾸지 않는다.**
+ *
+ *  `preview` 가 null 이면 환불할 선결제가 없다는 뜻이다(결제 전 취소).
+ *  그 자체는 오류가 아니므로 ok: true 로 돌려준다.
+ */
+export async function getCancelPreview(
+    reservationId: string,
+): Promise<CancelPreviewResult> {
+    const supabase = await createClient();
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false, message: "로그인이 필요합니다." };
+
+    // RLS 로 본인 예약만 조회된다. 금액은 본인만 볼 정보다.
+    const { data: reservation } = await supabase
+        .from("reservations")
+        .select("id, status")
+        .eq("id", reservationId)
+        .maybeSingle();
+
+    if (!reservation) return { ok: false, message: "예약을 찾을 수 없습니다." };
+    if (reservation.status !== "CONFIRMED") {
+        return { ok: false, message: "취소할 수 없는 예약입니다." };
+    }
+
+    return { ok: true, preview: await previewCancelRefund(reservationId) };
+}
 
 /** RPC 예외 메시지 → 사용자 안내 문구 */
 const ERROR_MESSAGE: Record<string, string> = {

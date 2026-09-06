@@ -60,6 +60,74 @@ type PaymentRow = {
     } | null;
 };
 
+/**
+ * 취소 전 안내에 쓸 예상 환불 내역 (#76).
+ *
+ *  약관 제19조의 표는 공개돼 있지만, **취소 버튼 앞에서 자기 건이 어느
+ *  구간인지 아는 사람은 없다.** 2시간 전 이내면 한 시간 요금이 남는데
+ *  그것을 모른 채 누르게 두면 안 된다.
+ *
+ *  ⚠️ 실제 환불(`refundReservationPayment`)과 **같은 함수로 계산한다.**
+ *     안내와 집행이 갈라지면 안내가 거짓말이 된다.
+ */
+export type RefundPreview = {
+    /** 선결제한 현금(원) — 포인트 할인분은 빠져 있다 */
+    paidCash: number;
+    /** 사용했던 포인트(원). 취소수수료와 무관하게 전액 복원된다 */
+    usedPoints: number;
+    /** 환불하지 않고 남기는 금액(원) — 제19조 ② */
+    cancelFee: number;
+    /** 실제로 돌려받는 현금(원) */
+    refundCash: number;
+    bracket: CancelFeeBracket;
+    /** 시작 예정시각까지 남은 분. 음수면 예정시각이 지났다 */
+    minutesUntilStart: number;
+};
+
+/** 환불 대상 선결제 행. 없으면 null — 선결제 전 예약이 그렇다. */
+async function loadBasePayment(
+    admin: ReturnType<typeof createAdminClient>,
+    reservationId: string,
+): Promise<PaymentRow | null> {
+    const { data } = await admin
+        .from("payments")
+        .select(
+            "id, order_id, transaction_id, gross_amount, discount_amount, " +
+                "reservations!inner(code, plan, use_date, arrive_time, surcharge_rate)",
+        )
+        .eq("reservation_id", reservationId)
+        .eq("type", "BASE")
+        .eq("status", "PAID")
+        .maybeSingle<PaymentRow>();
+
+    return data ?? null;
+}
+
+/**
+ * 취소했을 때 얼마가 돌아오는지 미리 계산한다. 아무것도 바꾸지 않는다.
+ *
+ *  ⚠️ 호출부가 **소유권을 먼저 확인해야 한다.** 금액은 본인만 볼 정보다.
+ */
+export async function previewCancelRefund(
+    reservationId: string,
+    options: { providerFault?: boolean } = {},
+): Promise<RefundPreview | null> {
+    const payment = await loadBasePayment(createAdminClient(), reservationId);
+    if (!payment) return null;
+
+    const fee = feeFor(payment, options.providerFault === true);
+    const paidCash = payment.gross_amount - payment.discount_amount;
+
+    return {
+        paidCash,
+        usedPoints: payment.discount_amount,
+        cancelFee: fee.amount,
+        refundCash: Math.max(0, paidCash - fee.amount),
+        bracket: fee.bracket,
+        minutesUntilStart: fee.minutesUntilStart,
+    };
+}
+
 /** 예약 정보로 제19조 취소수수료를 산정한다 */
 function feeFor(row: PaymentRow, providerFault: boolean): CancelFee {
     const r = row.reservations;
@@ -91,17 +159,7 @@ export async function refundReservationPayment(
     options: { providerFault?: boolean; memo?: string } = {},
 ): Promise<RefundOutcome> {
     const admin = createAdminClient();
-
-    const { data: payment } = await admin
-        .from("payments")
-        .select(
-            "id, order_id, transaction_id, gross_amount, discount_amount, " +
-                "reservations!inner(code, plan, use_date, arrive_time, surcharge_rate)",
-        )
-        .eq("reservation_id", reservationId)
-        .eq("type", "BASE")
-        .eq("status", "PAID")
-        .maybeSingle<PaymentRow>();
+    const payment = await loadBasePayment(admin, reservationId);
 
     if (!payment) {
         return {
