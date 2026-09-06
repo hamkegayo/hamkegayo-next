@@ -337,6 +337,49 @@ export async function getPartnerTodayServices(): Promise<PartnerServiceView[]> {
 }
 
 /** 서비스 단건(진행 관리 상세) */
+/**
+ * 파트너가 남긴 현장 고지·오류 기록 (#55 — 대응카드 13 · 26).
+ *
+ *  현장 확인표가 "기록했다" 를 확인하라고 요구한다. 확인할 화면이 없으면
+ *  규정은 지켜졌는지 알 수 없다. RLS 가 본인 것만 내려준다.
+ */
+export type ServiceNoticeView = {
+    id: string;
+    kind: "OVERRUN_NOTICE" | "BUTTON_ERROR";
+    status: "OPEN" | "RESOLVED";
+    /** 파트너가 적은 실제 시각 "HH:mm" */
+    occurredAtLabel: string;
+    detail: string;
+    errorText: string;
+    /** 운영센터 안내. 처리 완료된 건에만 있다. */
+    memo: string;
+};
+
+export async function getServiceNotices(
+    serviceId: string,
+): Promise<ServiceNoticeView[]> {
+    try {
+        const supabase = await createClient();
+        const { data } = await supabase
+            .from("service_notices")
+            .select("id, kind, status, occurred_at, detail, error_text, memo")
+            .eq("service_id", serviceId)
+            .order("reported_at", { ascending: false });
+
+        return (data ?? []).map((n) => ({
+            id: n.id,
+            kind: n.kind,
+            status: n.status,
+            occurredAtLabel: toTimeLabel(n.occurred_at) ?? "",
+            detail: n.detail ?? "",
+            errorText: n.error_text ?? "",
+            memo: n.memo ?? "",
+        }));
+    } catch {
+        return [];
+    }
+}
+
 export async function getPartnerService(
     serviceId: string,
 ): Promise<PartnerServiceView | null> {

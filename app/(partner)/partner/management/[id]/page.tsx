@@ -1,6 +1,9 @@
 import Link from "next/link";
 
-import { getPartnerService } from "../../../_lib/services.server";
+import {
+    getPartnerService,
+    getServiceNotices,
+} from "../../../_lib/services.server";
 import { ServiceDetailView } from "./service-detail-view";
 
 export default async function PartnerManagementDetail({
@@ -27,5 +30,7 @@ export default async function PartnerManagementDetail({
         );
     }
 
-    return <ServiceDetailView service={service} />;
+    const notices = await getServiceNotices(id);
+
+    return <ServiceDetailView service={service} notices={notices} />;
 }
