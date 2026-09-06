@@ -28,15 +28,30 @@ const ERROR_MESSAGE: Record<string, string> = {
     future_time: "아직 오지 않은 시각은 적을 수 없습니다.",
 };
 
-/** 서비스 행에 연결된 고객 id (알림 수신자) */
-async function getCustomerId(serviceId: string): Promise<string | null> {
+/**
+ * 서비스에 연결된 고객 id 와 예약 id.
+ *
+ *  예약 id 까지 가져오는 이유는 알림 링크 때문이다. `/mypage/reservations`
+ *  는 라우트가 없다 — 목록은 `/mypage` 가 보여주고 예약별 상세만 `[id]` 로
+ *  있다. 알림은 특정 예약에 대한 것이므로 상세로 보낸다.
+ */
+async function getServiceOwner(
+    serviceId: string,
+): Promise<{ customerId: string; reservationId: string } | null> {
     const supabase = await createClient();
     const { data } = await supabase
         .from("services")
-        .select("reservations!inner(customer_id)")
+        .select("reservation_id, reservations!inner(customer_id)")
         .eq("id", serviceId)
-        .maybeSingle<{ reservations: { customer_id: string } | null }>();
-    return data?.reservations?.customer_id ?? null;
+        .maybeSingle<{
+            reservation_id: string;
+            reservations: { customer_id: string } | null;
+        }>();
+    if (!data?.reservations?.customer_id) return null;
+    return {
+        customerId: data.reservations.customer_id,
+        reservationId: data.reservation_id,
+    };
 }
 
 async function callRpc(
@@ -90,13 +105,13 @@ export async function arriveService(
         serviceId,
     );
     if (res.ok) {
-        const customerId = await getCustomerId(serviceId);
-        if (customerId) {
-            await createNotification(customerId, {
+        const owner = await getServiceOwner(serviceId);
+        if (owner) {
+            await createNotification(owner.customerId, {
                 type: "PARTNER_ARRIVED",
                 title: "파트너가 도착했어요",
                 body: "파트너가 약속 장소에 도착했습니다.",
-                link: "/mypage/reservations",
+                link: `/mypage/reservations/${owner.reservationId}`,
             });
         }
     }
@@ -241,16 +256,16 @@ export async function endServiceNoShow(
                 type: "RESERVATION_CANCELLED",
                 title: "약속 장소에서 만나지 못했어요",
                 body,
-                link: "/mypage/reservations",
+                link: `/mypage/reservations/${final.reservationId}`,
             });
         } else {
-            const customerId = await getCustomerId(serviceId);
-            if (customerId) {
-                await createNotification(customerId, {
+            const owner = await getServiceOwner(serviceId);
+            if (owner) {
+                await createNotification(owner.customerId, {
                     type: "RESERVATION_CANCELLED",
                     title: "약속 장소에서 만나지 못했어요",
                     body: "파트너가 예약시각부터 20분간 기다린 뒤 종료했습니다. 자세한 내용은 고객센터로 문의해 주세요.",
-                    link: "/mypage/reservations",
+                    link: `/mypage/reservations/${owner.reservationId}`,
                 });
             }
         }
@@ -315,7 +330,7 @@ export async function endService(
                 type: "PAYMENT_REFUND",
                 title: "결제 금액이 환불될 예정이에요",
                 body: `${usage}. 선결제 금액 중 ${diff.refund.toLocaleString()}원을 확인 후 환불해 드립니다. 완료되면 다시 알려드릴게요.`,
-                link: "/mypage/reservations",
+                link: `/mypage/reservations/${final.reservationId}`,
             });
         }
     }
@@ -333,9 +348,9 @@ export async function completeService(
         serviceId,
     );
     if (res.ok) {
-        const customerId = await getCustomerId(serviceId);
-        if (customerId) {
-            await createNotification(customerId, {
+        const owner = await getServiceOwner(serviceId);
+        if (owner) {
+            await createNotification(owner.customerId, {
                 type: "SERVICE_COMPLETED",
                 title: "서비스가 완료되었어요",
                 body: "동행이 안전하게 마무리됐어요. 이용 후기를 남겨주세요.",
