@@ -15,10 +15,19 @@ import { COMPANY } from "@/lib/legal/company";
  *  **셋 다 운영하지 않는 창구**였고, 이메일은 도메인 오타(hamkkegayo)까지 있어
  *  보낸 문의가 아무 데도 닿지 않았다.
  *
+ *  이메일은 실제 수신·응대하는 주소로 다시 넣었다. 푸터가 전자상거래법
+ *  제10조 표시사항으로 이미 같은 주소를 공개하고 있어, 여기서 빼 두면
+ *  고객이 푸터 주소로 보내는데 고객센터는 모르는 창구 이원화가 생긴다.
+ *
  *  값은 COMPANY 한 곳에서 읽는다 — 푸터·약관 부칙과 어긋날 수 없게.
  */
-const CONTACTS = [
-    { label: "전화 상담", value: COMPANY.tel, tel: COMPANY.tel },
+const CONTACTS: { label: string; value: string; href?: string }[] = [
+    { label: "전화 상담", value: COMPANY.tel, href: `tel:${COMPANY.tel}` },
+    {
+        label: "이메일 문의",
+        value: COMPANY.email,
+        href: `mailto:${COMPANY.email}`,
+    },
     { label: "상담 시간", value: COMPANY.hours },
     {
         label: "문의 유형",
@@ -102,13 +111,19 @@ export default function MypageSupport() {
                         모았습니다.
                     </p>
                 </Card>
+                {/*
+                    전에는 "평일 08:00~20:00 / 토요일 09:00~15:00" 이 하드코딩돼
+                    있었다. 같은 사이트의 약관 부칙 표가 "고객센터 운영시간" 으로
+                    COMPANY.hours 를 공개하고 있어 두 값이 정면으로 어긋났다.
+                */}
                 <Card>
                     <p className="text-muted-foreground text-sm">상담 가능</p>
                     <p className="text-foreground mt-3 font-bold">
-                        평일 08:00 ~ 20:00
+                        {COMPANY.hours}
                     </p>
-                    <p className="text-foreground mt-3 font-bold">
-                        토요일 09:00 ~ 15:00
+                    <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+                        상담 시간 외에 남기신 문의는 다음 영업일에 순서대로
+                        답변드립니다.
                     </p>
                 </Card>
             </div>
@@ -129,9 +144,9 @@ export default function MypageSupport() {
                                 <span className="text-muted-foreground font-medium">
                                     {c.label}:{" "}
                                 </span>
-                                {c.tel ? (
+                                {c.href ? (
                                     <a
-                                        href={`tel:${c.tel}`}
+                                        href={c.href}
                                         className="text-foreground hover:text-brand font-bold"
                                     >
                                         {c.value}
