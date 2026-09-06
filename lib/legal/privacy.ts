@@ -478,7 +478,7 @@ export const PRIVACY: LegalDocument = {
                         ["이메일", COMPANY.email],
                         [
                             "문의 방법",
-                            "이메일 문의 / 카카오톡 'hamkegayo' 문의",
+                            `이메일 문의 / 카카오톡 '${COMPANY.kakao}' 문의`,
                         ],
                     ],
                 },

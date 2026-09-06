@@ -15,11 +15,13 @@ import { COMPANY } from "@/lib/legal/company";
  *  **셋 다 운영하지 않는 창구**였고, 이메일은 도메인 오타(hamkkegayo)까지 있어
  *  보낸 문의가 아무 데도 닿지 않았다.
  *
- *  이메일은 실제 수신·응대하는 주소로 다시 넣었다. 푸터가 전자상거래법
- *  제10조 표시사항으로 이미 같은 주소를 공개하고 있어, 여기서 빼 두면
- *  고객이 푸터 주소로 보내는데 고객센터는 모르는 창구 이원화가 생긴다.
+ *  이메일과 카카오톡은 실제 운영하는 창구로 다시 넣었다. 둘 다 법무
+ *  문서가 이미 공개하고 있어서다 — 이메일은 푸터의 전자상거래법 제10조
+ *  표시사항, 카카오톡은 처리방침 제14조의 문의 방법이다. **문서가 공개한
+ *  창구를 화면에서 빼 두면** 이용자는 문서를 보고 찾아오는데 고객센터에는
+ *  없는 상태가 된다.
  *
- *  값은 COMPANY 한 곳에서 읽는다 — 푸터·약관 부칙과 어긋날 수 없게.
+ *  값은 COMPANY 한 곳에서 읽는다 — 푸터·약관 부칙·처리방침과 어긋날 수 없게.
  */
 const CONTACTS: { label: string; value: string; href?: string }[] = [
     { label: "전화 상담", value: COMPANY.tel, href: `tel:${COMPANY.tel}` },
@@ -28,6 +30,9 @@ const CONTACTS: { label: string; value: string; href?: string }[] = [
         value: COMPANY.email,
         href: `mailto:${COMPANY.email}`,
     },
+    // 처리방침 제14조가 문의 방법으로 공개하는 창구다. 화면에서 빼 두면
+    // 이용자는 방침을 보고 찾아오는데 고객센터에는 없는 상태가 된다.
+    { label: "카카오톡 문의", value: COMPANY.kakao },
     { label: "상담 시간", value: COMPANY.hours },
     {
         label: "문의 유형",
