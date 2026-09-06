@@ -25,6 +25,21 @@ export type ReportAttachmentView = {
     size: number;
 };
 
+/**
+ * 리포트에 싣는 수행 시각 한 줄.
+ *
+ *  값은 전부 services 에 서버가 찍어 둔 것이다. 리포트가 따로 갖고 있지
+ *  않는다 — 두 곳에 두면 어긋나고, 어긋나면 어느 쪽이 맞는지 판단할 근거가
+ *  없다(#55, 마이그레이션 41).
+ */
+export type ReportTimeRow = {
+    label: string;
+    /** "HH:mm" */
+    value: string;
+    /** 청구 구간의 시작·끝. 분쟁 시 먼저 보는 두 줄이다. */
+    billing?: boolean;
+};
+
 export type ReportContext = {
     serviceId: string;
     code: string;
@@ -34,11 +49,17 @@ export type ReportContext = {
     customerAge: string;
     customerGender: string;
     partnerName: string;
+    /** 기록된 시각만 순서대로. 누르지 않은 단계는 아예 나오지 않는다. */
+    times: ReportTimeRow[];
+    /** 청구 기준 구간. 기록이 없으면 빈 문자열 */
+    timeRange: string;
+    /** 파트너가 종료를 누르지 않아 시스템이 마감한 건 */
+    autoClosed: boolean;
+    /** 이용자 미도착으로 끝난 건 (약관 제15조 ③) */
+    noShow: boolean;
     report: {
         id: string;
         status: "DRAFT" | "SUBMITTED";
-        meetTime: string;
-        endTime: string;
         supports: string[];
         exam: string;
         guardianNote: string;
@@ -142,6 +163,22 @@ export async function getPartnerPendingReportCount(): Promise<number> {
 type ContextRow = {
     id: string;
     partner_id: string;
+    arrived_at: string | null;
+    started_at: string | null;
+    ended_at: string | null;
+    notified_at: string | null;
+    hospital_arrived_at: string | null;
+    reception_at: string | null;
+    wait_started_at: string | null;
+    wait_ended_at: string | null;
+    treatment_started_at: string | null;
+    treatment_ended_at: string | null;
+    checkout_started_at: string | null;
+    checkout_ended_at: string | null;
+    home_departed_at: string | null;
+    handover_at: string | null;
+    no_show: boolean | null;
+    auto_closed_at: string | null;
     reservations: {
         code: string;
         hospital_address: string;
@@ -155,14 +192,64 @@ type ContextRow = {
         | {
               id: string;
               status: string;
-              meet_time: string | null;
-              end_time: string | null;
               supports: string[] | null;
               exam: string | null;
               guardian_note: string | null;
           }[]
         | null;
 };
+
+/** ISO → "HH:mm". 값이 없으면 null. */
+function toTimeLabel(iso: string | null): string | null {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    return `${hh}:${mm}`;
+}
+
+/**
+ * 리포트에 실을 시각 목록.
+ *
+ *  순서는 매뉴얼 단계 순서다(4 → 7 → 8 → 9 → 11 → 12 → 13). 누르지 않은
+ *  단계는 넣지 않는다 — 빈 줄을 채워 두면 "기록이 있는데 비어 있다" 로
+ *  읽힌다. 시작·종료 두 줄만 청구 구간으로 표시한다.
+ */
+function buildTimes(r: ContextRow): ReportTimeRow[] {
+    const rows: [string, string | null, boolean?][] = [
+        ["파트너 도착", r.arrived_at],
+        ["도착 통보", r.notified_at],
+        ["서비스 시작", r.started_at, true],
+        ["병원 도착", r.hospital_arrived_at],
+        ["접수 완료", r.reception_at],
+        ["대기 시작", r.wait_started_at],
+        ["대기 종료", r.wait_ended_at],
+        ["진료·검사 시작", r.treatment_started_at],
+        ["진료·검사 종료", r.treatment_ended_at],
+        ["수납·약국 시작", r.checkout_started_at],
+        ["수납·약국 종료", r.checkout_ended_at],
+        ["귀가 출발", r.home_departed_at],
+        ["인계 확인", r.handover_at],
+        ["서비스 종료", r.ended_at, true],
+    ];
+
+    const out: ReportTimeRow[] = [];
+    for (const [label, iso, billing] of rows) {
+        const value = toTimeLabel(iso);
+        if (!value) continue;
+        out.push(billing ? { label, value, billing: true } : { label, value });
+    }
+    return out;
+}
+
+const CONTEXT_SELECT =
+    "id, partner_id, arrived_at, started_at, ended_at, " +
+    "notified_at, hospital_arrived_at, reception_at, wait_started_at, wait_ended_at, " +
+    "treatment_started_at, treatment_ended_at, checkout_started_at, checkout_ended_at, " +
+    "home_departed_at, handover_at, no_show, auto_closed_at, " +
+    "reservations!inner(code, hospital_address, treatment, patient_name, patient_birth, patient_gender, use_date), " +
+    "reports(id, status, supports, exam, guardian_note)";
 
 /** 리포트 작성 컨텍스트 (서비스 + 기존 리포트/첨부) */
 export async function getReportContext(
@@ -177,9 +264,7 @@ export async function getReportContext(
 
         const { data, error } = await supabase
             .from("services")
-            .select(
-                "id, partner_id, reservations!inner(code, hospital_address, treatment, patient_name, patient_birth, patient_gender, use_date), reports(id, status, meet_time, end_time, supports, exam, guardian_note)",
-            )
+            .select(CONTEXT_SELECT)
             .eq("id", serviceId)
             .eq("partner_id", user.id)
             .eq("status", "COMPLETED")
@@ -213,6 +298,10 @@ export async function getReportContext(
             }));
         }
 
+        const times = buildTimes(data);
+        const startLabel = toTimeLabel(data.started_at);
+        const endLabel = toTimeLabel(data.ended_at);
+
         return {
             serviceId: data.id,
             code: res?.code ?? "",
@@ -222,13 +311,16 @@ export async function getReportContext(
             customerAge: res ? ageLabel(res.patient_birth) : "",
             customerGender: res?.patient_gender === "male" ? "남성" : "여성",
             partnerName: prof?.name ? `${prof.name} 파트너` : "파트너",
+            times,
+            timeRange:
+                startLabel && endLabel ? `${startLabel} ~ ${endLabel}` : "",
+            autoClosed: data.auto_closed_at != null,
+            noShow: data.no_show === true,
             report: report
                 ? {
                       id: report.id,
                       status:
                           report.status === "SUBMITTED" ? "SUBMITTED" : "DRAFT",
-                      meetTime: report.meet_time ?? "",
-                      endTime: report.end_time ?? "",
                       supports: report.supports ?? [],
                       exam: report.exam ?? "",
                       guardianNote: report.guardian_note ?? "",
