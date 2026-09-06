@@ -1,4 +1,4 @@
-import type { LegalDocument } from "./types";
+import type { LegalArticle, LegalDocument } from "./types";
 import { COMPANY, mailOrderLabel } from "./company";
 
 /**
@@ -803,3 +803,23 @@ export const TERMS: LegalDocument = {
         },
     ],
 };
+
+/**
+ * 조 번호로 약관 조문을 꺼낸다.
+ *
+ *  취소·환불 정책 페이지(#52)가 제19~22조를 발췌해 보여준다. 그 페이지에
+ *  조문을 다시 적으면 약관이 개정될 때 한쪽만 바뀐다 — 같은 데이터를 읽게
+ *  해서 어긋날 수 없게 한다.
+ *
+ *  없는 조를 찾으면 던진다. 조 번호가 바뀌었는데 화면이 조용히 비는 것보다
+ *  빌드가 깨지는 편이 낫다.
+ */
+export function termsArticle(no: string): LegalArticle {
+    const found = TERMS.articles.find((a) => a.no === no);
+    if (!found) {
+        throw new Error(
+            `이용약관에 ${no} 가 없습니다. 개정으로 조 번호가 바뀌었는지 확인하세요.`,
+        );
+    }
+    return found;
+}

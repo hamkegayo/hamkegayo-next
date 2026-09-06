@@ -17,7 +17,14 @@ function anchorId(index: number): string {
     return `article-${index + 1}`;
 }
 
-function ArticleBody({ article }: { article: LegalArticle }) {
+/**
+ * 조문 본문 렌더러.
+ *
+ *  약관·방침 전문 페이지 외에 **취소·환불 정책 페이지**도 같은 조문을
+ *  발췌해 보여준다(#52). 그쪽에서 서식을 새로 짜면 같은 조문이 두 화면에서
+ *  다르게 보이므로 렌더러를 공유한다.
+ */
+export function ArticleBody({ article }: { article: LegalArticle }) {
     return (
         <div className="mt-3 space-y-3">
             {article.blocks.map((block, i) => {
