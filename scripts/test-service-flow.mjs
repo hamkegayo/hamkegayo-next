@@ -116,7 +116,7 @@ async function makeService(customerId, partnerId, suffix, useDate, arriveTime) {
         .select("id")
         .single();
     if (sErr) throw sErr;
-    return { reservationId: res.id, serviceId: svc.id };
+    return { reservationId: res.id, serviceId: svc.id, partnerId };
 }
 
 async function cleanup() {
@@ -231,6 +231,41 @@ async function main() {
         p_field: "reception_at",
     });
     check("남의 서비스에는 기록할 수 없다", !!asUser.error);
+
+    // =============================================================
+    section("리포트는 시각을 따로 갖지 않는다 (매뉴얼 14단계)");
+    // =============================================================
+    //  파트너가 버튼으로 시각을 남긴 뒤 리포트에서 손으로 다시 치던 칸이
+    //  있었다. 그러면 보호자가 보는 시간과 청구되는 시간이 갈린다 —
+    //  약관 제12조 ④ 는 둘을 "함께 확인" 하라고 하는데 함께 확인하면
+    //  서로 달랐다. 저장할 자리를 없애 손으로 칠 수 없게 만들었다.
+
+    const withTypedTime = await admin
+        .from("reports")
+        .insert({
+            service_id: past.serviceId,
+            partner_id: past.partnerId,
+            status: "DRAFT",
+            meet_time: "09:00",
+        })
+        .select("id");
+    check(
+        "리포트에 시각을 손으로 넣을 자리가 없다",
+        !!withTypedTime.error,
+        withTypedTime.error?.message ?? "insert 가 성공해 버렸다",
+    );
+
+    // 대신 같은 사실이 services 에 그대로 있다 — 리포트는 이것을 읽는다.
+    const { data: svcTimes } = await admin
+        .from("services")
+        .select("started_at, hospital_arrived_at")
+        .eq("id", past.serviceId)
+        .maybeSingle();
+    check(
+        "리포트가 읽어 갈 시각은 services 에 남아 있다",
+        !!svcTimes?.started_at && !!svcTimes?.hospital_arrived_at,
+        JSON.stringify(svcTimes),
+    );
 
     // =============================================================
     section("이용자 미도착 종료 — 약관 제15조 ③④");
