@@ -25,6 +25,14 @@ export type CompanyInfo = {
     /** 약관 제13조 ③ — 서비스 운영시간과 같은 값이어야 한다 */
     hours: string;
     email: string;
+    /**
+     * 카카오톡 문의 아이디.
+     *
+     * 개인정보처리방침 제14조가 문의 방법으로 공개하는 창구다. 방침이
+     * 공개한 창구를 화면에서 빼 두면 이용자는 방침을 보고 찾아오는데
+     * 고객센터에는 없는 상태가 된다.
+     */
+    kakao: string;
     /** 개인정보처리방침 제14조 */
     privacyOfficer: string;
 };
@@ -38,6 +46,7 @@ export const COMPANY: CompanyInfo = {
     tel: "010-9345-2328",
     hours: "06:00~18:00",
     email: "hamkegayo@gmail.com",
+    kakao: "hamkegayo",
     privacyOfficer: "김서현 대표",
 };
 

@@ -4,7 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 /**
- * 회원 탈퇴 (#72) — 개인정보처리방침 제4조 · 제11조 ②.
+ * 회원 탈퇴 (#72) — 개인정보처리방침 제4조 · 제11조 ③.
  *
  *  ⚠️ **auth.users 를 지우지 않는다.** profiles 가 auth.users 를
  *     `on delete cascade` 로 참조하고, 12개 테이블이 다시 profiles 를

@@ -103,7 +103,7 @@ async function main() {
     await cleanup();
 
     // =============================================================
-    console.log("\n▶ 탈퇴 시 거래기록 보존 (처리방침 제4조 · 제11조 ②)");
+    console.log("\n▶ 탈퇴 시 거래기록 보존 (처리방침 제4조 · 제11조 ③)");
     // =============================================================
     const member = await makeMember("user");
 
@@ -207,7 +207,7 @@ async function main() {
         .eq("profile_id", member.id)
         .maybeSingle();
     check(
-        "식별정보가 분리 보관된다 (제11조 ②)",
+        "식별정보가 분리 보관된다 (제11조 ③)",
         kept?.name === "탈퇴테스트user" && kept?.email === member.email,
         JSON.stringify(kept),
     );
@@ -233,7 +233,7 @@ async function main() {
     );
 
     // =============================================================
-    console.log("\n▶ 분리 보관본 접근 차단 (제11조 ②)");
+    console.log("\n▶ 분리 보관본 접근 차단 (제11조 ③)");
     // =============================================================
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (anonKey) {
