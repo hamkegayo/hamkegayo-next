@@ -14,7 +14,7 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { runExpirySweep } from "@/lib/expire-matchings";
-import { toHhmm } from "@/lib/format";
+import { kstToday, toHhmm } from "@/lib/format";
 import { planDisplay, type PlanCode } from "@/lib/reservation";
 import { calcPartnerPayout, calcPrepayment } from "@/lib/pricing";
 
@@ -89,8 +89,12 @@ function formatDateLabel(useDate: string): string {
     if (!y || !mo || !d) return useDate;
 
     const target = new Date(y, mo - 1, d);
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // 오늘/내일 판정은 KST 기준이다. 서버(UTC)의 오늘을 쓰면 KST 09시
+    // 이전에 하루가 밀린다.
+    const [ty, tmo, td] = kstToday()
+        .split("-")
+        .map((n) => Number(n));
+    const today = new Date(ty, tmo - 1, td);
     const diffDays = Math.round(
         (target.getTime() - today.getTime()) / 86_400_000,
     );

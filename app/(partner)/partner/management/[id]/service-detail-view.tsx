@@ -39,10 +39,15 @@ import {
     endService,
     endServiceNoShow,
     recordServiceTime,
-    SERVICE_TIME_FIELDS,
     startService,
-    type ServiceTimeField,
 } from "../../_actions/services";
+// 값은 서버 액션 파일이 아니라 평범한 모듈에서 가져온다 — "use server" 는
+// async 함수만 export 할 수 있고, 그 밖의 값은 클라이언트에서 서버 참조
+// 프록시로 바뀐다(#55 회귀).
+import {
+    SERVICE_TIME_FIELDS,
+    type ServiceTimeField,
+} from "../../../_lib/service-times";
 import { EndServiceModal } from "../../../_components/end-service-modal";
 import { ServiceFeedbackModal } from "../../../_components/service-feedback-modal";
 import {

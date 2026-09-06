@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { planDisplay, type PlanCode } from "@/lib/reservation";
+import { kstTime } from "@/lib/format";
 
 /** 리포트 목록 항목 — 완료된 서비스 기준 */
 export type ReportListItem = {
@@ -204,9 +205,7 @@ function toTimeLabel(iso: string | null): string | null {
     if (!iso) return null;
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return null;
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
-    return `${hh}:${mm}`;
+    return kstTime(d);
 }
 
 /**

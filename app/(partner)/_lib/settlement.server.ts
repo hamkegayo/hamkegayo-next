@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { planDisplay, type PlanCode } from "@/lib/reservation";
 import type { Settlement, SettlementSummary } from "./settlement";
+import { kstDateDot } from "@/lib/format";
 
 /**
  * 정산 이력은 partner_list_settlements() RPC 로 읽는다 — #66 · #67
@@ -36,7 +37,7 @@ function formatSettled(iso: string | null): string | null {
     if (!iso) return null;
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return null;
-    return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+    return kstDateDot(d) ?? "";
 }
 
 /** 정산 ID 표시용 (ST-YYYYMM-앞4자리) */

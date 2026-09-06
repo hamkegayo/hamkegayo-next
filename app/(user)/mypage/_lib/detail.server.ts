@@ -1,5 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
-import { toHhmm } from "@/lib/format";
+import { kstStamp, toHhmm } from "@/lib/format";
 import { createAdminClient } from "@/utils/supabase/admin";
 import {
     PLAN_INFO,
@@ -117,16 +117,9 @@ function formatDate(useDate: string): string {
     return `${y}.${String(mo).padStart(2, "0")}.${String(d).padStart(2, "0")}`;
 }
 
-/** ISO → "MM.DD HH:mm" */
+/** ISO → "MM.DD HH:mm" (KST). 서버는 UTC 로 도므로 시간대를 명시한다. */
 function formatStamp(iso: string | null): string | null {
-    if (!iso) return null;
-    const dt = new Date(iso);
-    if (Number.isNaN(dt.getTime())) return null;
-    const mm = String(dt.getMonth() + 1).padStart(2, "0");
-    const dd = String(dt.getDate()).padStart(2, "0");
-    const hh = String(dt.getHours()).padStart(2, "0");
-    const mi = String(dt.getMinutes()).padStart(2, "0");
-    return `${mm}.${dd} ${hh}:${mi}`;
+    return kstStamp(iso);
 }
 
 type ReservationRow = {

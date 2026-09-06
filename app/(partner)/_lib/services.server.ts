@@ -1,5 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
-import { toHhmm } from "@/lib/format";
+import { kstTime, kstToday, toHhmm } from "@/lib/format";
 import {
     planDisplay,
     type PlanCode,
@@ -134,7 +134,7 @@ function toTimeLabel(iso: string | null): string | null {
     if (!iso) return null;
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return null;
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    return kstTime(d);
 }
 
 function ageLabel(birth: string): string {
@@ -276,10 +276,14 @@ export async function getPartnerServices(): Promise<PartnerServiceView[]> {
     }
 }
 
-/** 로컬 기준 오늘 날짜(YYYY-MM-DD) */
+/**
+ * 오늘 날짜(YYYY-MM-DD · KST).
+ *
+ *  서버가 UTC 로 돌면 KST 09시 이전에는 어제가 나온다 — "오늘 일정" 에
+ *  전날 건이 뜨고 오늘 건이 빠진다.
+ */
 function localToday(): string {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return kstToday();
 }
 
 /**
