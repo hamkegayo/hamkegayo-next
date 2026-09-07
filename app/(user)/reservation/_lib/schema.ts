@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isPastSlot, MIN_LEAD_MINUTES, reservationStartAt } from "./options";
+
 const required = "필수 입력 항목입니다.";
 
 /** STEP1 · 이용자 / 진료 정보 */
@@ -107,7 +109,44 @@ function requireHandover(
  *  카드번호·유효기간을 우리 폼에서 받으면 PCI-DSS 대상이 된다.
  */
 
-export const step2Form = step2Schema.superRefine(requireHandover);
+/**
+ * 이용일시 검증.
+ *
+ *  지난 시각으로 예약이 만들어지면 화면은 "매칭 진행 중" 을 보여주는데
+ *  정기 배치가 곧바로 CANCELLED 로 바꾼다. 파트너 목록을 여는 순간에도
+ *  만료 정리가 돌기 때문에, 이용자는 매칭 중인 줄 알고 파트너에게는
+ *  아무것도 보이지 않는다. 폼과 서버 양쪽에서 막는다.
+ */
+function checkSchedule(
+    v: { useDate: string; arriveTime: string; reserveTime: string },
+    ctx: z.RefinementCtx,
+) {
+    if (!v.useDate || !v.arriveTime || !v.reserveTime) return;
+
+    if (isPastSlot(v.useDate, v.arriveTime)) {
+        ctx.addIssue({
+            code: "custom",
+            path: ["arriveTime"],
+            message: `지금부터 ${MIN_LEAD_MINUTES}분 뒤부터 예약할 수 있습니다. 날짜와 시간을 다시 선택해 주세요.`,
+        });
+        return;
+    }
+
+    // 파트너가 도착하기 전에 진료가 시작될 수는 없다.
+    const arrive = reservationStartAt(v.useDate, v.arriveTime);
+    const reserve = reservationStartAt(v.useDate, v.reserveTime);
+    if (arrive && reserve && reserve.getTime() < arrive.getTime()) {
+        ctx.addIssue({
+            code: "custom",
+            path: ["reserveTime"],
+            message: "진료 예약 시간은 파트너 도착 시간보다 빠를 수 없습니다.",
+        });
+    }
+}
+
+export const step2Form = step2Schema
+    .superRefine(requireHandover)
+    .superRefine(checkSchedule);
 
 export type Step1Values = z.infer<typeof step1Schema>;
 export type Step2Values = z.infer<typeof step2Schema>;
@@ -120,6 +159,7 @@ export const reservationServerSchema = step1Schema
         plan: z.enum(["basic", "plus"]),
     })
     // 화면을 우회해 직접 호출해도 인계자 없는 성인 인계는 막는다.
-    .superRefine(requireHandover);
+    .superRefine(requireHandover)
+    .superRefine(checkSchedule);
 
 export type ReservationInput = z.infer<typeof reservationServerSchema>;

@@ -73,3 +73,69 @@ export const COGNITIVE_OPTIONS: string[] = [
     "인지 저하 있음 (반복 안내 필요)",
     "보호자 동반 필요",
 ];
+
+/**
+ * 예약 가능 최소 여유시간(분).
+ *
+ *  ⚠️ 약관에 조문이 없다. 제품 판단이다.
+ *
+ *  0 으로 두면 "1분 뒤" 예약이 만들어지고, 매칭이 끝나기도 전에 정기 배치가
+ *  지난 예약으로 보고 취소한다. 파트너가 수락하고 이용자가 선택해 결제까지
+ *  마쳐야 확정되는데(결제 기한만 30분) 그 시간이 물리적으로 없다.
+ *
+ *  FAQ 는 "최소 3시간 전 예약을 권장" 이라고 안내한다. 여기서 막는 것은
+ *  권장이 아니라 **불가능한 예약**이다.
+ */
+export const MIN_LEAD_MINUTES = 30;
+
+/** "9시 30분" · "09:30" → { h, m }. DB 의 reservation_start_at 과 같은 규칙. */
+export function parseTimeOption(time: string): { h: number; m: number } | null {
+    const t = time.trim();
+    const hm = /(\d{1,2})\D+(\d{1,2})/.exec(t);
+    if (hm) return { h: Number(hm[1]), m: Number(hm[2]) };
+    const h = /(\d{1,2})/.exec(t);
+    return h ? { h: Number(h[1]), m: 0 } : null;
+}
+
+/**
+ * 예약 시작 시각.
+ *
+ *  DB 의 `reservation_start_at(use_date, time)` 이 `at time zone 'Asia/Seoul'`
+ *  로 계산하므로 여기서도 KST 를 고정한다. 한국은 서머타임이 없어 +09:00 이
+ *  항상 맞다. 실행 환경 시간대를 타면 서버(UTC)에서 9시간 어긋난다.
+ */
+export function reservationStartAt(useDate: string, time: string): Date | null {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(useDate.trim())) return null;
+    const t = parseTimeOption(time);
+    if (!t) return null;
+    const hh = String(t.h).padStart(2, "0");
+    const mm = String(t.m).padStart(2, "0");
+    const at = new Date(`${useDate.trim()}T${hh}:${mm}:00+09:00`);
+    return Number.isNaN(at.getTime()) ? null : at;
+}
+
+/**
+ * 지금 신청할 수 없는 시각인가.
+ *
+ *  지난 시각으로 예약이 만들어지면 화면은 "매칭 진행 중" 을 보여주는데
+ *  정기 배치가 곧바로 취소한다. 파트너 목록을 여는 순간에도 만료 정리가
+ *  돌아서, 이용자는 매칭 중인 줄 알고 파트너에게는 보이지 않는다.
+ */
+export function isPastSlot(
+    useDate: string,
+    time: string,
+    now: Date = new Date(),
+): boolean {
+    const at = reservationStartAt(useDate, time);
+    if (!at) return false; // 형식 오류는 다른 검증이 잡는다
+    return at.getTime() < now.getTime() + MIN_LEAD_MINUTES * 60_000;
+}
+
+/** 그 날짜에 고를 수 있는 시간 옵션. 오늘이면 이미 지난 시각을 뺀다. */
+export function timeOptionsFor(
+    useDate: string,
+    now: Date = new Date(),
+): string[] {
+    if (!useDate) return TIME_OPTIONS;
+    return TIME_OPTIONS.filter((t) => !isPastSlot(useDate, t, now));
+}

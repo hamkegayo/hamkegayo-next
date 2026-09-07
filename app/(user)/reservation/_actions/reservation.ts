@@ -23,10 +23,17 @@ export async function createReservation(
     // 서버 재검증
     const parsed = reservationServerSchema.safeParse(input);
     if (!parsed.success) {
+        // 일정 문제는 이유를 그대로 보여준다. "입력값을 확인하세요" 만
+        // 띄우면 어느 칸이 문제인지 알 수 없어 같은 신청을 반복하게 된다.
+        const schedule = parsed.error.issues.find((i) =>
+            ["useDate", "arriveTime", "reserveTime"].includes(
+                String(i.path[0] ?? ""),
+            ),
+        );
         return {
             ok: false,
             reason: "validation",
-            message: "입력값을 다시 확인해 주세요.",
+            message: schedule?.message ?? "입력값을 다시 확인해 주세요.",
         };
     }
     const v = parsed.data;
