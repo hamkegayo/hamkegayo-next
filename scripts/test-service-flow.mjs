@@ -534,6 +534,117 @@ async function main() {
     const byUser = await user.rpc("auto_close_stale_services");
     check("일반 사용자는 자동 마감을 호출할 수 없다", !!byUser.error);
 
+    // =============================================================
+    section("예약 취소 사유 기록");
+    // =============================================================
+    //  이용자가 매칭 화면을 열어 둔 사이 예약이 자동 취소되면 화면은 계속
+    //  "매칭 진행 중" 을 보여줬다. 화면이 판단하려면 상태와 **사유**가
+    //  필요하다. 사유가 비면 "누가 취소했는지" 를 말할 수 없다.
+
+    /** 매칭 상태 예약 하나 (서비스 없이) */
+    async function makeMatching(code, arriveTime, useDate) {
+        const { data, error } = await admin
+            .from("reservations")
+            .insert({
+                code,
+                customer_id: customerId,
+                status: "MATCHING",
+                plan: "basic",
+                patient_name: "취소테스트",
+                patient_birth: "1960-01-01",
+                patient_gender: "male",
+                patient_phone: "010-0000-0000",
+                guardian_name: "보호자",
+                guardian_phone: "010-0000-0000",
+                relation: "본인",
+                treatment: "내과",
+                purpose: "검진",
+                use_date: useDate,
+                arrive_time: arriveTime,
+                reserve_time: "23시 00분",
+                duration: "2시간",
+                duration_minutes: 120,
+                depart_address: "출발지",
+                hospital_address: "병원",
+                hourly_rate: 20000,
+                fee_rate: 0.2,
+                surcharge_rate: 0,
+                prepaid_amount: 40000,
+            })
+            .select("id")
+            .single();
+        if (error) throw error;
+        return data.id;
+    }
+
+    // 어제 도착 시각 → 자동 만료 대상
+    const yesterday = new Date(Date.now() - 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+    const expiredId = await makeMatching(
+        `${CODE_PREFIX}-CANCEL-EXP`,
+        "10시 00분",
+        yesterday,
+    );
+
+    await admin.rpc("expire_past_matchings");
+
+    const { data: expiredRow } = await admin
+        .from("reservations")
+        .select("status, cancel_reason, cancelled_at")
+        .eq("id", expiredId)
+        .maybeSingle();
+    check(
+        "자동 만료는 EXPIRED 로 남는다",
+        expiredRow?.status === "CANCELLED" &&
+            expiredRow?.cancel_reason === "EXPIRED" &&
+            !!expiredRow?.cancelled_at,
+        JSON.stringify(expiredRow),
+    );
+
+    // 이용자 본인 취소 → USER
+    const cancelTomorrow = new Date(Date.now() + 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+    const mineId = await makeMatching(
+        `${CODE_PREFIX}-CANCEL-USER`,
+        "10시 00분",
+        cancelTomorrow,
+    );
+
+    const cancelByUser = await user.rpc("cancel_matching_reservation", {
+        p_reservation_id: mineId,
+    });
+    const { data: userRow } = await admin
+        .from("reservations")
+        .select("status, cancel_reason")
+        .eq("id", mineId)
+        .maybeSingle();
+    check(
+        "본인 취소는 USER 로 남는다",
+        cancelByUser.data === true &&
+            userRow?.status === "CANCELLED" &&
+            userRow?.cancel_reason === "USER",
+        JSON.stringify({ rpc: cancelByUser.data, row: userRow }),
+    );
+
+    // 남의 예약은 취소할 수 없다
+    const otherId = await makeMatching(
+        `${CODE_PREFIX}-CANCEL-OTHER`,
+        "10시 00분",
+        cancelTomorrow,
+    );
+    const byPartner = await partner.rpc("cancel_matching_reservation", {
+        p_reservation_id: otherId,
+    });
+    check("남의 예약은 취소할 수 없다", !!byPartner.error);
+
+    // 이미 취소된 건을 다시 취소해도 조용히 false
+    const cancelAgain = await user.rpc("cancel_matching_reservation", {
+        p_reservation_id: mineId,
+    });
+    check("이미 취소된 건은 false 를 돌려준다", cancelAgain.data === false);
+
     await partner.auth.signOut();
     await user.auth.signOut();
     await cleanup();

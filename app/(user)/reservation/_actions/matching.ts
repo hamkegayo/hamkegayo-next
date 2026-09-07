@@ -154,6 +154,58 @@ export async function getReservationApplicantsDetailed(
     }
 }
 
+/** 예약 취소 사유 — DB 의 reservations.cancel_reason 과 같은 값이다. */
+export type CancelReason = "EXPIRED" | "USER" | "REFUND" | "ADMIN" | null;
+
+export type MatchingState = {
+    /** 예약이 사라졌거나 남의 예약이면 null */
+    status: "MATCHING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" | null;
+    cancelReason: CancelReason;
+    applicants: DetailedApplicant[];
+};
+
+/**
+ * 매칭 화면이 주기적으로 읽는 상태.
+ *
+ *  지원자만 읽고 있었다. 그래서 예약이 자동 취소돼도 화면은 계속
+ *  "매칭 진행 중" 을 보여줬다 — 취소된 예약에는 지원자가 없으니 영영
+ *  0명이다. 상태와 사유를 함께 내려 화면이 판단하게 한다.
+ *
+ *  RLS 가 본인 예약만 내려주므로 남의 예약은 status = null 로 떨어진다.
+ */
+export async function getMatchingState(
+    reservationId: string,
+): Promise<MatchingState> {
+    const empty: MatchingState = {
+        status: null,
+        cancelReason: null,
+        applicants: [],
+    };
+    try {
+        const supabase = await createClient();
+        const { data } = await supabase
+            .from("reservations")
+            .select("status, cancel_reason")
+            .eq("id", reservationId)
+            .maybeSingle<{ status: string; cancel_reason: string | null }>();
+
+        if (!data) return empty;
+
+        const status = data.status as NonNullable<MatchingState["status"]>;
+        const cancelReason = (data.cancel_reason ?? null) as CancelReason;
+
+        // 매칭 중일 때만 지원자를 읽는다. 취소된 건에는 조회할 것이 없다.
+        const applicants =
+            status === "MATCHING"
+                ? await getReservationApplicantsDetailed(reservationId)
+                : [];
+
+        return { status, cancelReason, applicants };
+    } catch {
+        return empty;
+    }
+}
+
 export type CancelReservationResult =
     { ok: true } | { ok: false; message: string };
 
@@ -175,13 +227,11 @@ export async function cancelReservation(
         return { ok: false, message: "로그인이 필요합니다." };
     }
 
-    const { data, error } = await supabase
-        .from("reservations")
-        .update({ status: "CANCELLED" })
-        .eq("id", reservationId)
-        .eq("status", "MATCHING")
-        .select("id")
-        .maybeSingle();
+    // 취소 사유(USER)를 함께 남겨야 해서 RPC 로 옮겼다. 직접 update 하면
+    // 사유 없이 취소되고, 화면은 "누가 취소했는지" 를 말할 수 없다.
+    const { data, error } = await supabase.rpc("cancel_matching_reservation", {
+        p_reservation_id: reservationId,
+    });
 
     if (error) {
         return {
@@ -189,7 +239,7 @@ export async function cancelReservation(
             message: "취소에 실패했습니다. 잠시 후 다시 시도해 주세요.",
         };
     }
-    if (!data) {
+    if (data !== true) {
         return {
             ok: false,
             message: "취소할 수 없는 예약입니다.",
