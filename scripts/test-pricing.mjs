@@ -21,6 +21,13 @@ import {
     calcFinalCharge,
     calcPrepayment,
 } from "@/lib/pricing";
+import {
+    isPastSlot,
+    MIN_LEAD_MINUTES,
+    reservationStartAt,
+    TIME_OPTIONS,
+    timeOptionsFor,
+} from "@/app/(user)/reservation/_lib/options";
 
 let passed = 0;
 let failed = 0;
@@ -150,6 +157,56 @@ check(
     "8분을 넘으면 15분 단위로 올린다 (제11조 ⑤)",
     over.extraMinutes === 15 && over.total === 45000,
     `연장 ${over.extraMinutes}분 / ${over.total}원`,
+);
+
+// =============================================================
+console.log("\n▶ 예약 가능 시각 (지난 시각 차단)");
+// =============================================================
+//  지난 시각으로 예약이 만들어지면 화면은 "매칭 진행 중" 을 보여주는데
+//  정기 배치가 곧바로 CANCELLED 로 바꾼다. 파트너 목록을 여는 순간에도
+//  만료 정리가 돌아서, 이용자는 매칭 중인 줄 알고 파트너에게는 아무것도
+//  보이지 않는다. 실제로 프로덕션에서 그렇게 났다.
+//
+//  ⚠️ 이 함수들은 KST 를 고정한다. 서버(UTC)와 개발 기계(KST)에서 같은
+//     결과가 나와야 하므로 기준시각을 넣어 검증한다.
+
+// KST 2026-09-07 16:00 == UTC 07:00
+const SLOT_NOW = new Date("2026-09-07T07:00:00Z");
+
+check(
+    "예약 시작 시각을 KST 로 만든다",
+    reservationStartAt("2026-09-07", "9시 30분")?.toISOString() ===
+        "2026-09-07T00:30:00.000Z",
+    String(reservationStartAt("2026-09-07", "9시 30분")),
+);
+
+check(
+    "오늘 이미 지난 시각은 막는다",
+    isPastSlot("2026-09-07", "6시 30분", SLOT_NOW) === true,
+);
+
+check("여유시간 안쪽도 막는다", isPastSlot("2026-09-07", "16시 00분", SLOT_NOW) === true);
+
+check(
+    `여유시간(${MIN_LEAD_MINUTES}분) 뒤부터 열린다`,
+    isPastSlot("2026-09-07", "16시 30분", SLOT_NOW) === false,
+);
+
+check(
+    "다음 날은 모두 열린다",
+    isPastSlot("2026-09-08", "6시 30분", SLOT_NOW) === false,
+);
+
+check(
+    "오늘 남은 옵션만 남긴다",
+    timeOptionsFor("2026-09-07", SLOT_NOW).length === 4 &&
+        timeOptionsFor("2026-09-07", SLOT_NOW)[0] === "16시 30분",
+    timeOptionsFor("2026-09-07", SLOT_NOW).join(","),
+);
+
+check(
+    "다른 날짜는 전체 옵션이 그대로",
+    timeOptionsFor("2026-09-08", SLOT_NOW).length === TIME_OPTIONS.length,
 );
 
 console.log(

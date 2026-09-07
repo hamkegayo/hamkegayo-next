@@ -10,10 +10,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { selectPartner } from "@/app/(user)/mypage/_actions/matching";
 import { resumeReservation } from "../_actions/payment";
 import { useReservationStore } from "../_store/reservation-store";
-import {
-    getReservationApplicantsDetailed,
-    type DetailedApplicant,
-} from "../_actions/matching";
+import { getMatchingState, type DetailedApplicant } from "../_actions/matching";
 import { StepBand } from "./step-band";
 
 const POLL_MS = 5000;
@@ -25,21 +22,39 @@ export function StepPartnerSelect() {
     const [applicants, setApplicants] = useState<DetailedApplicant[]>([]);
     const [selected, setSelected] = useState<DetailedApplicant | null>(null);
     const [pending, startTransition] = useTransition();
+    /** 매칭이 끝난 예약이면 고를 수 없다 (취소·확정 등) */
+    const [closed, setClosed] = useState(false);
 
+    /*
+     * 지원자와 예약 상태를 함께 읽는다.
+     *
+     *  이 화면을 열어 둔 사이에도 예약은 자동 취소될 수 있다(서비스 시작
+     *  예정시각 경과). 상태를 보지 않으면 없는 예약의 파트너를 고르게 되고,
+     *  선택 시점에야 알 수 없는 오류로 튕긴다.
+     */
     useEffect(() => {
         if (!reservationId) return;
         let active = true;
+        let timer: ReturnType<typeof setInterval> | null = null;
+
         const run = async () => {
-            const list = await getReservationApplicantsDetailed(reservationId);
-            if (active) setApplicants(list);
+            const state = await getMatchingState(reservationId);
+            if (!active) return;
+            setApplicants(state.applicants);
+
+            if (state.status && state.status !== "MATCHING") {
+                setClosed(true);
+                if (timer) clearInterval(timer);
+            }
         };
+
         run();
-        const id = setInterval(() => {
+        timer = setInterval(() => {
             if (document.visibilityState === "visible") run();
         }, POLL_MS);
         return () => {
             active = false;
-            clearInterval(id);
+            if (timer) clearInterval(timer);
         };
     }, [reservationId]);
 
@@ -96,6 +111,13 @@ export function StepPartnerSelect() {
                         한 분을 선택하면 결제 단계로 넘어갑니다. 결제가 완료되면
                         예약이 확정되고 다른 지원 파트너는 자동으로 마감됩니다.
                     </p>
+
+                    {closed && (
+                        <p className="border-border text-muted-foreground mt-4 rounded-xl border border-dashed px-4 py-3 text-sm leading-relaxed">
+                            이 예약은 더 이상 매칭 중이 아닙니다. 마이페이지에서
+                            상태를 확인해 주세요.
+                        </p>
+                    )}
 
                     {applicants.length === 0 ? (
                         <div className="border-border bg-background mt-6 flex flex-col items-center gap-3 rounded-2xl border px-6 py-16 text-center">

@@ -8,7 +8,8 @@ import { formatPhoneNumber } from "@/lib/format";
 import { Section } from "@/app/(user)/_components/home/section";
 import { useReservationStore } from "../_store/reservation-store";
 import { step2Form, type Step2Values } from "../_lib/schema";
-import { DURATION_OPTIONS, TIME_OPTIONS } from "../_lib/options";
+import { DURATION_OPTIONS, timeOptionsFor } from "../_lib/options";
+import { kstToday } from "@/lib/format";
 import {
     END_METHOD_OPTIONS,
     HANDOVER_FAIL_WAIT_MIN,
@@ -56,6 +57,17 @@ export function StepHospitalInfo() {
     // 종료방식이 성인 인계일 때만 인계자 입력을 띄운다. 독립 귀가를 고르면
     // 입력 6개가 통째로 사라져 폼이 짧아진다.
     const endMethod = useWatch({ control, name: "endMethod" });
+
+    /*
+     * 지난 시각은 아예 고를 수 없게 한다.
+     *
+     *  고를 수 있게 두면 예약이 만들어지고 화면은 "매칭 진행 중" 을
+     *  보여주는데, 정기 배치가 곧바로 취소한다. 파트너 목록을 여는
+     *  순간에도 만료 정리가 돌아서 파트너에게는 아무것도 보이지 않는다.
+     */
+    const useDate = useWatch({ control, name: "useDate" });
+    const timeOptions = timeOptionsFor(useDate ?? "");
+    const noSlotToday = Boolean(useDate) && timeOptions.length === 0;
     const needsHandover = endMethod === "ADULT_HANDOVER";
 
     const onSubmit = (v: Step2Values) => {
@@ -93,6 +105,7 @@ export function StepHospitalInfo() {
                                 <Input
                                     id="useDate"
                                     type="date"
+                                    min={kstToday()}
                                     className="cursor-pointer"
                                     onClick={(e) =>
                                         e.currentTarget.showPicker?.()
@@ -107,6 +120,12 @@ export function StepHospitalInfo() {
                                 <FieldError>
                                     {errors.useDate?.message}
                                 </FieldError>
+                                {noSlotToday && (
+                                    <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">
+                                        오늘은 예약 가능한 시간이 지났습니다.
+                                        다른 날짜를 선택해 주세요.
+                                    </p>
+                                )}
                             </div>
 
                             <div>
@@ -123,7 +142,7 @@ export function StepHospitalInfo() {
                                     })}
                                 >
                                     <option value="">시간을 선택하세요</option>
-                                    {TIME_OPTIONS.map((t) => (
+                                    {timeOptions.map((t) => (
                                         <option key={t} value={t}>
                                             {t}
                                         </option>
@@ -148,7 +167,7 @@ export function StepHospitalInfo() {
                                     })}
                                 >
                                     <option value="">시간을 선택하세요</option>
-                                    {TIME_OPTIONS.map((t) => (
+                                    {timeOptions.map((t) => (
                                         <option key={t} value={t}>
                                             {t}
                                         </option>
