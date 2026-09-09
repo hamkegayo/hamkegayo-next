@@ -1,0 +1,121 @@
+# 백엔드 CI 체크 — 마이그레이션·RLS·권한 경계를 실제 DB 로 검증한다.
+#
+# 왜 필요한가
+#   scripts/ 에 통합 테스트 8종이 이미 있는데 **CI 에서 하나도 돌지 않았다.**
+#   전부 로컬에서 손으로 돌려야 알 수 있는 상태였다. 여기서 검증하는 것은
+#   대부분 약관·처리방침이 공개한 경계다 — 깨져도 화면은 멀쩡해 보이고,
+#   깨진 사실은 사고가 난 뒤에 드러난다.
+name: Backend CI Check
+
+on:
+    pull_request:
+        branches: ["main", "dev"]
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    # DB 가 필요 없는 검사. 수 초면 끝나므로 무거운 job 과 분리해 먼저 실패시킨다.
+    fast:
+        name: 순수 검사 (DB 불필요)
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  # ⚠️ 20 이 아니라 22 다. test:pricing 이 --experimental-strip-types 를
+                  #    쓰는데 그 플래그는 Node 22.6+ 에서만 있다.
+                  node-version: "22"
+                  cache: "npm"
+
+            - run: npm ci
+
+            # 돈을 계산하는 함수다. 구간 경계 하나가 틀리면 과다청구이거나 손실이다.
+            - name: 요금 계산 단위 테스트 (#46 · #76)
+              run: npm run test:pricing
+
+            # 알림 링크는 누가 누르기 전까지 아무도 모른다. 실제로 404 가 난 적이 있다.
+            - name: 알림·리다이렉트 링크 검사
+              run: npm run check:links
+
+    # 로컬 Supabase 스택을 띄워 마이그레이션과 권한 경계를 실제로 검증한다.
+    database:
+        name: 마이그레이션 · RLS · 권한 경계
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+                  cache: "npm"
+
+            - run: npm ci
+
+            - uses: supabase/setup-cli@v1
+              with:
+                  version: latest
+
+            - name: Supabase 로컬 스택 기동
+              run: supabase start
+
+            # 마이그레이션이 **처음부터** 깨끗이 적용되는지 본다.
+            # 운영에 적용하기 전에 여기서 깨져야 한다.
+            - name: 마이그레이션 재적용 (db reset)
+              run: supabase db reset
+
+            # 테스트 스크립트들은 --env-file=.env.local 을 읽는다. 로컬 스택 값으로 만든다.
+            # (스크립트의 안전장치가 localhost 가 아니면 즉시 중단하므로 이 값이어야 한다)
+            - name: .env.local 생성
+              run: |
+                  eval "$(supabase status -o env)"
+                  {
+                    echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+                    echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+                    echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+                  } > .env.local
+
+            # 버킷·크론이 마이그레이션에 딸려 오는지 확인한다.
+            # 스테이징 신설(#114)이 이 전제 위에 서 있다.
+            - name: Storage 버킷 · pg_cron 잡 확인
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+                  do $$
+                  declare b int; c int;
+                  begin
+                    select count(*) into b from storage.buckets;
+                    select count(*) into c from cron.job;
+                    raise notice '버킷 %개 · 크론 잡 %개', b, c;
+                    if b < 3 then raise exception 'Storage 버킷이 3개 미만이다 (%)', b; end if;
+                    if c < 2 then raise exception 'pg_cron 잡이 2개 미만이다 (%)', c; end if;
+                  end $$;
+                  SQL
+
+            - name: 테스트 계정 시드
+              run: npm run seed:dev
+
+            # 아래는 전부 "무엇이 되는가" 가 아니라 **"무엇이 안 되는가"** 를 보는 테스트다.
+            - name: 동의 이력 불변성 (#58)
+              run: npm run test:agreements
+
+            - name: 서비스 수행 시각 무결성 (#55)
+              run: npm run test:service
+
+            - name: 파트너 개인정보 3단계 경계 (#66 · #67)
+              run: npm run test:partner
+
+            - name: 관리자 권한·접근통제·접속기록 (#50)
+              run: npm run test:admin
+
+            - name: 정산 계좌 열람 통제 (#51)
+              run: npm run test:payout
+
+            - name: 탈퇴 시 보존·파기 (#72)
+              run: npm run test:withdrawal
+
+            # ⚠️ test:nicepay · test:payapi · test:payments 는 여기서 돌리지 않는다.
+            #    NICEPAY 샌드박스 실호출이라 외부 의존이 생기고 키를 시크릿으로 넣어야 한다.
+            #    PG 사고가 CI 실패로 둔갑하면 아무도 CI 를 믿지 않게 된다.
