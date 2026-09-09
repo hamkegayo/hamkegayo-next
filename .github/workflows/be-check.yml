@@ -56,15 +56,21 @@ jobs:
 
             - uses: supabase/setup-cli@v1
               with:
-                  version: latest
+                  # 고정한다. `latest` 로 두면 CLI 가 올라갈 때마다 아래 -x 의
+                  # 서비스 이름이 조용히 바뀌어 CI 가 깨진다.
+                  version: 2.117.0
 
-            - name: Supabase 로컬 스택 기동
-              run: supabase start
-
-            # 마이그레이션이 **처음부터** 깨끗이 적용되는지 본다.
-            # 운영에 적용하기 전에 여기서 깨져야 한다.
-            - name: 마이그레이션 재적용 (db reset)
-              run: supabase db reset
+            # 러너는 매번 새 볼륨이라 start 가 마이그레이션을 처음부터 전부 적용한다.
+            # 즉 이 한 줄이 "마이그레이션이 zero 에서 깨끗이 서는가" 검사를 겸한다.
+            # (별도 `db reset` 을 두었더니 컨테이너를 다시 띄우다 포트가 겹쳐 깨졌다.)
+            #
+            # 쓰지 않는 서비스는 제외한다 — 특히 mailpit(구 inbucket)이 54324 를
+            # 잡으려다 "address already in use" 로 죽은 것이 실제 실패 원인이었다.
+            # 메일은 Resend 목이라 mailpit 이 필요 없고, 나머지도 테스트가 쓰지 않는다.
+            # 덤으로 기동이 빨라진다.
+            - name: Supabase 로컬 스택 기동 (마이그레이션 전량 적용 포함)
+              run: |
+                  supabase start -x mailpit,studio,imgproxy,edge-runtime,logflare,vector,supavisor,realtime,postgres-meta
 
             # 테스트 스크립트들은 --env-file=.env.local 을 읽는다. 로컬 스택 값으로 만든다.
             # (스크립트의 안전장치가 localhost 가 아니면 즉시 중단하므로 이 값이어야 한다)
