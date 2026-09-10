@@ -79,9 +79,30 @@ const PARTNER_LOGIN = "reviewpartner";
 const PARTNER_EMAIL = `${PARTNER_LOGIN}@partner.hamkegayo.internal`;
 const PARTNER_PASSWORD = "Review2026!";
 
-/** 이용일 — 오늘로부터 7일 뒤 평일. 주말 할증을 피해 금액을 단순하게 둔다. */
+// ---------------------------------------------------------------
+// 기간 — 심사가 끝나기 전에 화면이 죽지 않도록
+//
+//  NICEPAY 심사는 2주쯤 걸린다. 처음엔 토큰 3일 · 이용일 7일로 잡았는데
+//  그러면 **심사 도중에 두 화면이 모두 못 쓰게 된다.**
+//
+//   · 링크결제 — 토큰이 만료되면 /pay/<token> 이 만료 화면을 띄운다
+//   · 예약금 결제 — 이용일이 지나면 expire_matchings 크론이 MATCHING 예약을
+//     자동 만료시킨다(20260708000013). 파트너를 고를 수 없게 된다.
+//
+//  심사 기간에 일주일을 더해 잡는다. 심사가 늘어지거나 재심사가 붙어도
+//  스크립트를 다시 돌리지 않아도 된다.
+// ---------------------------------------------------------------
+
+/** 예상 심사 기간(일) */
+const REVIEW_DAYS = 14;
+/** 여유 — 심사 지연·재심사분 */
+const GRACE_DAYS = 7;
+/** 링크결제 토큰 유효기간 · 이용일까지 남은 날수 */
+const VALID_DAYS = REVIEW_DAYS + GRACE_DAYS;
+
+/** 이용일 — 심사 기간 내내 미래로 남는 평일. 주말 할증을 피해 금액을 단순하게 둔다. */
 function reviewUseDate() {
-    const at = new Date(Date.now() + 7 * 86_400_000);
+    const at = new Date(Date.now() + VALID_DAYS * 86_400_000);
     // KST 기준 날짜로 맞춘다 (서버가 UTC 로 돌 수 있다).
     const ymd = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Seoul",
@@ -235,7 +256,9 @@ async function main() {
 
     const token = randomBytes(32).toString("base64url");
     const orderId = `${linkRes.code}-${Date.now().toString(36)}`;
-    const expires = new Date(Date.now() + 3 * 86_400_000).toISOString();
+    const expires = new Date(
+        Date.now() + VALID_DAYS * 86_400_000,
+    ).toISOString();
 
     const { data: charge, error: chargeErr } = await admin.rpc(
         "create_extension_payment",
@@ -253,9 +276,23 @@ async function main() {
     if (chargeErr) throw chargeErr;
 
     // 링크를 실제로 보낸 것으로 표시해야 발송 대기로 보이지 않는다.
+    //
+    //  ⚠️ 그런데 link_sent_at 이 찍히는 순간 이 건은 **독촉 대상**이 된다.
+    //     claim_extension_reminders 는 20시간이 지난 미납 EXTENSION 을 매일
+    //     물어간다(20260708000036). 심사가 2주면 심사 계정으로 독촉 메일이
+    //     상한(7회)까지 나간다 — 심사자에게 보낼 메일이 아니고, 받는 주소가
+    //     실제 사서함이 아니면 반송이 쌓여 발신 도메인 평판까지 깎인다.
+    //
+    //     그래서 처음부터 UNPAID_EXPIRED 로 둔다. 이 상태는 **독촉만** 멈추고
+    //     결제 자체는 막지 않는다 — get_extension_charge 도
+    //     finalize_extension_payment 도 이 값을 보지 않는다. 심사자는 그대로
+    //     결제할 수 있다.
     await admin
         .from("payments")
-        .update({ link_sent_at: new Date().toISOString() })
+        .update({
+            link_sent_at: new Date().toISOString(),
+            collection_state: "UNPAID_EXPIRED",
+        })
         .eq("id", charge.payment_id);
 
     // ---------------------------------------------------------------
@@ -281,9 +318,11 @@ async function main() {
 
 ■ ② 테스트용 링크결제 URL  (로그인 불필요)
    ${siteUrl}/pay/${token}
-   금액 5,000원 · 유효기간 3일 (${expires.slice(0, 10)} 까지)
+   금액 5,000원 · 유효기간 ${VALID_DAYS}일 (${expires.slice(0, 10)} 까지)
 
 ■ 참고
+   · 위 두 화면은 ${useDate} 까지 이용하실 수 있습니다.
+     기간이 더 필요하시면 말씀해 주시면 연장해 드리겠습니다.
    · 현재 테스트(샌드박스) 키로 연동되어 있어 실제 청구는 발생하지 않습니다.
    · 사업자정보 · 이용약관 · 취소·환불 정책은 모든 결제 화면 하단에 있습니다.
      ${siteUrl}/refund-policy
