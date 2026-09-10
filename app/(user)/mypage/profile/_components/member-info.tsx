@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CreditCard, UserRound } from "lucide-react";
+import { UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
@@ -10,6 +11,7 @@ import { ConfirmModal } from "@/components/ui/modal";
 import { updateProfileName } from "../../_actions/profile";
 import { deleteCareRecipient } from "../../_actions/care";
 import type { CareRecipient } from "../../_lib/care.server";
+import type { AgreementView } from "../../_lib/agreements.server";
 import { CareRecipientModal } from "./care-recipient-modal";
 
 type Basic = {
@@ -59,18 +61,14 @@ function OutlineButton({
     );
 }
 
-const AGREEMENTS = [
-    { label: "서비스 이용 약관 동의", required: true },
-    { label: "개인정보 수집 및 이용 동의", required: true },
-    { label: "결제 이용 동의", required: true },
-];
-
 export function MemberInfo({
     basic,
     recipients,
+    agreements,
 }: {
     basic: Basic;
     recipients: CareRecipient[];
+    agreements: AgreementView[];
 }) {
     const router = useRouter();
     const [marketing, setMarketing] = useState(false);
@@ -219,35 +217,6 @@ export function MemberInfo({
                     </dl>
                 </Card>
 
-                {/* 결제 수단 관리 */}
-                <Card
-                    title="결제 수단 관리"
-                    action={<OutlineButton>카드 추가하기</OutlineButton>}
-                >
-                    <p className="text-muted-foreground text-sm font-semibold">
-                        등록된 카드
-                    </p>
-                    <div className="bg-muted/40 mt-3 flex items-center gap-4 rounded-xl p-4">
-                        <div className="bg-brand/10 text-brand flex size-9 shrink-0 items-center justify-center rounded-lg">
-                            <CreditCard className="size-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <p className="text-foreground font-bold">
-                                신한카드
-                            </p>
-                            <p className="text-muted-foreground text-xs">
-                                유효기간 08/27
-                            </p>
-                        </div>
-                        <p className="text-foreground hidden text-sm font-semibold tracking-wider sm:block">
-                            **** **** **** 1234
-                        </p>
-                        <span className="bg-background text-muted-foreground shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold">
-                            기본 카드
-                        </span>
-                    </div>
-                </Card>
-
                 {/* 환자 정보 관리 */}
                 <Card
                     title="환자 정보 관리"
@@ -315,19 +284,46 @@ export function MemberInfo({
                 {/* 약관 동의 관리 */}
                 <Card title="약관 동의 관리">
                     <div className="divide-border divide-y">
-                        {AGREEMENTS.map((a) => (
+                        {agreements.map((a) => (
                             <div
-                                key={a.label}
+                                key={a.type}
                                 className="flex items-center justify-between gap-3 py-3.5"
                             >
-                                <span className="text-foreground text-sm font-medium">
-                                    {a.label}
-                                </span>
-                                <div className="flex items-center gap-3">
-                                    <span className="text-sm font-semibold text-emerald-600">
-                                        동의 완료
+                                <div className="min-w-0">
+                                    <span className="text-foreground text-sm font-medium">
+                                        {a.label}
                                     </span>
-                                    <OutlineButton>약관 보기</OutlineButton>
+                                    {a.agreedLabel && (
+                                        <p className="text-muted-foreground text-xs">
+                                            {a.agreedLabel} 동의
+                                            {!a.isCurrent &&
+                                                " · 개정본 재동의 필요"}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="flex shrink-0 items-center gap-3">
+                                    <span
+                                        className={cn(
+                                            "text-sm font-semibold",
+                                            a.agreedLabel
+                                                ? a.isCurrent
+                                                    ? "text-emerald-600"
+                                                    : "text-amber-600"
+                                                : "text-muted-foreground",
+                                        )}
+                                    >
+                                        {a.agreedLabel
+                                            ? a.isCurrent
+                                                ? "동의 완료"
+                                                : "재동의 필요"
+                                            : "기록 없음"}
+                                    </span>
+                                    <Link
+                                        href={a.href}
+                                        className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-3.5 py-2 text-sm font-bold transition-colors"
+                                    >
+                                        약관 보기
+                                    </Link>
                                 </div>
                             </div>
                         ))}
@@ -348,7 +344,12 @@ export function MemberInfo({
                                 >
                                     {marketing ? "동의 완료" : "미동의"}
                                 </span>
-                                <OutlineButton>약관 보기</OutlineButton>
+                                <Link
+                                    href="/privacy#article-2"
+                                    className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-3.5 py-2 text-sm font-bold transition-colors"
+                                >
+                                    약관 보기
+                                </Link>
                                 <button
                                     type="button"
                                     onClick={() => {
