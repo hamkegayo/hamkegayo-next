@@ -31,8 +31,12 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
+#  ⚠️ `.env` `.env.local` 두 줄만 두면 `vercel env pull .env.production.local` 처럼
+#     다른 이름으로 받은 파일이 그대로 커밋된다. 운영 시크릿이 저장소에 박힌다.
 .env
-.env.local
+.env*.local
+.env.production
+.env.development
 
 # vercel
 .vercel
