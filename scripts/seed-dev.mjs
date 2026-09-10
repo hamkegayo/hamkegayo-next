@@ -7,9 +7,9 @@
 //   1) `npx supabase start` 로 로컬 스택이 떠 있을 것
 //   2) .env.local 이 로컬(127.0.0.1:54321) 블록을 가리킬 것
 //
-// 안전장치: 로컬은 그냥 통과하고, 원격은 SEED_ALLOW_REMOTE 에 대상 ref 를 직접
+// 안전장치: 로컬은 그냥 통과하고, 원격은 SEED_TARGET_REF 에 대상 ref 를 직접
 //           적어야만 실행된다. scripts/_target-guard.mjs 참고.
-//   스테이징: SEED_ALLOW_REMOTE=<ref> node --env-file=.env.staging.local scripts/seed-dev.mjs
+//   스테이징: SEED_TARGET_REF=<ref> node --env-file=.env.staging.local scripts/seed-dev.mjs
 //
 // 옵션(환경변수):
 //   USER_EMAIL     (기본 user01@example.com)   USER_PASSWORD (기본 user1234!)

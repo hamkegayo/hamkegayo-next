@@ -10,7 +10,7 @@
 // 스테이징 ref 를 적었다면 불일치로 멈춘다 — 이것이 핵심이다.
 //
 //   로컬      : npm run seed:dev
-//   스테이징  : SEED_ALLOW_REMOTE=<스테이징_ref> npm run seed:dev
+//   스테이징  : SEED_TARGET_REF=<스테이징_ref> npm run seed:dev
 //
 // ref 는 Supabase 프로젝트 URL 의 서브도메인이다.
 //   https://abcdefghijklmnop.supabase.co  →  abcdefghijklmnop
@@ -18,11 +18,16 @@
 /**
  * 절대 시드를 넣지 않을 프로젝트 ref.
  *
- * 운영 ref 를 여기 적어 두면 `SEED_ALLOW_REMOTE` 를 맞게 적어도 차단된다.
- * ⚠️ 비밀이 아니다 — 프로젝트 URL 은 `NEXT_PUBLIC_` 이라 이미 브라우저 번들에 들어 있다.
- * 운영 ref 를 확인하는 대로 채울 것. 비어 있어도 아래 ref 확인 절차는 그대로 동작한다.
+ * `SEED_TARGET_REF` 를 정확히 맞게 적어도 여기 있는 ref 는 차단된다.
+ * ref 확인 대조를 통과한 뒤 마지막으로 걸리는 그물이다 — 운영 ref 를 그대로
+ * 타이핑해 버리는 경우까지 막는다.
+ *
+ * ⚠️ ref 는 비밀이 아니다. 프로젝트 URL(`https://<ref>.supabase.co`)이
+ *    `NEXT_PUBLIC_SUPABASE_URL` 이라 이미 브라우저 번들에 들어 있다.
+ *
+ *   scpczxkcmnpubtmnqkem — 운영 (Supabase 프로젝트 `hamkegayo-next`)
  */
-const BLOCKED_REFS = [];
+const BLOCKED_REFS = ["scpczxkcmnpubtmnqkem"];
 
 const LOCAL_RE = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/;
 
@@ -48,7 +53,7 @@ export function assertSeedTarget(url, scriptName) {
     if (LOCAL_RE.test(url)) return "local";
 
     const ref = projectRef(url);
-    const allow = process.env.SEED_ALLOW_REMOTE?.trim();
+    const allow = process.env.SEED_TARGET_REF?.trim();
 
     if (!ref) {
         console.error(
@@ -72,12 +77,12 @@ export function assertSeedTarget(url, scriptName) {
         );
         console.error(`   현재 URL 의 ref : ${ref}`);
         console.error(
-            `   SEED_ALLOW_REMOTE : ${allow ? `${allow} (불일치)` : "지정되지 않음"}`,
+            `   SEED_TARGET_REF : ${allow ? `${allow} (불일치)` : "지정되지 않음"}`,
         );
         console.error("");
         console.error("   맞는 대상이라면 ref 를 직접 적어 다시 실행하세요.");
         console.error(
-            `     SEED_ALLOW_REMOTE=${ref} node --env-file=.env.local scripts/${scriptName}`,
+            `     SEED_TARGET_REF=${ref} node --env-file=.env.local scripts/${scriptName}`,
         );
         console.error("");
         console.error(

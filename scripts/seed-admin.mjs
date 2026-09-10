@@ -15,7 +15,7 @@
 //     insert into public.admin_role_grants (target_id, action, reason)
 //       values ('<uuid>', 'GRANT', '최초 관리자 지정');
 //
-// 안전장치: 로컬은 그냥 통과하고, 원격은 SEED_ALLOW_REMOTE 에 대상 ref 를 직접
+// 안전장치: 로컬은 그냥 통과하고, 원격은 SEED_TARGET_REF 에 대상 ref 를 직접
 //           적어야만 실행된다. scripts/_target-guard.mjs 참고.
 //           ⚠️ 운영 관리자는 여전히 대시보드에서 수동 지정한다(위 주석).
 //
