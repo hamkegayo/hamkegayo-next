@@ -35,7 +35,7 @@ const QUICK_MENU: {
         icon: Star,
         title: "후기 확인",
         desc: "이용자 후기를 확인할 수 있습니다.",
-        href: null,
+        href: "/partner/reviews",
     },
     {
         icon: ReceiptText,
