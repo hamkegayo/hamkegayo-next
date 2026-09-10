@@ -71,7 +71,6 @@ export function MemberInfo({
     agreements: AgreementView[];
 }) {
     const router = useRouter();
-    const [marketing, setMarketing] = useState(false);
     const [editingName, setEditingName] = useState(false);
     const [nameInput, setNameInput] = useState(basic.name);
     const [pending, startTransition] = useTransition();
@@ -340,50 +339,6 @@ export function MemberInfo({
                                 </div>
                             </div>
                         ))}
-
-                        {/* 마케팅 (토글) */}
-                        <div className="flex items-center justify-between gap-3 py-3.5">
-                            <span className="text-foreground text-sm font-medium">
-                                마케팅 정보 수신 동의 (선택)
-                            </span>
-                            <div className="flex items-center gap-3">
-                                <span
-                                    className={cn(
-                                        "text-sm font-semibold",
-                                        marketing
-                                            ? "text-emerald-600"
-                                            : "text-muted-foreground",
-                                    )}
-                                >
-                                    {marketing ? "동의 완료" : "미동의"}
-                                </span>
-                                <Link
-                                    href="/privacy#article-2"
-                                    className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-3.5 py-2 text-sm font-bold transition-colors"
-                                >
-                                    약관 보기
-                                </Link>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setMarketing((v) => !v);
-                                        toast.success(
-                                            marketing
-                                                ? "마케팅 수신 동의를 철회했습니다."
-                                                : "마케팅 수신에 동의했습니다.",
-                                        );
-                                    }}
-                                    className={cn(
-                                        "rounded-lg px-3.5 py-2 text-sm font-bold transition-colors",
-                                        marketing
-                                            ? "border-border bg-background text-foreground hover:bg-muted border"
-                                            : "bg-brand text-brand-foreground hover:bg-brand/90",
-                                    )}
-                                >
-                                    {marketing ? "철회하기" : "동의하기"}
-                                </button>
-                            </div>
-                        </div>
                     </div>
                 </Card>
             </div>
