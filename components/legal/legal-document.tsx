@@ -111,8 +111,16 @@ export function LegalDocumentView({ doc }: { doc: LegalDocument }) {
             <h1 className="text-foreground text-3xl font-extrabold md:text-4xl">
                 {doc.title}
             </h1>
+            {/*
+              시행일과 개정일을 함께 적는다. 2026-09-06 개정처럼 시행일을
+              올리지 않고 본문만 고치는 경우가 있어, 시행일만 보면 최신본인지
+              알 수 없다 (#105).
+            */}
             <p className="text-muted-foreground mt-3 text-sm">
                 시행일 {doc.effectiveDate}
+                {doc.revisedDate !== doc.effectiveDate && (
+                    <span> · 최종 개정일 {doc.revisedDate}</span>
+                )}
             </p>
 
             <details className="border-border bg-muted/30 group mt-8 rounded-xl border">

@@ -40,6 +40,11 @@ jobs:
             - name: 알림·리다이렉트 링크 검사
               run: npm run check:links
 
+            # 본문이 바뀌었는데 version 을 안 올리면 동의 이력이 본문을 식별하지
+            # 못한다. 실제로 2026-09-06 개정에서 그 일이 일어났다 (#105).
+            - name: 약관·방침 버전 무결성 (#105)
+              run: npm run test:legal
+
     # 로컬 Supabase 스택을 띄워 마이그레이션과 권한 경계를 실제로 검증한다.
     database:
         name: 마이그레이션 · RLS · 권한 경계
