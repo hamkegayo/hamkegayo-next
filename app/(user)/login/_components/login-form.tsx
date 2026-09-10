@@ -288,13 +288,12 @@ export function LoginForm() {
                     >
                         회원가입
                     </Link>
-                    <button
-                        type="button"
-                        onClick={notReady}
+                    <Link
+                        href="/forgot-password"
                         className="hover:text-brand transition-colors"
                     >
                         비밀번호 찾기
-                    </button>
+                    </Link>
                 </div>
             </form>
         </div>
