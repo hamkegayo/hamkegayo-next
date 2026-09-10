@@ -1,7 +1,8 @@
-import { ArrowRight, Headset } from "lucide-react";
+import { Headset, Phone } from "lucide-react";
 
 import { Section } from "@/app/(user)/_components/home/section";
-import { ComingSoonButton } from "@/app/(user)/_components/home/coming-soon-button";
+import { COMPANY } from "@/lib/legal/company";
+import { ContactLink } from "@/app/(user)/_components/home/contact-link";
 
 /** 하단 고객센터 안내 CTA */
 export function FaqContactCta() {
@@ -21,13 +22,14 @@ export function FaqContactCta() {
                         </p>
                     </div>
                 </div>
-                <ComingSoonButton
-                    contact="support"
+                <ContactLink
+                    href={`tel:${COMPANY.tel}`}
+                    method="support"
                     className="border-border bg-background text-foreground hover:bg-muted inline-flex w-full items-center justify-center gap-1.5 rounded-lg border px-5 py-3 text-sm font-bold whitespace-nowrap transition-colors md:w-auto"
                 >
-                    고객센터 바로가기
-                    <ArrowRight className="size-4" />
-                </ComingSoonButton>
+                    <Phone className="size-4" />
+                    고객센터 {COMPANY.tel}
+                </ContactLink>
             </div>
         </Section>
     );
