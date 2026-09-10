@@ -13,8 +13,8 @@ import { COMPANY, mailOrderLabel } from "./company";
 export const TERMS: LegalDocument = {
     title: "이용약관",
     effectiveDate: "2026년 9월 3일",
-    revisedDate: "2026년 9월 6일",
-    version: "2026-09-06",
+    revisedDate: "2026년 9월 3일",
+    version: "2026-09-03",
     articles: [
         {
             no: "제1조",

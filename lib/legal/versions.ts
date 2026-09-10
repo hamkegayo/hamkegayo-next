@@ -39,8 +39,9 @@ export type LegalDocKey = "TERMS" | "PRIVACY";
  */
 export const LEGAL_BODY_HASHES: Record<LegalDocKey, Record<string, string>> = {
     TERMS: {
-        // 2026-09-06 개정 — 취소·환불 정책 페이지 반영 (#52)
-        "2026-09-06": "f68c948cd62004b3",
+        // 초판. 2026-09-06 커밋(01def53)은 termsArticle() 헬퍼만 추가했고
+        // 조문은 건드리지 않았다 — 그래서 개정이 아니다.
+        "2026-09-03": "f68c948cd62004b3",
     },
     PRIVACY: {
         // 2026-09-06 개정 — 파트너 정산정보, 제11조 조문 번호 (#104)
