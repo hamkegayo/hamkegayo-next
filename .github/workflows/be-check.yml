@@ -133,6 +133,11 @@ jobs:
             - name: 비밀번호 재설정·세션 실효 (#127)
               run: npm run test:reset
 
+            # 개정 고지는 약관 제4조 ③ · 처리방침 제16조 ② 가 요구하는 절차다.
+            # 깨져도 화면은 멀쩡하고 개정이 실제로 일어나야 드러난다 — 그때는 늦다.
+            - name: 약관 재동의 안내·중복 방지 (#91)
+              run: npm run test:reconsent
+
             # ⚠️ test:nicepay · test:payapi · test:payments 는 여기서 돌리지 않는다.
             #    NICEPAY 샌드박스 실호출이라 외부 의존이 생기고 키를 시크릿으로 넣어야 한다.
             #    PG 사고가 CI 실패로 둔갑하면 아무도 CI 를 믿지 않게 된다.
