@@ -122,6 +122,12 @@ jobs:
             - name: 탈퇴 시 보존·파기 (#72)
               run: npm run test:withdrawal
 
+            # 재설정은 계정을 빼앗겼을 때 되찾는 경로다. "바꿔지는가" 보다
+            # **기존 세션이 죽는가** 가 핵심이고, 그건 GoTrue 의 동작이라
+            # 우리 코드 변경 없이도 사라질 수 있다. 여기서 못 박는다.
+            - name: 비밀번호 재설정·세션 실효 (#127)
+              run: npm run test:reset
+
             # ⚠️ test:nicepay · test:payapi · test:payments 는 여기서 돌리지 않는다.
             #    NICEPAY 샌드박스 실호출이라 외부 의존이 생기고 키를 시크릿으로 넣어야 한다.
             #    PG 사고가 CI 실패로 둔갑하면 아무도 CI 를 믿지 않게 된다.
