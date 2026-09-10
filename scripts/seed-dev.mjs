@@ -7,8 +7,9 @@
 //   1) `npx supabase start` 로 로컬 스택이 떠 있을 것
 //   2) .env.local 이 로컬(127.0.0.1:54321) 블록을 가리킬 것
 //
-// 안전장치: NEXT_PUBLIC_SUPABASE_URL 이 localhost/127.0.0.1 이 아니면 즉시 중단한다.
-// (원격·운영 프로젝트에 테스트 계정이 생기는 사고를 막기 위함)
+// 안전장치: 로컬은 그냥 통과하고, 원격은 SEED_ALLOW_REMOTE 에 대상 ref 를 직접
+//           적어야만 실행된다. scripts/_target-guard.mjs 참고.
+//   스테이징: SEED_ALLOW_REMOTE=<ref> node --env-file=.env.staging.local scripts/seed-dev.mjs
 //
 // 옵션(환경변수):
 //   USER_EMAIL     (기본 user01@example.com)   USER_PASSWORD (기본 user1234!)
@@ -17,6 +18,8 @@
 // 멱등: 재실행하면 비밀번호/프로필만 갱신한다.
 
 import { createClient } from "@supabase/supabase-js";
+
+import { assertSeedTarget } from "./_target-guard.mjs";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -29,14 +32,7 @@ if (!url || !key) {
     process.exit(1);
 }
 
-if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.test(url)) {
-    console.error("❌ 로컬 스택이 아닙니다. 중단합니다.");
-    console.error(`   현재 URL: ${url}`);
-    console.error(
-        "   .env.local 에서 로컬(127.0.0.1:54321) 블록의 주석을 해제하세요.",
-    );
-    process.exit(1);
-}
+assertSeedTarget(url, "seed-dev.mjs");
 
 const USER_EMAIL = process.env.USER_EMAIL ?? "user01@example.com";
 const USER_PASSWORD = process.env.USER_PASSWORD ?? "user1234!";

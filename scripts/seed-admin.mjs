@@ -15,7 +15,9 @@
 //     insert into public.admin_role_grants (target_id, action, reason)
 //       values ('<uuid>', 'GRANT', '최초 관리자 지정');
 //
-// 안전장치: NEXT_PUBLIC_SUPABASE_URL 이 localhost/127.0.0.1 이 아니면 즉시 중단한다.
+// 안전장치: 로컬은 그냥 통과하고, 원격은 SEED_ALLOW_REMOTE 에 대상 ref 를 직접
+//           적어야만 실행된다. scripts/_target-guard.mjs 참고.
+//           ⚠️ 운영 관리자는 여전히 대시보드에서 수동 지정한다(위 주석).
 //
 // 옵션(환경변수):
 //   ADMIN_EMAIL (기본 admin01@example.com)  ADMIN_PASSWORD (기본 admin1234!)
@@ -26,6 +28,8 @@
 //    /admin/login 에서 QR 을 스캔해 인증기를 등록하면 된다.
 
 import { createClient } from "@supabase/supabase-js";
+
+import { assertSeedTarget } from "./_target-guard.mjs";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -38,14 +42,7 @@ if (!url || !key) {
     process.exit(1);
 }
 
-if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.test(url)) {
-    console.error("❌ 로컬 스택이 아닙니다. 중단합니다.");
-    console.error(`   현재 URL: ${url}`);
-    console.error(
-        "   운영 관리자는 대시보드에서 수동으로 지정합니다 (파일 상단 주석 참고).",
-    );
-    process.exit(1);
-}
+assertSeedTarget(url, "seed-admin.mjs");
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "admin01@example.com";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "admin1234!";
@@ -95,7 +92,11 @@ async function main() {
 
     const { error: aErr } = await admin
         .from("admin_accounts")
-        .upsert({ profile_id: id, duty: "전체", memo: "로컬 개발용 최초 관리자" });
+        .upsert({
+            profile_id: id,
+            duty: "전체",
+            memo: "로컬 개발용 최초 관리자",
+        });
     if (aErr) throw aErr;
 
     // 고시 제5조 ③ — 권한 부여 내역을 남긴다. 부여자가 없으므로 actor_id 는 null.
@@ -120,7 +121,9 @@ async function main() {
     console.log(`    비밀번호 : ${ADMIN_PASSWORD}`);
     console.log("");
     console.log("👉 http://localhost:3000/admin/login 에서 로그인하세요.");
-    console.log("   최초 로그인 시 인증 앱으로 QR 을 스캔해 2단계 인증을 등록합니다.");
+    console.log(
+        "   최초 로그인 시 인증 앱으로 QR 을 스캔해 2단계 인증을 등록합니다.",
+    );
 }
 
 main().catch((e) => {
