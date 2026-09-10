@@ -6,7 +6,8 @@ import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Section } from "@/app/(user)/_components/home/section";
-import { ComingSoonButton } from "@/app/(user)/_components/home/coming-soon-button";
+import { COMPANY } from "@/lib/legal/company";
+import { ContactLink } from "@/app/(user)/_components/home/contact-link";
 
 const FAQS: { q: string; a: string }[] = [
     {
@@ -120,12 +121,13 @@ function BookingCta() {
                 >
                     동행 예약하기
                 </Link>
-                <ComingSoonButton
-                    contact="phone"
+                <ContactLink
+                    href={`tel:${COMPANY.tel}`}
+                    method="phone"
                     className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-6 py-3 text-sm font-bold transition-colors"
                 >
                     전화 상담 받기
-                </ComingSoonButton>
+                </ContactLink>
             </div>
         </div>
     );
