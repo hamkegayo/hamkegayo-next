@@ -283,6 +283,19 @@ export function MemberInfo({
 
                 {/* 약관 동의 관리 */}
                 <Card title="약관 동의 관리">
+                    {/*
+                     * 이력이 없는 항목이 있을 때만 안내한다.
+                     * 동의 이력 원장(#58)은 2026-09 에 신설됐고, 그 이전 가입자는
+                     * 받은 동의가 남아 있지 않다. 설명 없이 "기록 없음" 만 보이면
+                     * 동의를 안 한 것으로 오해한다.
+                     */}
+                    {agreements.some((a) => !a.agreedLabel) && (
+                        <p className="bg-muted/40 text-muted-foreground mb-4 rounded-lg px-4 py-3 text-xs leading-relaxed">
+                            동의 이력 저장 기능이 도입된 2026년 9월 이전에
+                            가입하신 경우 &lsquo;기록 없음&rsquo; 으로
+                            표시됩니다.
+                        </p>
+                    )}
                     <div className="divide-border divide-y">
                         {agreements.map((a) => (
                             <div
