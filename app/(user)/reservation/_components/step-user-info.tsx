@@ -115,13 +115,22 @@ export function StepUserInfo() {
             setValue("userPhone", formatPhoneNumber(r.phone));
             clearErrors("userPhone");
         }
-        if (r.relation && RELATION_OPTIONS.includes(r.relation)) {
+        // 관계는 값 체계가 달라 일치할 때만 채운다. 못 채운 것을 사용자가 알아야
+        // 빈 칸을 지나치지 않으므로 토스트로 알린다. 확인 모달을 한 겹 더 두면
+        // 클릭만 늘고 흐름을 끊는다.
+        const relationFilled =
+            !!r.relation && RELATION_OPTIONS.includes(r.relation);
+        if (relationFilled) {
             setValue("relation", r.relation);
             clearErrors("relation");
         }
 
         setPickerOpen(false);
-        toast.success(`${r.name} 님의 정보를 불러왔습니다.`);
+        toast.success(
+            relationFilled
+                ? `${r.name} 님의 정보로 채워졌습니다.`
+                : `${r.name} 님의 정보로 채워졌습니다. 관계는 직접 선택해 주세요.`,
+        );
     };
 
     return (
