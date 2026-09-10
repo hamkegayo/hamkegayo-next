@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ConfirmModal } from "@/components/ui/modal";
 import { updateProfileName } from "../../_actions/profile";
+import { reconsentAll } from "../../_actions/agreements";
 import { deleteCareRecipient } from "../../_actions/care";
 import type { CareRecipient } from "../../_lib/care.server";
 import type { AgreementView } from "../../_lib/agreements.server";
@@ -72,6 +73,7 @@ export function MemberInfo({
 }) {
     const router = useRouter();
     const [editingName, setEditingName] = useState(false);
+    const [reconsenting, startReconsent] = useTransition();
     const [nameInput, setNameInput] = useState(basic.name);
     const [pending, startTransition] = useTransition();
 
@@ -288,6 +290,45 @@ export function MemberInfo({
                      * 받은 동의가 남아 있지 않다. 설명 없이 "기록 없음" 만 보이면
                      * 동의를 안 한 것으로 오해한다.
                      */}
+                    {/*
+                     * 개정본 재동의 — 대상이 있을 때만 띄운다.
+                     * 항목마다 버튼을 두지 않는 이유: 처리방침이 개정되면
+                     * PRIVACY·PERSONAL·SENSITIVE 세 항목이 함께 밀린다.
+                     * 같은 개정에 세 번 누르게 할 이유가 없다.
+                     */}
+                    {agreements.some((a) => a.agreedLabel && !a.isCurrent) && (
+                        <div className="mb-4 rounded-lg bg-amber-50 px-4 py-3.5 dark:bg-amber-950/30">
+                            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                                개정된 문서가 있습니다.
+                            </p>
+                            <p className="mt-1 text-xs leading-relaxed text-amber-700 dark:text-amber-400">
+                                변경된 내용을 확인하신 뒤 다시 동의해 주세요.
+                                기존 동의 기록은 그대로 보관됩니다.
+                            </p>
+                            <button
+                                type="button"
+                                disabled={reconsenting}
+                                aria-busy={reconsenting}
+                                onClick={() =>
+                                    startReconsent(async () => {
+                                        const res = await reconsentAll();
+                                        if (res.ok) {
+                                            toast.success(
+                                                "재동의가 완료되었습니다.",
+                                            );
+                                            router.refresh();
+                                        } else {
+                                            toast.error(res.message);
+                                        }
+                                    })
+                                }
+                                className="mt-3 rounded-lg bg-amber-600 px-3.5 py-2 text-sm font-bold text-white transition-colors hover:bg-amber-700 disabled:opacity-60"
+                            >
+                                {reconsenting ? "처리 중…" : "다시 동의하기"}
+                            </button>
+                        </div>
+                    )}
+
                     {agreements.some((a) => !a.agreedLabel) && (
                         <p className="bg-muted/40 text-muted-foreground mb-4 rounded-lg px-4 py-3 text-xs leading-relaxed">
                             동의 이력 저장 기능이 도입된 2026년 9월 이전에

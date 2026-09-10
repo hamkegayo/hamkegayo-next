@@ -11,7 +11,9 @@ export type NotificationType =
     | "PAYMENT_ADDITIONAL"
     | "PAYMENT_REFUND"
     | "PAYMENT_EXPIRED"
-    | "REPORT_READY";
+    | "REPORT_READY"
+    /** 약관·방침이 개정되어 재동의가 필요하다 (#91) */
+    | "AGREEMENT_REVISED";
 
 export type NotificationView = {
     id: string;
@@ -40,20 +42,43 @@ function timeAgo(iso: string): string {
 /**
  * 알림 생성 — 수신자(recipient)는 행위자와 다르므로 service_role(admin)로 insert.
  * 서버 액션 내부에서만 호출한다(실패해도 본 작업은 진행되도록 throw 하지 않음).
+ *
+ *  `dedupeKey` 를 주면 같은 수신자에게 두 번 들어가지 않는다.
+ *  예약 확정처럼 **사건**이 일어난 순간 부르는 알림은 키가 필요 없지만,
+ *  재동의 안내처럼 **상태**가 유지되는 알림은 배치가 돌 때마다 쌓인다(#91).
  */
 export async function createNotification(
     recipientId: string,
-    n: { type: NotificationType; title: string; body?: string; link?: string },
+    n: {
+        type: NotificationType;
+        title: string;
+        body?: string;
+        link?: string;
+        /** 상태형 알림의 중복 방지 키. 같은 수신자·같은 키는 한 번만 들어간다 */
+        dedupeKey?: string;
+    },
 ): Promise<void> {
     try {
         const admin = createAdminClient();
-        await admin.from("notifications").insert({
+        const row = {
             recipient_id: recipientId,
             type: n.type,
             title: n.title,
             body: n.body ?? null,
             link: n.link ?? null,
-        });
+            dedupe_key: n.dedupeKey ?? null,
+        };
+
+        if (n.dedupeKey) {
+            // 부분 유니크 인덱스에 걸리면 조용히 넘어간다 — 이미 보낸 것이다.
+            await admin.from("notifications").upsert(row, {
+                onConflict: "recipient_id,dedupe_key",
+                ignoreDuplicates: true,
+            });
+            return;
+        }
+
+        await admin.from("notifications").insert(row);
     } catch {
         // 알림 실패는 무시(본 작업 성공을 막지 않음)
     }
