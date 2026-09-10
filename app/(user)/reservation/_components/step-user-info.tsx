@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useTransition } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -22,6 +23,9 @@ import {
 } from "../_lib/options";
 import { NOTIFY_TARGET_OPTIONS } from "@/lib/handover";
 import { StepBand, StepNav } from "./step-band";
+import { CareRecipientPicker } from "./care-recipient-picker";
+import { listMyCareRecipients } from "../_actions/care";
+import type { CareRecipient } from "@/app/(user)/mypage/_lib/care.server";
 import { FieldError, FieldLabel, NativeSelect, Textarea } from "./fields";
 
 const DOCS = [
@@ -75,7 +79,59 @@ export function StepUserInfo() {
         next();
     };
 
-    const notReady = () => toast.info("준비 중인 기능입니다.");
+    // 저장해 둔 환자 정보 불러오기
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const [recipients, setRecipients] = useState<CareRecipient[]>([]);
+    const [loadingRecipients, startLoad] = useTransition();
+
+    const openPicker = () => {
+        setPickerOpen(true);
+        startLoad(async () => {
+            const list = await listMyCareRecipients();
+            setRecipients(list);
+        });
+    };
+
+    /**
+     * 고른 환자를 폼에 채운다.
+     *
+     *  ⚠️ 관계(relation)는 채우지 않는다. 마이페이지는 자유 입력("어머니")이고
+     *     예약 폼은 RELATION_OPTIONS 선택형("부모")이라 값 체계가 다르다.
+     *     정확히 일치할 때만 채우고, 아니면 사용자가 직접 고르게 둔다.
+     */
+    const applyRecipient = (r: CareRecipient) => {
+        setValue("userName", r.name);
+        clearErrors("userName");
+
+        if (r.birth) {
+            setValue("userBirth", r.birth);
+            clearErrors("userBirth");
+        }
+        if (r.gender) {
+            setValue("userGender", r.gender);
+            clearErrors("userGender");
+        }
+        if (r.phone) {
+            setValue("userPhone", formatPhoneNumber(r.phone));
+            clearErrors("userPhone");
+        }
+        // 관계는 값 체계가 달라 일치할 때만 채운다. 못 채운 것을 사용자가 알아야
+        // 빈 칸을 지나치지 않으므로 토스트로 알린다. 확인 모달을 한 겹 더 두면
+        // 클릭만 늘고 흐름을 끊는다.
+        const relationFilled =
+            !!r.relation && RELATION_OPTIONS.includes(r.relation);
+        if (relationFilled) {
+            setValue("relation", r.relation);
+            clearErrors("relation");
+        }
+
+        setPickerOpen(false);
+        toast.success(
+            relationFilled
+                ? `${r.name} 님의 정보로 채워졌습니다.`
+                : `${r.name} 님의 정보로 채워졌습니다. 관계는 직접 선택해 주세요.`,
+        );
+    };
 
     return (
         <>
@@ -88,6 +144,14 @@ export function StepUserInfo() {
                 ]}
             />
 
+            <CareRecipientPicker
+                open={pickerOpen}
+                loading={loadingRecipients}
+                recipients={recipients}
+                onClose={() => setPickerOpen(false)}
+                onSelect={applyRecipient}
+            />
+
             <Section>
                 <p className="text-muted-foreground text-center text-sm">
                     * 환자 정보는 마이페이지에서 관리할 수 있습니다.
@@ -95,7 +159,7 @@ export function StepUserInfo() {
                 <div className="mt-1 text-center">
                     <button
                         type="button"
-                        onClick={notReady}
+                        onClick={openPicker}
                         className="text-foreground hover:text-brand text-sm font-bold"
                     >
                         [ 이용자 정보 불러오기 ]
