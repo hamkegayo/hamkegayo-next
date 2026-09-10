@@ -153,7 +153,16 @@ export default function RefundPolicyPage() {
                         <dt className="text-foreground w-20 shrink-0 font-semibold">
                             카카오톡
                         </dt>
-                        <dd>{COMPANY.kakao}</dd>
+                        <dd>
+                            <a
+                                href={COMPANY.kakaoUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-foreground hover:text-brand font-semibold"
+                            >
+                                {COMPANY.kakao}
+                            </a>
+                        </dd>
                     </div>
                 </dl>
             </Card>

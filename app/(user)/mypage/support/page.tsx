@@ -31,7 +31,7 @@ const CONTACTS: { label: string; value: string; href?: string }[] = [
     },
     // 처리방침 제14조가 문의 방법으로 공개하는 창구다. 화면에서 빼 두면
     // 이용자는 방침을 보고 찾아오는데 고객센터에는 없는 상태가 된다.
-    { label: "카카오톡 문의", value: COMPANY.kakao },
+    { label: "카카오톡 문의", value: COMPANY.kakao, href: COMPANY.kakaoUrl },
     { label: "상담 시간", value: COMPANY.hours },
     {
         label: "문의 유형",

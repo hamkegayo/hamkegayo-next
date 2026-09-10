@@ -19,12 +19,15 @@ import { trackContact } from "@/lib/analytics";
 export function ContactLink({
     href,
     method,
+    external,
     className,
     children,
 }: {
-    /** tel: · mailto: 등 실제 창구 주소 */
+    /** tel: · mailto: · 외부 채널 주소 */
     href: string;
     method?: "phone" | "support";
+    /** 새 탭으로 여는 외부 링크인지 (카카오톡 채널 등). tel:·mailto: 는 false */
+    external?: boolean;
     className?: string;
     children: React.ReactNode;
 }) {
@@ -33,6 +36,9 @@ export function ContactLink({
             href={href}
             onClick={() => trackContact(method)}
             className={className}
+            {...(external
+                ? { target: "_blank", rel: "noreferrer noopener" }
+                : {})}
         >
             {children}
         </a>
