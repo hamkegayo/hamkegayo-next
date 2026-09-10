@@ -169,13 +169,13 @@ async function main() {
     const access = session.access_token;
     const refresh = session.refresh_token;
 
-    const useAccess = async () => {
+    const accessTokenWorks = async () => {
         const r = await fetch(`${url}/auth/v1/user`, {
             headers: { apikey: anonKey, Authorization: `Bearer ${access}` },
         });
         return r.ok;
     };
-    check("변경 전 access token 은 유효", await useAccess());
+    check("변경 전 access token 은 유효", await accessTokenWorks());
 
     // ── 실제 재설정 (액션과 같은 순서)
     await admin
@@ -191,7 +191,7 @@ async function main() {
     check("옛 비밀번호는 거부된다", !(await login(EMAIL, OLD_PW)));
 
     // 여기가 이 스크립트의 핵심이다.
-    check("변경 후 기존 access token 이 거부된다", !(await useAccess()));
+    check("변경 후 기존 access token 이 거부된다", !(await accessTokenWorks()));
 
     const refreshed = await createClient(url, anonKey, {
         auth: { persistSession: false, autoRefreshToken: false },
