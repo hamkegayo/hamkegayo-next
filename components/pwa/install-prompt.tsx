@@ -19,7 +19,12 @@
  *  ## 띄우지 않는 경우
  *
  *  - 쿠키 동의 배너가 떠 있는 동안 — 배너(z-60)가 모달 딤 위에 겹친다.
- *    배너를 처리하면 그때 뜬다
+ *    배너를 처리하면 **곧바로** 뜬다.
+ *
+ *    ⚠️ 사이에 딜레이(1.5초)를 둔 적이 있다(#137 리뷰). 실제로 써 보니
+ *       사용자가 이미 로그인 폼으로 넘어간 뒤에 모달이 튀어나와 **뜬금없게**
+ *       느껴졌다. 배너를 닫는 동작의 연장선에서 바로 뜨는 쪽이 자연스럽다.
+ *       전환은 패널의 짧은 페이드 인으로만 부드럽게 한다
  *  - 재노출 정책이 막을 때 (lib/pwa/prompt-policy.ts)
  *  - 저장소를 못 쓸 때 — 닫아도 기록이 안 남아 매번 뜬다
  *  - 데스크톱 · 이미 설치된 앱
@@ -61,13 +66,6 @@ import {
     subscribePromptEnv,
 } from "./install-prompt-store";
 
-/**
- * 동의 배너가 닫힌 뒤 설치 모달까지 쉬는 시간.
- *  창 두 개가 연달아 튀어나오면 피로하다. 한 박자 쉬어 전환을 부드럽게 한다.
- *  배너가 없던 방문(이미 동의를 처리한 사용자)은 기다리지 않는다.
- */
-const BANNER_GAP_MS = 1500;
-
 /** 이 경로에서만 띄운다 — 허용 목록 */
 const ALLOWED_PATHS = ["/login", "/signup"];
 
@@ -101,16 +99,6 @@ export function InstallPrompt() {
         getServerInstallEvent,
     );
 
-    // 배너가 먼저 떴던 방문이면, 배너가 닫히고 BANNER_GAP_MS 뒤에 연다
-    const [gapPassed, setGapPassed] = useState(false);
-    const consentPending = env?.consentPending ?? false;
-    useEffect(() => {
-        if (!consentPending || bannerOpen) return;
-        const t = setTimeout(() => setGapPassed(true), BANNER_GAP_MS);
-        return () => clearTimeout(t);
-    }, [consentPending, bannerOpen]);
-    const waited = !consentPending || gapPassed;
-
     const allowed = ALLOWED_PATHS.some(
         (p) => pathname === p || pathname.startsWith(`${p}/`),
     );
@@ -118,7 +106,6 @@ export function InstallPrompt() {
         env !== null &&
         allowed &&
         !bannerOpen &&
-        waited &&
         env.eligible &&
         canOffer(env.platform, deferred);
 
