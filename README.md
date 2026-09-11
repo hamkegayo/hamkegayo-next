@@ -204,7 +204,7 @@ Supabase Storage **비공개 버킷** + signed URL. 서버에서 `service_role`�
 
 ## PWA
 
-사용자·파트너 **단일 앱**입니다(`app/manifest.ts`). manifest는 origin당 하나가 원칙이라 두 앱으로 가르면 브라우저마다 다르게 설치됩니다. 파트너 진입점은 `shortcuts`로 줍니다.
+사용자·파트너 **단일 앱**입니다(`app/manifest.ts`). manifest는 origin당 하나가 원칙이라 두 앱으로 가르면 브라우저마다 다르게 설치됩니다. 홈 화면 바로가기(`shortcuts`)는 이용자 동선(예약하기·예약 현황)을 앞에, 파트너 홈을 뒤에 둡니다.
 
 서비스워커(`public/sw.js`)는 **아무것도 캐싱하지 않습니다.** 인증된 응답이 캐시되면 다른 사용자의 화면이 보일 수 있고, `/pay/*`가 stale 응답을 받으면 결제가 어긋납니다. 프로덕션 빌드에서만 등록하며, 잘못 배포했을 때는 `NEXT_PUBLIC_SW_KILL=1`로 재배포해 해제합니다.
 

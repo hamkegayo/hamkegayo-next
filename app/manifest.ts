@@ -9,7 +9,13 @@ import type { MetadataRoute } from "next";
  *  설치시키는 것은 브라우저마다 달라 보장되지 않는다(안드로이드에서 둘로 뜨던
  *  것이 iOS 에서 하나로 합쳐지는 식). 나눌 실익도 없다 — `/login` 이 두 역할을
  *  함께 받고 middleware 가 JWT role 로 `/partner` 에 보낸다.
- *  파트너 진입점은 `shortcuts` 로 준다.
+ *
+ *  ## 바로가기 (홈 화면 아이콘 길게 누르기)
+ *
+ *  이용자 핵심 동선 둘 + 파트너 진입점 하나. 안드로이드는 앞에서부터 보여 주고
+ *  개수가 많으면 뒤를 자르므로 **이용자 동선을 앞에** 둔다.
+ *  세 경로 모두 로그인 필요 경로라 비로그인이면 middleware 가 로그인으로 보낸다.
+ *  라벨은 화면 메뉴명과 같게 쓴다 — 바로가기와 화면 이름이 다르면 헷갈린다.
  *
  *  ## 아이콘
  *
@@ -54,6 +60,31 @@ export default function manifest(): MetadataRoute.Manifest {
             },
         ],
         shortcuts: [
+            {
+                name: "예약하기",
+                short_name: "예약하기",
+                url: "/reservation",
+                icons: [
+                    {
+                        src: "/common/icon192.png",
+                        sizes: "192x192",
+                        type: "image/png",
+                    },
+                ],
+            },
+            {
+                // /mypage/reservations 는 /mypage 로 넘기기만 한다 — 목적지를 직접 가리킨다.
+                name: "예약 현황",
+                short_name: "예약 현황",
+                url: "/mypage",
+                icons: [
+                    {
+                        src: "/common/icon192.png",
+                        sizes: "192x192",
+                        type: "image/png",
+                    },
+                ],
+            },
             {
                 name: "파트너 홈",
                 short_name: "파트너",
