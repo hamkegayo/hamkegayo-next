@@ -11,6 +11,7 @@ import { ConsentBanner } from "@/components/analytics/consent-banner";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { InstallTracker } from "@/components/pwa/install-tracker";
 import { InstallSheetHost } from "@/components/pwa/install-entry";
+import { PwaDebug } from "@/components/pwa/pwa-debug";
 import { CAPTURE_SCRIPT } from "@/lib/pwa/install-event";
 
 // 전역 폰트: Pretendard (Variable)
@@ -92,6 +93,8 @@ export default function RootLayout({
                 <InstallTracker />
                 {/* 메뉴의 "앱 설치하기"(#139)가 여는 안내 시트 — 드로어 밖에 둔다 */}
                 <InstallSheetHost />
+                {/* 실기기 설치 진단 — ?pwa-debug=1 일 때만 보인다 */}
+                <PwaDebug />
             </body>
         </html>
     );

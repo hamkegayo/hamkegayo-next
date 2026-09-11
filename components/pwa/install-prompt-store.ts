@@ -108,7 +108,16 @@ export function recordInstall(): void {
  * InstallSheetHost 가 그린다 — 드로어는 링크를 누르면 닫히므로 드로어 안에
  * 그리면 함께 사라진다.
  */
-let sheetOpen = false;
+export type SheetState = {
+    open: boolean;
+    /** 보통은 플랫폼대로, 설치창을 못 열었으면 Chrome 메뉴 안내 */
+    variant: "platform" | "android-menu";
+    /** 누가 열었나 — 계측용. 이 시트는 어느 쪽이 열었든 닫기를 세지 않는다 */
+    source: "auto" | "menu";
+};
+
+const CLOSED: SheetState = { open: false, variant: "platform", source: "menu" };
+let sheet: SheetState = CLOSED;
 const sheetListeners = new Set<() => void>();
 
 export function subscribeInstallSheet(onChange: () => void): () => void {
@@ -116,16 +125,24 @@ export function subscribeInstallSheet(onChange: () => void): () => void {
     return () => sheetListeners.delete(onChange);
 }
 
-export function getInstallSheet(): boolean {
-    return sheetOpen;
+export function getInstallSheet(): SheetState {
+    return sheet;
 }
 
-export function getServerInstallSheet(): boolean {
-    return false;
+export function getServerInstallSheet(): SheetState {
+    return CLOSED;
 }
 
-export function setInstallSheet(open: boolean): void {
-    if (sheetOpen === open) return;
-    sheetOpen = open;
+export function openInstallSheet(
+    variant: SheetState["variant"] = "platform",
+    source: SheetState["source"] = "menu",
+): void {
+    sheet = { open: true, variant, source };
+    sheetListeners.forEach((l) => l());
+}
+
+export function closeInstallSheet(): void {
+    if (!sheet.open) return;
+    sheet = { ...sheet, open: false };
     sheetListeners.forEach((l) => l());
 }

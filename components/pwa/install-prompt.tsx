@@ -51,6 +51,7 @@ import { platformLabel } from "@/lib/pwa/platform";
 import {
     getPromptEnv,
     getServerPromptEnv,
+    openInstallSheet,
     recordDismiss,
     subscribePromptEnv,
 } from "./install-prompt-store";
@@ -114,6 +115,12 @@ export function InstallPrompt() {
             // 저장소가 따로라 거기서 처음부터 판정하고, 인앱으로 돌아왔을 때는
             // 같은 안내를 또 보지 않는다.
             if (via === "external") recordDismiss();
+        },
+        // 설치창을 못 열었다 — 사용자가 거절한 게 아니므로 세지 않는다.
+        // 모달은 이미 닫혔으니 root layout 호스트가 Chrome 메뉴 안내를 띄운다.
+        fail: () => {
+            gaEvent("pwa_prompt_failed", { platform: label, source: "auto" });
+            openInstallSheet("android-menu", "auto");
         },
     };
 

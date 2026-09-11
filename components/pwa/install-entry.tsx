@@ -36,8 +36,10 @@ import {
     getPromptEnv,
     getServerInstallSheet,
     getServerPromptEnv,
-    setInstallSheet,
+    closeInstallSheet,
+    openInstallSheet,
     subscribeInstallSheet,
+    type SheetState,
     subscribePromptEnv,
 } from "./install-prompt-store";
 import {
@@ -61,24 +63,27 @@ function useInstallInputs() {
     return { env, deferred };
 }
 
-/** 메뉴에서 연 시트의 동작 — 닫아도 세지 않는다 */
-function menuHandlers(label: string): InstallHandlers {
+/** 호스트 시트의 동작 — 닫아도 세지 않는다 */
+function sheetHandlers(
+    label: string,
+    source: SheetState["source"],
+): InstallHandlers {
     return {
         dismiss: (via) => {
-            setInstallSheet(false);
+            closeInstallSheet();
             gaEvent("pwa_prompt_dismissed", {
                 platform: label,
-                source: "menu",
+                source,
                 ...(via ? { via } : {}),
             });
         },
         accept: (via) => {
-            setInstallSheet(false);
-            gaEvent("pwa_prompt_accepted", {
-                platform: label,
-                source: "menu",
-                via,
-            });
+            closeInstallSheet();
+            gaEvent("pwa_prompt_accepted", { platform: label, source, via });
+        },
+        fail: () => {
+            gaEvent("pwa_prompt_failed", { platform: label, source });
+            openInstallSheet("android-menu", source);
         },
     };
 }
@@ -108,10 +113,10 @@ export function InstallEntryButton({
         if (env.platform.kind === "android") {
             // Android 는 중간 안내 없이 곧바로 네이티브 설치창
             gaEvent("pwa_prompt_shown", { platform: label, source: "menu" });
-            void runNativePrompt(deferred, menuHandlers(label));
+            void runNativePrompt(deferred, sheetHandlers(label, "menu"));
             return;
         }
-        setInstallSheet(true);
+        openInstallSheet();
     };
 
     return (
@@ -132,7 +137,7 @@ export function InstallEntryButton({
  * 메뉴에서 연 시트를 그리는 곳 — root layout 에 하나.
  */
 export function InstallSheetHost() {
-    const open = useSyncExternalStore(
+    const sheet = useSyncExternalStore(
         subscribeInstallSheet,
         getInstallSheet,
         getServerInstallSheet,
@@ -141,18 +146,25 @@ export function InstallSheetHost() {
     const label = env ? platformLabel(env.platform) : "";
 
     useEffect(() => {
-        if (open)
-            gaEvent("pwa_prompt_shown", { platform: label, source: "menu" });
-    }, [open, label]);
+        if (sheet.open)
+            gaEvent("pwa_prompt_shown", {
+                platform: label,
+                source: sheet.source,
+                ...(sheet.variant === "android-menu"
+                    ? { variant: sheet.variant }
+                    : {}),
+            });
+    }, [sheet, label]);
 
     if (!env) return null;
 
     return (
         <InstallSheet
-            open={open}
+            open={sheet.open}
             platform={env.platform}
             deferred={deferred}
-            handlers={menuHandlers(label)}
+            variant={sheet.variant}
+            handlers={sheetHandlers(label, sheet.source)}
         />
     );
 }
