@@ -61,6 +61,13 @@ import {
     subscribePromptEnv,
 } from "./install-prompt-store";
 
+/**
+ * 동의 배너가 닫힌 뒤 설치 모달까지 쉬는 시간.
+ *  창 두 개가 연달아 튀어나오면 피로하다. 한 박자 쉬어 전환을 부드럽게 한다.
+ *  배너가 없던 방문(이미 동의를 처리한 사용자)은 기다리지 않는다.
+ */
+const BANNER_GAP_MS = 1500;
+
 /** 이 경로에서만 띄운다 — 허용 목록 */
 const ALLOWED_PATHS = ["/login", "/signup"];
 
@@ -94,6 +101,16 @@ export function InstallPrompt() {
         getServerInstallEvent,
     );
 
+    // 배너가 먼저 떴던 방문이면, 배너가 닫히고 BANNER_GAP_MS 뒤에 연다
+    const [gapPassed, setGapPassed] = useState(false);
+    const consentPending = env?.consentPending ?? false;
+    useEffect(() => {
+        if (!consentPending || bannerOpen) return;
+        const t = setTimeout(() => setGapPassed(true), BANNER_GAP_MS);
+        return () => clearTimeout(t);
+    }, [consentPending, bannerOpen]);
+    const waited = !consentPending || gapPassed;
+
     const allowed = ALLOWED_PATHS.some(
         (p) => pathname === p || pathname.startsWith(`${p}/`),
     );
@@ -101,6 +118,7 @@ export function InstallPrompt() {
         env !== null &&
         allowed &&
         !bannerOpen &&
+        waited &&
         env.eligible &&
         canOffer(env.platform, deferred);
 
@@ -128,7 +146,7 @@ export function InstallPrompt() {
         <Modal
             open={open}
             onClose={dismiss}
-            className="max-h-full max-w-sm overflow-y-auto p-6"
+            className="animate-in fade-in-0 zoom-in-95 max-h-full max-w-sm overflow-y-auto p-6 duration-300"
         >
             <button
                 type="button"

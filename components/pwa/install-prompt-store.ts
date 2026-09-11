@@ -12,6 +12,7 @@
  *  렌더가 순수하지 않게 된다. 시각은 스냅숏을 만들 때 한 번만 읽는다.
  */
 
+import { readConsent } from "@/lib/consent";
 import { detectPlatform, type Platform } from "@/lib/pwa/platform";
 import {
     afterDismiss,
@@ -28,6 +29,14 @@ export type PromptEnv = {
     /** null = 저장소를 쓸 수 없다 → 띄우지 않는다 */
     state: PromptState | null;
     eligible: boolean;
+    /**
+     * 이 방문을 시작할 때 쿠키 동의가 미처리였다 — 동의 배너가 먼저 뜬다.
+     *  배너가 닫힌 뒤 잠깐 쉬었다 띄운다(install-prompt.tsx BANNER_GAP_MS).
+     *
+     *  훅의 bannerOpen 으로 판단하지 않는 이유: hydration 첫 렌더에서는 서버
+     *  스냅숏(동의값 null)이라 **누구에게나 true** 로 나온다. 원본을 읽는다.
+     */
+    consentPending: boolean;
 };
 
 let snapshot: PromptEnv | null = null;
@@ -58,6 +67,7 @@ function build(state: PromptState | null): PromptEnv {
         }),
         state,
         eligible: state !== null && isEligible(state, Date.now()),
+        consentPending: readConsent() === null,
     };
 }
 
