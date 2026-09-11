@@ -1,15 +1,18 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CreditCard, UserRound } from "lucide-react";
+import { UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { ConfirmModal } from "@/components/ui/modal";
 import { updateProfileName } from "../../_actions/profile";
+import { reconsentAll } from "../../_actions/agreements";
 import { deleteCareRecipient } from "../../_actions/care";
 import type { CareRecipient } from "../../_lib/care.server";
+import type { AgreementView } from "../../_lib/agreements.server";
 import { CareRecipientModal } from "./care-recipient-modal";
 
 type Basic = {
@@ -59,22 +62,18 @@ function OutlineButton({
     );
 }
 
-const AGREEMENTS = [
-    { label: "서비스 이용 약관 동의", required: true },
-    { label: "개인정보 수집 및 이용 동의", required: true },
-    { label: "결제 이용 동의", required: true },
-];
-
 export function MemberInfo({
     basic,
     recipients,
+    agreements,
 }: {
     basic: Basic;
     recipients: CareRecipient[];
+    agreements: AgreementView[];
 }) {
     const router = useRouter();
-    const [marketing, setMarketing] = useState(false);
     const [editingName, setEditingName] = useState(false);
+    const [reconsenting, startReconsent] = useTransition();
     const [nameInput, setNameInput] = useState(basic.name);
     const [pending, startTransition] = useTransition();
 
@@ -219,35 +218,6 @@ export function MemberInfo({
                     </dl>
                 </Card>
 
-                {/* 결제 수단 관리 */}
-                <Card
-                    title="결제 수단 관리"
-                    action={<OutlineButton>카드 추가하기</OutlineButton>}
-                >
-                    <p className="text-muted-foreground text-sm font-semibold">
-                        등록된 카드
-                    </p>
-                    <div className="bg-muted/40 mt-3 flex items-center gap-4 rounded-xl p-4">
-                        <div className="bg-brand/10 text-brand flex size-9 shrink-0 items-center justify-center rounded-lg">
-                            <CreditCard className="size-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <p className="text-foreground font-bold">
-                                신한카드
-                            </p>
-                            <p className="text-muted-foreground text-xs">
-                                유효기간 08/27
-                            </p>
-                        </div>
-                        <p className="text-foreground hidden text-sm font-semibold tracking-wider sm:block">
-                            **** **** **** 1234
-                        </p>
-                        <span className="bg-background text-muted-foreground shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold">
-                            기본 카드
-                        </span>
-                    </div>
-                </Card>
-
                 {/* 환자 정보 관리 */}
                 <Card
                     title="환자 정보 관리"
@@ -314,62 +284,102 @@ export function MemberInfo({
 
                 {/* 약관 동의 관리 */}
                 <Card title="약관 동의 관리">
+                    {/*
+                     * 이력이 없는 항목이 있을 때만 안내한다.
+                     * 동의 이력 원장(#58)은 2026-09 에 신설됐고, 그 이전 가입자는
+                     * 받은 동의가 남아 있지 않다. 설명 없이 "기록 없음" 만 보이면
+                     * 동의를 안 한 것으로 오해한다.
+                     */}
+                    {/*
+                     * 개정본 재동의 — 대상이 있을 때만 띄운다.
+                     * 항목마다 버튼을 두지 않는 이유: 처리방침이 개정되면
+                     * PRIVACY·PERSONAL·SENSITIVE 세 항목이 함께 밀린다.
+                     * 같은 개정에 세 번 누르게 할 이유가 없다.
+                     */}
+                    {agreements.some((a) => a.agreedLabel && !a.isCurrent) && (
+                        <div className="mb-4 rounded-lg bg-amber-50 px-4 py-3.5 dark:bg-amber-950/30">
+                            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                                개정된 문서가 있습니다.
+                            </p>
+                            <p className="mt-1 text-xs leading-relaxed text-amber-700 dark:text-amber-400">
+                                변경된 내용을 확인하신 뒤 다시 동의해 주세요.
+                                기존 동의 기록은 그대로 보관됩니다.
+                            </p>
+                            <button
+                                type="button"
+                                disabled={reconsenting}
+                                aria-busy={reconsenting}
+                                onClick={() =>
+                                    startReconsent(async () => {
+                                        const res = await reconsentAll();
+                                        if (res.ok) {
+                                            toast.success(
+                                                "재동의가 완료되었습니다.",
+                                            );
+                                            router.refresh();
+                                        } else {
+                                            toast.error(res.message);
+                                        }
+                                    })
+                                }
+                                className="mt-3 rounded-lg bg-amber-600 px-3.5 py-2 text-sm font-bold text-white transition-colors hover:bg-amber-700 disabled:opacity-60"
+                            >
+                                {reconsenting ? "처리 중…" : "다시 동의하기"}
+                            </button>
+                        </div>
+                    )}
+
+                    {agreements.some((a) => !a.agreedLabel) && (
+                        <p className="bg-muted/40 text-muted-foreground mb-4 rounded-lg px-4 py-3 text-xs leading-relaxed">
+                            동의 이력 저장 기능이 도입된 2026년 9월 이전에
+                            가입하신 경우 &lsquo;기록 없음&rsquo; 으로
+                            표시됩니다.
+                        </p>
+                    )}
                     <div className="divide-border divide-y">
-                        {AGREEMENTS.map((a) => (
+                        {agreements.map((a) => (
                             <div
-                                key={a.label}
+                                key={a.type}
                                 className="flex items-center justify-between gap-3 py-3.5"
                             >
-                                <span className="text-foreground text-sm font-medium">
-                                    {a.label}
-                                </span>
-                                <div className="flex items-center gap-3">
-                                    <span className="text-sm font-semibold text-emerald-600">
-                                        동의 완료
+                                <div className="min-w-0">
+                                    <span className="text-foreground text-sm font-medium">
+                                        {a.label}
                                     </span>
-                                    <OutlineButton>약관 보기</OutlineButton>
+                                    {a.agreedLabel && (
+                                        <p className="text-muted-foreground text-xs">
+                                            {a.agreedLabel} 동의
+                                            {!a.isCurrent &&
+                                                " · 개정본 재동의 필요"}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="flex shrink-0 items-center gap-3">
+                                    <span
+                                        className={cn(
+                                            "text-sm font-semibold",
+                                            a.agreedLabel
+                                                ? a.isCurrent
+                                                    ? "text-emerald-600"
+                                                    : "text-amber-600"
+                                                : "text-muted-foreground",
+                                        )}
+                                    >
+                                        {a.agreedLabel
+                                            ? a.isCurrent
+                                                ? "동의 완료"
+                                                : "재동의 필요"
+                                            : "기록 없음"}
+                                    </span>
+                                    <Link
+                                        href={a.href}
+                                        className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-3.5 py-2 text-sm font-bold transition-colors"
+                                    >
+                                        약관 보기
+                                    </Link>
                                 </div>
                             </div>
                         ))}
-
-                        {/* 마케팅 (토글) */}
-                        <div className="flex items-center justify-between gap-3 py-3.5">
-                            <span className="text-foreground text-sm font-medium">
-                                마케팅 정보 수신 동의 (선택)
-                            </span>
-                            <div className="flex items-center gap-3">
-                                <span
-                                    className={cn(
-                                        "text-sm font-semibold",
-                                        marketing
-                                            ? "text-emerald-600"
-                                            : "text-muted-foreground",
-                                    )}
-                                >
-                                    {marketing ? "동의 완료" : "미동의"}
-                                </span>
-                                <OutlineButton>약관 보기</OutlineButton>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setMarketing((v) => !v);
-                                        toast.success(
-                                            marketing
-                                                ? "마케팅 수신 동의를 철회했습니다."
-                                                : "마케팅 수신에 동의했습니다.",
-                                        );
-                                    }}
-                                    className={cn(
-                                        "rounded-lg px-3.5 py-2 text-sm font-bold transition-colors",
-                                        marketing
-                                            ? "border-border bg-background text-foreground hover:bg-muted border"
-                                            : "bg-brand text-brand-foreground hover:bg-brand/90",
-                                    )}
-                                >
-                                    {marketing ? "철회하기" : "동의하기"}
-                                </button>
-                            </div>
-                        </div>
                     </div>
                 </Card>
             </div>

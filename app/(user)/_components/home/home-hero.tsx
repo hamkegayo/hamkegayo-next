@@ -2,7 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { NonMedicalNotice } from "@/components/non-medical-notice";
-import { ComingSoonButton } from "./coming-soon-button";
+import { COMPANY } from "@/lib/legal/company";
+import { ContactLink } from "./contact-link";
 import { Section } from "./section";
 
 export function HomeHero() {
@@ -33,12 +34,13 @@ export function HomeHero() {
                         >
                             서비스 예약하기
                         </Link>
-                        <ComingSoonButton
-                            contact="phone"
+                        <ContactLink
+                            href={`tel:${COMPANY.tel}`}
+                            method="phone"
                             className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-6 py-3 text-sm font-bold transition-colors"
                         >
                             전화 상담하기
-                        </ComingSoonButton>
+                        </ContactLink>
                     </div>
                     <NonMedicalNotice className="mt-6 max-w-md" />
                 </div>

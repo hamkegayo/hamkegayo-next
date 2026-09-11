@@ -40,6 +40,16 @@ jobs:
             - name: 알림·리다이렉트 링크 검사
               run: npm run check:links
 
+            # 본문이 바뀌었는데 version 을 안 올리면 동의 이력이 본문을 식별하지
+            # 못한다. 실제로 2026-09-06 개정에서 그 일이 일어났다 (#105).
+            - name: 약관·방침 버전 무결성 (#105)
+              run: npm run test:legal
+
+            # 닫아도 다음 날 또 뜨거나, 인앱 브라우저에 "설치하기" 가 떠서 눌러도
+            # 아무 일이 없으면 화면만 봐서는 모른다. 날짜와 UA 를 고정해 본다.
+            - name: PWA 설치 유도 — 재노출 정책·플랫폼 판정 (#117)
+              run: npm run test:pwa
+
     # 로컬 Supabase 스택을 띄워 마이그레이션과 권한 경계를 실제로 검증한다.
     database:
         name: 마이그레이션 · RLS · 권한 경계
@@ -56,15 +66,21 @@ jobs:
 
             - uses: supabase/setup-cli@v1
               with:
-                  version: latest
+                  # 고정한다. `latest` 로 두면 CLI 가 올라갈 때마다 아래 -x 의
+                  # 서비스 이름이 조용히 바뀌어 CI 가 깨진다.
+                  version: 2.117.0
 
-            - name: Supabase 로컬 스택 기동
-              run: supabase start
-
-            # 마이그레이션이 **처음부터** 깨끗이 적용되는지 본다.
-            # 운영에 적용하기 전에 여기서 깨져야 한다.
-            - name: 마이그레이션 재적용 (db reset)
-              run: supabase db reset
+            # 러너는 매번 새 볼륨이라 start 가 마이그레이션을 처음부터 전부 적용한다.
+            # 즉 이 한 줄이 "마이그레이션이 zero 에서 깨끗이 서는가" 검사를 겸한다.
+            # (별도 `db reset` 을 두었더니 컨테이너를 다시 띄우다 포트가 겹쳐 깨졌다.)
+            #
+            # 쓰지 않는 서비스는 제외한다 — 특히 mailpit(구 inbucket)이 54324 를
+            # 잡으려다 "address already in use" 로 죽은 것이 실제 실패 원인이었다.
+            # 메일은 Resend 목이라 mailpit 이 필요 없고, 나머지도 테스트가 쓰지 않는다.
+            # 덤으로 기동이 빨라진다.
+            - name: Supabase 로컬 스택 기동 (마이그레이션 전량 적용 포함)
+              run: |
+                  supabase start -x mailpit,studio,imgproxy,edge-runtime,logflare,vector,supavisor,realtime,postgres-meta
 
             # 테스트 스크립트들은 --env-file=.env.local 을 읽는다. 로컬 스택 값으로 만든다.
             # (스크립트의 안전장치가 localhost 가 아니면 즉시 중단하므로 이 값이어야 한다)
@@ -115,6 +131,17 @@ jobs:
 
             - name: 탈퇴 시 보존·파기 (#72)
               run: npm run test:withdrawal
+
+            # 재설정은 계정을 빼앗겼을 때 되찾는 경로다. "바꿔지는가" 보다
+            # **기존 세션이 죽는가** 가 핵심이고, 그건 GoTrue 의 동작이라
+            # 우리 코드 변경 없이도 사라질 수 있다. 여기서 못 박는다.
+            - name: 비밀번호 재설정·세션 실효 (#127)
+              run: npm run test:reset
+
+            # 개정 고지는 약관 제4조 ③ · 처리방침 제16조 ② 가 요구하는 절차다.
+            # 깨져도 화면은 멀쩡하고 개정이 실제로 일어나야 드러난다 — 그때는 늦다.
+            - name: 약관 재동의 안내·중복 방지 (#91)
+              run: npm run test:reconsent
 
             # ⚠️ test:nicepay · test:payapi · test:payments 는 여기서 돌리지 않는다.
             #    NICEPAY 샌드박스 실호출이라 외부 의존이 생기고 키를 시크릿으로 넣어야 한다.

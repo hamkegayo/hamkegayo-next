@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
-import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { COMPANY } from "@/lib/legal/company";
@@ -32,7 +31,7 @@ const CONTACTS: { label: string; value: string; href?: string }[] = [
     },
     // 처리방침 제14조가 문의 방법으로 공개하는 창구다. 화면에서 빼 두면
     // 이용자는 방침을 보고 찾아오는데 고객센터에는 없는 상태가 된다.
-    { label: "카카오톡 문의", value: COMPANY.kakao },
+    { label: "카카오톡 문의", value: COMPANY.kakao, href: COMPANY.kakaoUrl },
     { label: "상담 시간", value: COMPANY.hours },
     {
         label: "문의 유형",
@@ -98,8 +97,6 @@ export default function MypageSupport() {
     const [open, setOpen] = useState(0);
 
     const toggle = (i: number) => setOpen((prev) => (prev === i ? -1 : i));
-
-    const notReady = () => toast.info("준비 중인 기능입니다.");
 
     return (
         <div>
@@ -252,13 +249,12 @@ export default function MypageSupport() {
                 >
                     서비스 소개 보기
                 </Link>
-                <button
-                    type="button"
-                    onClick={notReady}
+                <Link
+                    href="/review"
                     className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-6 py-3 text-sm font-bold transition-colors"
                 >
                     이용 후기 보기
-                </button>
+                </Link>
             </div>
         </div>
     );

@@ -17,6 +17,7 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePartnerNav } from "./partner-nav-context";
 import { COMPANY } from "@/lib/legal/company";
+import { InstallEntryButton } from "@/components/pwa/install-entry";
 
 const ITEMS: {
     href: string;
@@ -94,18 +95,26 @@ function SidebarContent({
                 })}
             </nav>
 
-            {/* 파트너 고객센터 — 하단 고정 */}
-            <div className="border-border bg-background mt-auto rounded-2xl border p-5">
-                <p className="text-foreground flex items-center gap-2 font-bold">
-                    <Headphones className="text-brand size-4" />
-                    파트너 고객센터
-                </p>
-                <p className="text-foreground mt-3 text-xl font-extrabold">
-                    {COMPANY.tel}
-                </p>
-                <p className="text-muted-foreground mt-1 text-xs">
-                    {COMPANY.hours}
-                </p>
+            {/* 하단 고정 — 앱 설치(#139) + 파트너 고객센터 */}
+            <div className="mt-auto flex flex-col gap-3">
+                {/* 현장에서 매일 여는 사람들이라 설치 효용이 가장 크다.
+                    데스크톱·설치된 앱에서는 그리지 않는다 */}
+                <InstallEntryButton
+                    onOpen={onNavigate}
+                    className="px-4 py-3 text-sm"
+                />
+                <div className="border-border bg-background rounded-2xl border p-5">
+                    <p className="text-foreground flex items-center gap-2 font-bold">
+                        <Headphones className="text-brand size-4" />
+                        파트너 고객센터
+                    </p>
+                    <p className="text-foreground mt-3 text-xl font-extrabold">
+                        {COMPANY.tel}
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                        {COMPANY.hours}
+                    </p>
+                </div>
             </div>
         </>
     );

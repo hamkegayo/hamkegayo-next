@@ -33,6 +33,13 @@ export type CompanyInfo = {
      * 고객센터에는 없는 상태가 된다.
      */
     kakao: string;
+    /**
+     * 카카오톡 채널 주소.
+     *
+     * `kakao` 는 아이디라 화면에 적어도 눌러서 갈 수 없다. 처리방침 제14조가
+     * 문의 방법으로 공개한 창구인 이상 실제로 닿아야 한다.
+     */
+    kakaoUrl: string;
     /** 개인정보처리방침 제14조 */
     privacyOfficer: string;
 };
@@ -47,6 +54,7 @@ export const COMPANY: CompanyInfo = {
     hours: "06:00~18:00",
     email: "hamkegayo@gmail.com",
     kakao: "hamkegayo",
+    kakaoUrl: "https://pf.kakao.com/_fImBX",
     privacyOfficer: "김서현 대표",
 };
 

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { ConfirmModal } from "@/components/ui/modal";
 import { useLogout } from "@/hooks/use-logout";
 import type { HeaderMember } from "@/components/layout/user-header";
+import { InstallEntryButton } from "@/components/pwa/install-entry";
 
 type NavItem = { label: string; href: string };
 
@@ -87,6 +88,12 @@ export function MobileNav({
                                 </Link>
                             ))}
                         </nav>
+
+                        {/* 앱 설치 (#139) — 설치할 수 없는 환경이면 그리지 않는다 */}
+                        <InstallEntryButton
+                            onOpen={() => setOpen(false)}
+                            className="mt-1 px-3 py-2.5 text-sm"
+                        />
 
                         <div className="bg-border my-3 h-px" />
 

@@ -1,41 +1,117 @@
-# 함께가요
+# 함께가요 — 병원동행 매칭·결제 플랫폼
 
-사용자가 동행 서비스를 **예약 신청**하면, 여러 **파트너(매니저)**가 요청을 수락하고, 사용자가 그중 한 명을 선택해 서비스를 진행·정산하는 **양방향 매칭 플랫폼**입니다.
+이용자가 병원동행을 예약하면 여러 파트너가 수락하고, 이용자가 한 명을 선택해 **선결제 → 수행 → 정산**까지 진행하는 양방향 매칭 플랫폼입니다.
 
-## 기술 스택
+**2026.03 ~ 진행 중** · Next.js 16 (App Router) · React 19 · TypeScript · Supabase (Postgres·Auth·Storage·pg_cron) · Zustand · Zod · Tailwind CSS 4 · NICEPAY · GitHub Actions · Vercel
 
-| 항목                                    | 버전 / 비고                                           |
-| --------------------------------------- | ----------------------------------------------------- |
-| Next.js (App Router)                    | 16.2.10                                               |
-| React                                   | 19.2.7                                                |
-| TypeScript                              | ^6                                                    |
-| Supabase (DB / Auth / Storage)          | @supabase/supabase-js ^2.110.0, @supabase/ssr ^0.12.0 |
-| Tailwind CSS                            | ^4                                                    |
-| shadcn/ui                               | ^4.13.0                                               |
-| Zustand                                 | ^5.0.14 — 예약 STEP 등 클라이언트 상태                |
-| zod                                     | ^4.4.3 — 폼 유효성 검증                               |
-| Resend                                  | 이메일 발송 (인증 메일 등)                            |
-| ESLint / Prettier / Husky / lint-staged | 코드 품질                                             |
+|        |                                                                    |
+| ------ | ------------------------------------------------------------------ |
+| 저장소 | https://github.com/hamkegayo/hamkegayo-next                        |
+| 서비스 | 준비 중 — PG사 심사 진행 중                                        |
+| 규모   | 페이지 36 · 마이그레이션 46 (테이블 25 · RPC 68) · PR 71 · 이슈 61 |
 
-> **설계 원칙 — 오버엔지니어링 경계**
->
-> - 복잡한 애니메이션 대신 기본 애니메이션 사용
-> - 실시간 팝업 알림 대신 알림 내역 페이지 + DB Fetching (추후 고도화)
-> - 소셜 로그인은 클릭 시 "준비중입니다" 안내로 처리
-> - 웹사이트는 1920px width 기준 (반응형은 추후 고려)
->
-> 결제는 초기 무통장 입금 확인 방식에서 **PG사 연동으로 전환**합니다(이슈 #46).
-> 카드 등록(빌링키 발급) → 서비스 완료 → 서버 승인 요청 흐름이며, 승인 API는 반드시 서버에서 호출합니다.
+## 팀
 
-## 시작하기
+기획·홍보 팀원과 함께 만들고 있습니다. 개발 영역은 1인이 담당합니다.
 
-### 1. 의존성 설치
+| 역할     | 담당                                                                    |
+| -------- | ----------------------------------------------------------------------- |
+| 기획     | 서비스 정책, 약관·개인정보처리방침·파트너 현장업무 매뉴얼 원문 (Notion) |
+| 홍보     | 마케팅·홍보                                                             |
+| **개발** | **설계 · UI/UX 디자인 · 프론트엔드 · 백엔드 · CI** (1인)                |
+
+- **2026.03 ~ 06** — 기획 문서 검토, 개발 범위 확정, AI·Figma 기반 이용자·파트너 화면 디자인
+- **2026.07 ~** — 개발
+
+약관·방침 원문은 기획이 관리하고, 개발은 그 조항을 **DB 정책·테스트로 옮기는 쪽**을 맡습니다. 조항과 구현이 어긋나면 PR에서 조항 번호를 근거로 기획과 맞춥니다 — 아래 [5장](#5-약관개인정보처리방침을-db-정책으로-강제)이 그 결과입니다.
+
+> 앞부분은 **설계 판단의 기록**이고, [실행](#실행)부터는 개발 문서입니다.
+
+---
+
+## 1. 전환 추적을 민감정보가 새지 않는 구조로
+
+**문제** — 마케팅 집행에 GA4·Meta Pixel 전환 추적이 필요했지만, 이용자 입력 대부분이 진료·건강 정보라 **파라미터 하나만 잘못 실어도 민감정보가 외부 광고 플랫폼으로 나갑니다.** 게다가 Vercel은 프리뷰 배포도 `NODE_ENV=production`이라 테스트 트래픽이 운영 데이터셋을 오염시킵니다.
+
+**선택**
+
+- 동의 확인을 **스크립트 로드 시점과 이벤트 전송 시점에 이중으로** 배치 — 세션 중 동의 철회까지 반영
+- 환경변수가 아니라 **운영 호스트명 기준**으로 스크립트를 로드 — 프리뷰·`*.vercel.app` 트래픽이 수집되지 않음
+- 퍼널 이벤트(가입 → 서비스 조회 → 플랜 선택 → 결제 시작 → 예약 완료 → 문의)를 전송 함수 단위로 한 모듈에 모으고, **전송 금지 항목을 주석으로 명시**
+- Pixel 이벤트마다 고유 `eventID` 발급 — Conversions API 도입 시 중복 집계 방지. 최초 로드는 GA config·Pixel init이 `page_view`를 자동 전송하므로 수동 전송은 라우트 변경에만 붙여 **첫 화면 이중 집계를 막았습니다**
+
+**결과** — 오픈 전에 운영 데이터셋 분리와 동의 기반 수집 경로를 확보해, 오픈 첫날부터 오염 없는 퍼널 데이터를 쌓을 수 있는 상태입니다.
+
+`components/analytics/` · `lib/analytics.ts`
+
+## 2. 결제 승인 라우트 — 청구 지점 앞뒤의 실패를 전부 분류
+
+**문제** — PG 승인 API를 호출하는 순간 **실제 청구가 발생**합니다. 승인 후 DB 확정이 실패하거나 서버리스 함수가 중간에 종료되면 "돈은 빠지고 예약은 미확정"인 상태가 되고, 복구할 기록조차 남지 않습니다.
+
+**선택**
+
+- 검증 순서 고정 — 서명 검증 → 주문 조회 → 금액 대조 → 만료·재선택 재확인 → PG 승인 → 결제·예약 확정 단일 트랜잭션 → 실패 시 망취소·포인트 복원
+- **실행 시간 예산을 코드에 명시** — 승인 20초 + 복구 10초 + DB ≈ 31초, 함수 상한 60초. 상한이 어댑터 타임아웃보다 작으면 **망취소가 실행되지 않으므로** 두 값의 관계를 주석으로 고정
+- 결제·환불 사고 **9개 유형**을 심각도(`CRITICAL`/`HIGH`/`MEDIUM`)·처리상태와 함께 enum으로 정의하고 담당자에게 메일 발송
+    - 승인 — `CANCEL_FAILED` · `APPROVE_INDETERMINATE` · `POINT_RESTORE_FAILED` · `STATE_MISMATCH` · `AMOUNT_MISMATCH` · `UNKNOWN_ORDER` · `FINALIZE_FAILED`
+    - 환불 — `REFUND_FAILED` · `REFUND_RECORD_FAILED`. 뒤쪽이 더 위험합니다 — PG 취소는 됐는데 기록이 없으니 **재시도하면 두 번 환불됩니다**
+- 사고 기록 모듈은 **절대 예외를 던지지 않도록** 설계 — 보상 처리 도중 호출되므로 여기서 실패하면 이미 처리된 결제를 되돌릴 수 없습니다. 적재에 실패해도 알림은 시도합니다
+
+`app/api/payments/confirm/route.ts` · `lib/payments/`
+
+## 3. 실제 사고를 개인의 주의가 아니라 lint·CI 규칙으로
+
+한 번 난 사고가 다시 나지 않게 하는 방법은 "조심하기"가 아니라 **같은 코드를 쓸 수 없게 만드는 것**이라고 봤습니다.
+
+- **시간대 사고** — Vercel(UTC)과 개발 환경(KST) 차이로 파트너 확정 시각이 9시간 어긋나 표시되고, KST 09시 이전에 만든 예약번호에 전날 날짜가 박혔습니다. 테스트도 KST에서 돌아 재현되지 않았습니다.
+  → KST 명시 포맷 함수로 통일하고, **로컬 시간대 `Date` 접근자를 ESLint `no-restricted-syntax`로 금지**했습니다. `getFullYear`·`getMonth`·`getHours` 등을 쓰면 커밋 단계에서 막힙니다.
+- **알림 링크 404** — 존재하지 않는 라우트를 가리키는 알림이 타입 검사와 빌드를 모두 통과해 프로덕션에서 404가 났습니다.
+  → `app/**/page.tsx`에서 **라우트 목록을 복원해** 알림 링크·`redirect()`·`router.push()` 경로를 대조하는 검사기를 만들어 CI에 넣었습니다.
+- **권한 우회 방지** — RLS를 통째로 우회하는 `service_role` 클라이언트를 **관리자 영역에서 import하지 못하도록** `no-restricted-imports`로 차단했습니다. 관리자 조회는 접속기록이 남는 RPC로만 갑니다.
+- **운영 DB 오염 방지** — 스테이징 도입에 맞춰 시드 스크립트 가드를 "localhost만 허용"에서 **"원격 기본 차단 + 대상 프로젝트 ref 직접 입력 + 운영 ref 차단 목록"**으로 바꿨습니다. 허용 목록은 환경이 늘 때마다 고쳐야 하지만, 차단 목록은 새 환경이 생겨도 유효합니다.
+
+`eslint.config.mjs` · `scripts/check-links.mjs` · `scripts/_target-guard.mjs`
+
+## 4. "무엇이 안 되는가"를 검증하는 CI
+
+**문제** — 통합 테스트 스크립트는 있었지만 **CI에서 하나도 돌지 않았습니다.** 권한 경계가 깨져도 화면은 정상으로 보이고, 사고가 난 뒤에야 드러나는 구조였습니다.
+
+**선택**
+
+- GitHub Actions에서 로컬 Supabase 스택을 띄워 **매 PR마다 마이그레이션 46개를 0부터 적용** — 마이그레이션 정합성 검사를 겸합니다
+- 권한·RLS·보존 경계 통합 테스트 **8종** 실행 — 파트너 개인정보 3단계, 관리자 접근통제, 정산 계좌 열람, 탈퇴 시 보존·파기, 비밀번호 재설정 후 세션 실효, 약관 재동의 등
+- DB가 필요 없는 검사(요금 계산 단위 테스트, 링크 검사, 약관 버전 무결성)는 **별도 job으로 분리**해 수 초 안에 먼저 실패시킵니다
+
+**포기한 것** — PG 샌드박스 실호출 테스트는 CI에서 제외했습니다. 외부 장애가 CI 실패로 둔갑하면 **아무도 CI 결과를 믿지 않게 됩니다.**
+
+**트러블슈팅** — 테스트에 쓰지 않는 메일 컨테이너가 포트를 점유해 CI가 무작위로 깨졌습니다. 불필요한 서비스를 기동 대상에서 빼 해결하면서 기동 시간도 줄었고(2분 37초 → 1분 48초), CLI 버전을 고정해 업데이트 시 서비스명이 바뀌어 깨지는 경로도 막았습니다.
+
+`.github/workflows/be-check.yml`
+
+## 5. 약관·개인정보처리방침을 DB 정책으로 강제
+
+문서가 공개한 약속과 코드가 어긋나면, 어긋난 쪽이 곧 사고입니다. 조항을 **화면 문구가 아니라 DB 정책과 테스트로** 옮겼습니다.
+
+- **파트너 개인정보 3단계 노출** — 매칭 전(병원명·지역 등 최소 정보) → 선결제 확정 후(성명·연락처·상세주소) → 수행기록 제출 또는 종료 24시간 후 차단. RLS는 행 단위라 컬럼을 가릴 수 없어 **1단계는 RPC로** 필요한 열만 내보내고, 주소는 동 단위로 가공합니다. _(처리방침 제5조·제9조)_
+- **Realtime 구독을 기각하고 폴링** — 파트너 대기 목록을 Realtime으로 실시간 갱신하는 안(#27)을 설계 단계에서 기각했습니다. Realtime의 권한 판정은 행(RLS)과 역할 단위라, **같은 파트너에게 매칭 전엔 가리고 확정 후엔 보여줘야 하는 열**도, **동 단위로 가공한 주소**도 표현할 수 없습니다. 위 RPC가 막은 정보가 구독 채널로 새는 경로가 생깁니다.
+  → 파트너 목록은 15초, 이용자 매칭 화면은 5초 주기로 다시 조회하고 **백그라운드 탭에서는 멈춥니다.** 즉시성을 몇 초 포기하는 대신 조회 경로를 RPC 하나로 유지했습니다.
+- **매칭 만료 처리** — Vercel Hobby 크론은 하루 1회가 한계라 30분 결제 기한에 맞지 않습니다. **DB pg_cron 5분 주기 + 조회 직전 lazy 폴백**으로 처리하고, 폴백은 인스턴스당 1분 스로틀을 걸어 과호출을 막았습니다.
+- **상태형 알림 중복 방지** — 부분 유니크 인덱스는 `ON CONFLICT`가 인덱스 조건을 추론해야 하는데 PostgREST가 그것을 전달하지 못해 **upsert가 조용히 0건이 되는 것을 스테이징에서 확인**했습니다. 전체 유니크 인덱스 + null 키로 사건형·상태형 알림을 구분하는 방식으로 바꿨습니다.
+- **개정 감지** — 약관 본문이 바뀌었는데 버전을 올리지 않으면 동의 이력이 어느 본문에 대한 것인지 식별할 수 없습니다. **버전별 본문 해시를 CI가 대조**해, 본문만 고치고 버전을 잊으면 빌드가 실패합니다.
+
+---
+
+# 실행
+
+## 1. 의존성
 
 ```bash
 npm install
 ```
 
-### 2. 환경변수 설정
+Node 22.6 이상이 필요합니다. 일부 스크립트가 `--experimental-strip-types`를 씁니다.
+
+## 2. 환경변수
 
 `.env.example`을 복사해 `.env.local`을 만들고 값을 채웁니다.
 
@@ -43,206 +119,135 @@ npm install
 cp .env.example .env.local
 ```
 
-| 변수                            | 필수 | 용도                                                      |
-| ------------------------------- | ---- | --------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`      | ✅   | Supabase 프로젝트 URL                                     |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅   | 클라이언트/SSR 용 공개 키 (RLS 적용)                      |
-| `SUPABASE_SERVICE_ROLE_KEY`     | ✅   | 서버 전용 관리자 키 (RLS 우회)                            |
-| `RESEND_API_KEY`                | –    | 미설정 시 개발용 Mock(콘솔 출력)으로 동작                 |
-| `EMAIL_FROM`                    | –    | 미설정 시 기본 발신주소 사용                              |
-| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | –    | GA4. 값이 없으면 로드하지 않음                            |
-| `NEXT_PUBLIC_META_PIXEL_ID`     | –    | Meta Pixel. 값이 없으면 로드하지 않음                     |
-| `NEXT_PUBLIC_ANALYTICS_DEBUG`   | –    | 로컬에서 DebugView·Pixel Helper 검증할 때만 `true`        |
-| `CRON_SECRET`                   | –    | Vercel Cron 인증용. 미설정 시 keepalive 엔드포인트가 거부 |
-| `DATA_GO_KR_SERVICE_KEY`        | –    | 공휴일 판정(주말·공휴일 할증). 미설정 시 폴백 테이블 사용 |
+| 변수                             | 필수 | 용도                                                   |
+| -------------------------------- | ---- | ------------------------------------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`       | ✅   | Supabase 프로젝트 URL                                  |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`  | ✅   | 클라이언트·SSR 공개 키 (RLS 적용)                      |
+| `SUPABASE_SERVICE_ROLE_KEY`      | ✅   | 서버 전용 키 (RLS 우회)                                |
+| `NEXT_PUBLIC_NICEPAY_CLIENT_KEY` | –    | 결제창 호출용 (노출 전제)                              |
+| `NICEPAY_SECRET_KEY`             | –    | 승인 API 인증용                                        |
+| `NEXT_PUBLIC_SITE_URL`           | –    | 결제 링크·메일의 절대 주소. 미설정 시 운영 주소로 폴백 |
+| `RESEND_API_KEY`                 | –    | 미설정 시 콘솔 Mock으로 동작                           |
+| `EMAIL_FROM`                     | –    | 미설정 시 기본 발신주소                                |
+| `PAYMENT_ALERT_EMAIL`            | –    | 결제 사고 수신자. 미설정 시 적재만 하고 발송 안 함     |
+| `CRON_SECRET`                    | –    | Vercel Cron 인증. 미설정 시 크론 엔드포인트가 거부     |
+| `DATA_GO_KR_SERVICE_KEY`         | –    | 공휴일 판정(주말·공휴일 할증). 미설정 시 폴백 테이블   |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID`  | –    | GA4. 값이 없으면 로드하지 않음                         |
+| `NEXT_PUBLIC_META_PIXEL_ID`      | –    | Meta Pixel. 값이 없으면 로드하지 않음                  |
+| `NEXT_PUBLIC_ANALYTICS_DEBUG`    | –    | 로컬에서 DebugView·Pixel Helper로 검증할 때만 `true`   |
+| `NEXT_PUBLIC_SW_KILL`            | –    | `1`이면 서비스워커를 등록 대신 해제 (비상 되돌리기)    |
 
-> ⚠️ `SUPABASE_SERVICE_ROLE_KEY`에는 **절대 `NEXT_PUBLIC_` 접두사를 붙이지 마세요.** 브라우저에 노출되면 DB 전체 권한이 뚫립니다. 서버 코드(Server Action, Route Handler)에서만 사용합니다.
+> ⚠️ `SUPABASE_SERVICE_ROLE_KEY`와 `NICEPAY_SECRET_KEY`에는 **절대 `NEXT_PUBLIC_` 접두사를 붙이지 마세요.** 붙이는 순간 클라이언트 번들에 박혀 누구나 DB 전체를 읽거나 결제를 승인·취소할 수 있습니다.
 
-> 애널리틱스는 기본적으로 **프로덕션에서 + 사용자 동의(쿠키 배너) 시에만** 로드됩니다.
+> 애널리틱스는 **운영 호스트 + 사용자 동의** 두 조건을 모두 만족할 때만 로드됩니다.
 
-### 3. 스크립트
+## 3. 스크립트
 
 ```bash
-npm run dev        # 개발 서버 (Turbopack)
-npm run build      # 프로덕션 빌드
-npm run lint       # ESLint
-npm run typecheck  # tsc --noEmit
+npm run dev              # 개발 서버
+npm run build            # 프로덕션 빌드
+npm run lint             # ESLint
+npm run typecheck        # tsc --noEmit
+
+npm run check:links      # 알림·리다이렉트 링크가 실제 라우트를 가리키는지
+npm run test:pricing     # 요금 계산 단위 테스트 (DB 불필요)
+npm run test:legal       # 약관·방침 버전 무결성 (DB 불필요)
+
+npm run seed:dev         # 로컬 테스트 계정 (사용자·파트너)
+npm run seed:admin       # 최초 관리자 계정
 ```
 
-## 디렉터리 구조 (Route Groups 활용)
+DB가 필요한 통합 테스트는 `npx supabase start` 후 `npm run test:*`로 실행합니다. 전체 목록은 `package.json`을 참고하세요.
 
-괄호 폴더는 URL 경로에 영향을 주지 않으면서 레이아웃과 접근 권한을 그룹 단위로 분리합니다.
-언더스코어(`_`) 폴더는 라우팅에서 제외되는 내부 전용 폴더입니다.
+> 시드·테스트 스크립트는 대상 프로젝트를 검사합니다. 로컬은 그냥 통과하고, 원격은 `SEED_TARGET_REF`에 대상 ref를 **직접 입력**해야 열리며, 운영 ref는 입력해도 차단됩니다.
+
+---
+
+# 구조
+
+## 디렉터리 (Route Groups)
 
 ```
 app/
-├── (user)/                  # 일반 사용자 서비스 그룹
-│   ├── layout.tsx           # 사용자용 헤더 / 푸터
-│   ├── page.tsx             # 사용자 메인 (/)
-│   ├── login/  signup/      # 로그인 / 회원가입
-│   ├── reservation/         # 예약 STEP (단일 page.tsx + Zustand 스텝 전환)
-│   ├── mypage/              # 마이페이지 (자체 layout.tsx 보유)
-│   ├── review/              # 후기 목록 / 상세 / 작성
-│   ├── service/  faq/       # 서비스 소개 / FAQ
-│   └── _actions/ _components/ _lib/
-│
-├── (partner)/               # 파트너(매니저) 서비스 그룹
-│   ├── layout.tsx           # 파트너용 레이아웃
-│   ├── _components/ _lib/
-│   └── partner/             # 실제 URL 프리픽스 (/partner)
-│       ├── page.tsx         # 파트너 메인 (수락 대기 목록)
-│       ├── requests/        # 요청 수락 / 거절
-│       ├── management/      # 진행 관리 리스트 및 상세
-│       ├── reports/         # 리포트 작성 / 조회
-│       ├── settlement/      # 정산 관리 및 내역
-│       ├── profile/  notifications/
-│       └── _actions/
-│
-├── api/
-│   └── cron/keepalive/      # Vercel Cron 진입점 (아래 "정기 작업" 참고)
-│
-└── layout.tsx               # 최상위 글로벌 설정 (폰트, Provider 등)
+├── (user)/      # 이용자 — 예약, 마이페이지, 후기, 법무 페이지
+├── (partner)/   # 파트너 — 요청 수락, 진행 관리, 리포트, 정산
+├── (admin)/     # 관리자 — service_role import 금지 (lint)
+├── pay/         # 결제창 복귀·링크결제
+└── api/
+    ├── cron/     # keepalive · reminders
+    └── payments/ # prepare · confirm · status
 
-middleware.ts                # (프로젝트 루트) 역할 기반 권한 필터링
-utils/supabase/              # Supabase 클라이언트 (client / server / admin / middleware)
-lib/  hooks/  components/    # 공통 로직 / 훅 / UI 컴포넌트
-supabase/migrations/         # DB 스키마 마이그레이션
+middleware.ts        # 역할 기반 권한 필터링
+lib/                 # 도메인 로직 (payments · legal · analytics · otp …)
+utils/supabase/      # client / server / admin / middleware
+supabase/migrations/ # 스키마 마이그레이션
+scripts/             # 시드 · 통합 테스트 · 검사기
 ```
 
-**폴더 규칙**
+**폴더 규칙** — `_actions/`는 Server Action, `_lib/`의 서버 전용 조회는 `*.server.ts`, `_components/`는 해당 라우트 전용입니다.
 
-- `_actions/` — Server Action (`"use server"`)
-- `_lib/` — 서버 전용 조회 로직은 `*.server.ts`, 공용 유틸은 접미사 없음
-- `_components/` — 해당 라우트 전용 컴포넌트
+## 권한 분리
 
-URL 예시:
+페이지마다 검증하는 대신 루트 `middleware.ts`가 경로를 기준으로 역할(`USER`/`PARTNER`/`ADMIN`)을 가로챕니다. `role`은 **JWT 클레임**(`app_metadata.role`)으로 판별하므로 요청마다 테이블을 조회하지 않습니다. 원본은 `profiles.role`이고 `auth.users.raw_app_meta_data`에 동기화됩니다.
 
-- `/` → 사용자 메인 (`(user)/page.tsx`)
-- `/reservation` → 예약 페이지 (`(user)/reservation/page.tsx`)
-- `/partner` → 파트너 메인 (`(partner)/partner/page.tsx`)
+## 예약 매칭
 
-## 권한 분리 — middleware
+`reservations`가 상태(`MATCHING`/`CONFIRMED`/`CANCELLED`/`COMPLETED`)와 확정 파트너를 갖고, 파트너별 수락·거절은 `reservation_applications`에 별도 행으로 남습니다(`unique (reservation_id, partner_id)`).
 
-각 페이지마다 검증하는 대신, 루트 `middleware.ts`에서 라우트 경로를 기준으로 역할(`USER` / `PARTNER`)을 가로채 리다이렉트합니다.
+최종 선택은 `confirm_reservation_partner()` RPC가 **단일 트랜잭션**으로 처리합니다 — 예약을 `CONFIRMED`로 전이하고 나머지 `ACCEPTED` 지원건을 `NOT_SELECTED`로 일괄 정리합니다.
 
-- 비로그인 상태로 `/mypage`, `/partner`, `/reservation`, `/review/write` 접근 → `/?blocked=auth` (홈에서 로그인 안내 모달 표시)
-- 로그인 상태로 `/login`, `/signup` 접근 → 역할별 홈(`PARTNER`는 `/partner`, 그 외 `/`)
-- `USER`가 파트너 영역(`/partner`) 접근 → `/?blocked=partner`
-- `PARTNER`가 파트너 영역 밖 접근 → `/partner?blocked=user`
+> 다중 선택 항목은 배열 컬럼이 아니라 **별도 테이블로 정규화**합니다.
 
-`role`은 **JWT 클레임(`app_metadata.role`)** 으로 판별합니다. 원본은 `profiles.role` 컬럼이며, `auth.users.raw_app_meta_data`에 동기화되어 세션에 실립니다. 즉 요청마다 테이블을 조회하지 않습니다.
+## 파일 업로드
 
-## 예약 매칭 흐름
+Supabase Storage **비공개 버킷** + signed URL. 서버에서 `service_role`로 URL을 발급하고 접근을 검증합니다. 제한은 5MB · PNG/JPG/PDF입니다.
 
-- **데이터 모델**: `reservations` 테이블이 상태값(`MATCHING` / `CONFIRMED` / `CANCELLED` / `COMPLETED`), 예약번호(`code`), 확정 파트너(`confirmed_partner_id`)를 가집니다. 하나의 예약에 대한 파트너별 수락/거절 기록은 `reservation_applications` 테이블(`reservation_id`, `partner_id`, `status`, `reject_reason`)에 별도 레코드로 저장하며, `unique (reservation_id, partner_id)` 제약으로 중복 수락을 막습니다.
-- **지원 상태값**: `PENDING` / `ACCEPTED` / `REJECTED` / `NOT_SELECTED`
-- **최종 선택**: `confirm_reservation_partner()` RPC(security definer)가 단일 트랜잭션으로 `reservations.status`를 `CONFIRMED`로, `confirmed_partner_id`를 기록하고, 나머지 `ACCEPTED` 지원건을 `NOT_SELECTED`로 일괄 전이합니다. 파트너 본인이 거절한 `REJECTED`는 유지됩니다.
-- **미확정 예약 만료**: 진료일시가 지난 `MATCHING` 예약은 `expire_past_matchings()` RPC로 `CANCELLED` 처리됩니다. 조회 시점 lazy 호출(`lib/expire-matchings.ts`)과 매일 도는 Cron 양쪽에서 실행되며, 여러 번 실행해도 안전합니다.
+## PWA
 
-> 다중 선택 항목은 배열 컬럼이 아닌 **별도 테이블로 정규화**합니다.
+사용자·파트너 **단일 앱**입니다(`app/manifest.ts`). manifest는 origin당 하나가 원칙이라 두 앱으로 가르면 브라우저마다 다르게 설치됩니다. 홈 화면 바로가기(`shortcuts`)는 이용자 동선(예약하기·예약 현황)을 앞에, 파트너 홈을 뒤에 둡니다.
 
-## 파일 업로드 (자격증 / 리포트 첨부)
+서비스워커(`public/sw.js`)는 **아무것도 캐싱하지 않습니다.** 인증된 응답이 캐시되면 다른 사용자의 화면이 보일 수 있고, `/pay/*`가 stale 응답을 받으면 결제가 어긋납니다. 프로덕션 빌드에서만 등록하며, 잘못 배포했을 때는 `NEXT_PUBLIC_SW_KILL=1`로 재배포해 해제합니다.
 
-- Supabase Storage **비공개 버킷** + **signed URL** 방식
-- 서버(Server Action)에서 `SUPABASE_SERVICE_ROLE_KEY`로 signed URL 생성 / 접근 검증
-- 제한: **5MB 이하**, 형식 **PNG / JPG / PDF**
+## 정기 작업
 
-## 정기 작업 (Vercel Cron)
+| 위치        | 작업                                   | 주기             |
+| ----------- | -------------------------------------- | ---------------- |
+| Vercel Cron | `/api/cron/keepalive`                  | 매일 (UTC 03:00) |
+| Vercel Cron | `/api/cron/reminders`                  | 매일 (UTC 01:00) |
+| pg_cron     | `expiry-sweep` — 만료 예약·결제 정리   | 5분              |
+| pg_cron     | `retention-purge` — 보유기간 만료 파기 | 매일 (KST 03:10) |
 
-`vercel.json`에 선언하며, 프로덕션 배포에만 등록됩니다.
+Vercel Hobby는 크론 **2개·하루 1회**가 한계입니다. 5분 주기가 필요한 작업과 HTTP 표면이 필요 없는 DB 작업은 pg_cron으로 뺐습니다 — 외부에서 호출할 엔드포인트 자체가 생기지 않습니다.
 
-| 경로                  | 주기                 | 목적                                                |
-| --------------------- | -------------------- | --------------------------------------------------- |
-| `/api/cron/keepalive` | 매일 1회 (UTC 03:00) | Supabase 무료 플랜 일시정지 방지 + 미확정 예약 만료 |
+---
 
-- Supabase 무료 플랜은 **7일간 DB 활동이 없으면 프로젝트가 자동 일시정지**됩니다. 판정 기준이 "DB 쿼리"이므로 정적 페이지 핑은 CDN에서 끝나 효과가 없습니다.
-- 엔드포인트는 `Authorization: Bearer $CRON_SECRET` 헤더를 검증하며, Vercel Cron이 이 헤더를 자동으로 붙입니다. `CRON_SECRET`이 **Vercel 환경변수에 등록되어 있어야** 합니다.
-- Vercel Hobby 플랜은 cron **최소 주기가 하루 1회**이고 실행 시각 정밀도가 **±59분**입니다. 그보다 잦은 표현식(`*/30 * * * *` 등)은 배포 자체가 실패합니다.
-- cron 문법의 `*/N`은 day-of-month 기준이라 월 경계에서 간격이 벌어집니다. 임계값 대비 여유를 확보하기 위해 **매일 1회**로 둡니다.
+# 개발 규칙
 
-## 개발 일정
+## 브랜치 — GitHub Flow (3트랙)
 
-1. 데이터베이스 설계 및 인증 (회원가입 / 로그인 + 기본 DB 테이블 + Next.js·Supabase 배포)
-2. 예약 시스템 & 마이페이지 (예약 신청 → 상태 조회 흐름)
-3. 파트너 페이지 & 진행 관리 (요청 수락 → 진행 상황 업데이트)
-4. 정산 · 후기 · 예외 처리 및 배포 시연 (후속 기능 + UI 폴리싱 + 배포)
+| 브랜치      | 역할                                      | 배포 대상 |
+| ----------- | ----------------------------------------- | --------- |
+| `main`      | 항상 실행 가능한 상태. 릴리스 머지만 받음 | 운영      |
+| `dev`       | 상시 통합 브랜치. 작업 브랜치의 base      | 스테이징  |
+| 작업 브랜치 | `타입/작업명-이슈번호`                    | PR 프리뷰 |
 
-## Git 전략
+머지 방향은 **작업 → `dev` → `main`**이고, 두 브랜치 모두 직접 푸시 금지·PR 필수·CI 통과 필수입니다.
 
-### 브랜치 — GitHub Flow (3트랙)
+> 작업 브랜치의 프리뷰는 배포마다 URL이 바뀝니다. 그래서 NICEPAY `returnUrl`, OAuth 리다이렉트, PWA 서비스워커(origin 단위)를 검증할 수 없습니다. `dev`에 고정 도메인을 붙여 "운영에 올려야만 알 수 있는 것"을 없앴습니다.
 
-| 브랜치      | 역할                                                  | 배포 대상                                |
-| ----------- | ----------------------------------------------------- | ---------------------------------------- |
-| `main`      | 항상 실행 가능하고 버그 없는 상태. 릴리스 머지만 받음 | Vercel 프로덕션 (운영 Supabase)          |
-| `dev`       | 상시 통합 브랜치. 작업 브랜치의 base                  | 고정 스테이징 도메인 (스테이징 Supabase) |
-| 작업 브랜치 | `타입/작업명-이슈번호`                                | PR 프리뷰                                |
+## 커밋 — `타입(스코프) : 메시지`
 
-머지 방향은 **작업 브랜치 → `dev` → `main`** 입니다.
+콜론 앞뒤에 공백을 둡니다. 타입은 `feat` · `fix` · `refactor` · `docs` · `chore` · `test`, 스코프는 `fe`(UI·클라이언트 상태) · `be`(스키마·Server Action·미들웨어) · `common`(공통 타입·환경변수·패키지)입니다.
 
 ```bash
-feat/analytics-ga4-meta-39
-fix/DB-keepalive-47
-chore/fb-domain-verification
-```
-
-- 타입은 아래 커밋 타입과 동일한 값을 사용합니다.
-- 이슈가 있으면 브랜치명 끝에 이슈번호를 붙입니다.
-- `main` · `dev` 모두 **직접 푸시 금지, PR로만 merge**하며 CI(`Frontend CI Check`) 통과가 필수입니다.
-
-> **왜 3트랙인가** — 작업 브랜치의 프리뷰는 배포마다 URL이 바뀝니다. 그래서 NICEPAY `returnUrl`,
-> 소셜 로그인 OAuth 리다이렉트 URI, PWA 서비스워커(origin 단위 등록)를 프리뷰에서 검증할 수 없습니다.
-> `dev`에 고정 도메인을 붙여 "운영에 올려야만 알 수 있는 것"을 없앱니다. (#113)
-
-### 커밋 메시지 — `타입(스코프) : 메시지`
-
-콜론 **앞뒤로 공백**을 둡니다. 스코프가 애매한 설정·문서 작업은 스코프를 생략할 수 있습니다.
-
-**타입**
-
-- `feat` : 새 기능
-- `fix` : 버그 수정
-- `refactor` : 동작 변경 없는 구조 개선
-- `docs` : 문서(README 등) 변경
-- `chore` : 빌드·설정·의존성 등 그 외
-
-**스코프**
-
-- `fe` : UI, 컴포넌트, CSS, 클라이언트 상태(zustand)
-- `be` : Supabase 스키마, Route Handler, Server Actions, Middleware
-- `common` : 공통 타입, 환경변수, 패키지 설치
-
-**예시**
-
-```bash
-git commit -m "feat(fe) : 예약 STEP 1 페이지 및 병원 선택 UI 구현"
 git commit -m "feat(be) : 환자 정보 관리(care_recipients) CRUD 및 내 포인트 실데이터화"
-git commit -m "fix(be) : Supabase 미사용 일시정지 방지 keepalive cron 추가"
 git commit -m "fix(fe) : 로그인 성공 시 이동 완료까지 로딩 유지로 스피너 깜빡임 제거"
-git commit -m "refactor(fe) : 중복 모달 팝업 useState 기반으로 통합"
-git commit -m "docs : README 디렉터리 구조·스키마 현행화"
-git commit -m "chore : 네이버 서치 어드바이저 메타 태그 추가"
 ```
 
-## 코드 품질 도구
+## 코드 품질
 
-### Husky + lint-staged
-
-`git commit` 시 자동 실행:
-
-- `*.{js,jsx,ts,tsx}` — ESLint 자동 수정 + Prettier 포맷팅
-- `*.{json,css,md}` — Prettier 포맷팅
-
-### Prettier
-
-`tabWidth: 4`, 큰따옴표, 세미콜론, 후행 쉼표(`all`).
-`prettier-plugin-tailwindcss` 포함 — Tailwind 클래스 자동 정렬 적용.
-
-### CI (GitHub Actions)
-
-`main` 대상 PR마다 `.github/workflows/pr-check.yml`이 실행됩니다.
-
-```
-npm ci → npm run lint → npm run typecheck → npm run build
-```
-
-셋 중 하나라도 실패하면 merge 전에 걸립니다.
+- **Husky + lint-staged** — 커밋 시 변경된 파일만 `eslint --fix` → `prettier --write`
+- **Prettier** — 4칸 들여쓰기, 큰따옴표, 세미콜론, 후행 쉼표. `prettier-plugin-tailwindcss`로 클래스 자동 정렬
+- **CI** — PR마다 두 워크플로가 병렬로 돕니다
+    - `Frontend CI Check` — lint · typecheck · build (Node 20)
+    - `Backend CI Check` — 순수 검사(수 초) + 로컬 Supabase 스택 위 통합 테스트 (Node 22)

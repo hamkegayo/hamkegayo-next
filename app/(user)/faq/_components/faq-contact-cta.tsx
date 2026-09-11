@@ -1,7 +1,8 @@
-import { ArrowRight, Headset } from "lucide-react";
+import { Headset, MessageCircle, Phone } from "lucide-react";
 
 import { Section } from "@/app/(user)/_components/home/section";
-import { ComingSoonButton } from "@/app/(user)/_components/home/coming-soon-button";
+import { COMPANY } from "@/lib/legal/company";
+import { ContactLink } from "@/app/(user)/_components/home/contact-link";
 
 /** 하단 고객센터 안내 CTA */
 export function FaqContactCta() {
@@ -21,13 +22,30 @@ export function FaqContactCta() {
                         </p>
                     </div>
                 </div>
-                <ComingSoonButton
-                    contact="support"
-                    className="border-border bg-background text-foreground hover:bg-muted inline-flex w-full items-center justify-center gap-1.5 rounded-lg border px-5 py-3 text-sm font-bold whitespace-nowrap transition-colors md:w-auto"
-                >
-                    고객센터 바로가기
-                    <ArrowRight className="size-4" />
-                </ComingSoonButton>
+                {/*
+                  두 창구 모두 법무 문서가 공개한 것이다 — 전화는 이용약관 부칙,
+                  카카오톡은 처리방침 제14조. 화면에서 빼 두면 문서를 보고
+                  찾아온 이용자가 닿을 곳이 없다.
+                */}
+                <div className="flex w-full shrink-0 flex-col gap-2 sm:flex-row md:w-auto">
+                    <ContactLink
+                        href={`tel:${COMPANY.tel}`}
+                        method="support"
+                        className="border-border bg-background text-foreground hover:bg-muted inline-flex items-center justify-center gap-1.5 rounded-lg border px-5 py-3 text-sm font-bold whitespace-nowrap transition-colors"
+                    >
+                        <Phone className="size-4" />
+                        고객센터 {COMPANY.tel}
+                    </ContactLink>
+                    <ContactLink
+                        href={COMPANY.kakaoUrl}
+                        method="support"
+                        external
+                        className="bg-kakao text-kakao-foreground inline-flex items-center justify-center gap-1.5 rounded-lg px-5 py-3 text-sm font-bold whitespace-nowrap transition-colors hover:brightness-95"
+                    >
+                        <MessageCircle className="size-4" />
+                        카카오톡 문의
+                    </ContactLink>
+                </div>
             </div>
         </Section>
     );

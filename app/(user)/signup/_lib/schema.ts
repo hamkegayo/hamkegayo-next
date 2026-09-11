@@ -1,8 +1,7 @@
 import { z } from "zod";
 
 import { isValidPhone, normalizePhone } from "@/lib/otp";
-
-const SPECIAL_CHAR = /[!@#$%^&*(),.?":{}|<>[\]~`_\-+=;'/\\]/;
+import { PASSWORD_RULE_MESSAGE, isValidPassword } from "@/lib/password";
 
 /** 회원가입 유형 — 일반 사용자 / 파트너 */
 export type SignupType = "user" | "partner";
@@ -29,10 +28,7 @@ const commonShape = {
     password: z
         .string()
         .min(1, "비밀번호를 입력해 주세요.")
-        .refine(
-            (v) => v.length >= 8 && SPECIAL_CHAR.test(v),
-            "8자 이상, 특수문자를 포함해 주세요.",
-        ),
+        .refine(isValidPassword, PASSWORD_RULE_MESSAGE),
     passwordConfirm: z.string().min(1, "비밀번호를 한 번 더 입력해 주세요."),
     name: z.string().min(1, "이름을 입력해 주세요."),
     agreeService: z.boolean(),

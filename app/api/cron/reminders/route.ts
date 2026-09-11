@@ -5,6 +5,12 @@ import {
     notifyCollectionHandover,
     sendExtensionReminder,
 } from "@/lib/payments/extension";
+import { createNotification } from "@/lib/notifications";
+import {
+    collectReconsentTargets,
+    documentTitleOf,
+    reconsentDedupeKey,
+} from "@/lib/legal/reconsent";
 
 /**
  * 추가결제 독촉 (#75) — 약관 제22조 ①.
@@ -71,11 +77,50 @@ export async function GET(request: NextRequest) {
         handed.map((t) => ({ code: t.code, amount: t.amount })),
     );
 
+    // ---------- 약관·방침 재동의 안내 (#91) ----------
+    //  같은 배치에 얹는다. Vercel Hobby 는 크론을 2개까지만 허용하고
+    //  keepalive 와 이 배치가 그 둘이다 — 새 크론을 팔 자리가 없다.
+    //
+    //  재동의 대상은 **상태**라 매일 참이다. dedupeKey 가 중복을 막고,
+    //  키에 버전이 들어가므로 다음 개정 때는 다시 나간다.
+    const reconsent = await sendReconsentNotices(admin);
+
     return NextResponse.json({
         ok: true,
         claimed: targets.length,
         sent,
         handedOver: handed.length,
+        reconsentNotified: reconsent,
         at: new Date().toISOString(),
     });
+}
+
+/** 재동의 대상자에게 안내를 보낸다. 보낸(=새로 만들어진) 건수를 돌려준다. */
+async function sendReconsentNotices(
+    admin: ReturnType<typeof createAdminClient>,
+): Promise<number> {
+    const byUser = await collectReconsentTargets(admin);
+    let count = 0;
+
+    for (const [userId, items] of byUser) {
+        // 한 사람이 여러 항목의 대상일 수 있다(처리방침 3종이 한 번에 밀린다).
+        // 문서 단위로 묶어 한 번만 안내한다 — 같은 개정으로 알림 세 개는 소음이다.
+        const seen = new Set<string>();
+        for (const item of items) {
+            const doc = documentTitleOf(item.type);
+            if (seen.has(doc)) continue;
+            seen.add(doc);
+
+            await createNotification(userId, {
+                type: "AGREEMENT_REVISED",
+                title: `${doc}이 개정되었습니다`,
+                body: "변경된 내용을 확인하고 다시 동의해 주세요.",
+                link: "/mypage/profile",
+                dedupeKey: reconsentDedupeKey(item),
+            });
+            count += 1;
+        }
+    }
+
+    return count;
 }
