@@ -2,12 +2,15 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Suspense } from "react";
 import localFont from "next/font/local";
+import Script from "next/script";
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/sonner";
 import { AnalyticsScripts } from "@/components/analytics/analytics-scripts";
 import { PageViewTracker } from "@/components/analytics/page-view-tracker";
 import { ConsentBanner } from "@/components/analytics/consent-banner";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
+import { InstallTracker } from "@/components/pwa/install-tracker";
+import { CAPTURE_SCRIPT } from "@/lib/pwa/install-event";
 
 // 전역 폰트: Pretendard (Variable)
 const pretendard = localFont({
@@ -81,6 +84,11 @@ export default function RootLayout({
                 <ConsentBanner />
                 {/* PWA — 캐싱 없는 서비스워커 (프로덕션 빌드에서만) */}
                 <ServiceWorkerRegister />
+                {/* 설치 유도(#117) — 설치 이벤트를 hydration 전에 붙잡고, 설치를 감지한다 */}
+                <Script id="pwa-install-capture" strategy="beforeInteractive">
+                    {CAPTURE_SCRIPT}
+                </Script>
+                <InstallTracker />
             </body>
         </html>
     );
