@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Suspense } from "react";
 import localFont from "next/font/local";
@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AnalyticsScripts } from "@/components/analytics/analytics-scripts";
 import { PageViewTracker } from "@/components/analytics/page-view-tracker";
 import { ConsentBanner } from "@/components/analytics/consent-banner";
+import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 
 // 전역 폰트: Pretendard (Variable)
 const pretendard = localFont({
@@ -32,8 +33,13 @@ export const metadata: Metadata = {
         description: "함께가요 - 병원 방문 이동과 절차를 돕는 동행 지원 서비스",
         url: "https://www.hamkegayo.kr",
     },
-    icons: {
-        icon: "/favicon.ico", // public 폴더에 본인 로고 favicon 넣고 주석 해제할 것
+    // 아이콘은 파일 규약으로 붙는다 — app/favicon.ico · app/apple-icon.png.
+    // 여기에 icons 를 적으면 파일 규약보다 뒤에 오거나 겹친다.
+    // iOS 홈 화면 추가 시 이름. manifest 의 name 과 같다.
+    appleWebApp: {
+        capable: true,
+        title: "함께가요",
+        statusBarStyle: "default",
     },
     // Meta(페이스북) 도메인 인증
     verification: {
@@ -43,6 +49,11 @@ export const metadata: Metadata = {
                 "484abb8b304c4ee671d6488c562af0f9b71025df",
         },
     },
+};
+
+// 주소창·상태바 색 — manifest theme_color 와 같은 --brand
+export const viewport: Viewport = {
+    themeColor: "#2e9ce6",
 };
 
 export default function RootLayout({
@@ -68,6 +79,8 @@ export default function RootLayout({
                     <PageViewTracker />
                 </Suspense>
                 <ConsentBanner />
+                {/* PWA — 캐싱 없는 서비스워커 (프로덕션 빌드에서만) */}
+                <ServiceWorkerRegister />
             </body>
         </html>
     );

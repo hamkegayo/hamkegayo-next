@@ -135,6 +135,7 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID`  | –    | GA4. 값이 없으면 로드하지 않음                         |
 | `NEXT_PUBLIC_META_PIXEL_ID`      | –    | Meta Pixel. 값이 없으면 로드하지 않음                  |
 | `NEXT_PUBLIC_ANALYTICS_DEBUG`    | –    | 로컬에서 DebugView·Pixel Helper로 검증할 때만 `true`   |
+| `NEXT_PUBLIC_SW_KILL`            | –    | `1`이면 서비스워커를 등록 대신 해제 (비상 되돌리기)    |
 
 > ⚠️ `SUPABASE_SERVICE_ROLE_KEY`와 `NICEPAY_SECRET_KEY`에는 **절대 `NEXT_PUBLIC_` 접두사를 붙이지 마세요.** 붙이는 순간 클라이언트 번들에 박혀 누구나 DB 전체를 읽거나 결제를 승인·취소할 수 있습니다.
 
@@ -200,6 +201,12 @@ scripts/             # 시드 · 통합 테스트 · 검사기
 ## 파일 업로드
 
 Supabase Storage **비공개 버킷** + signed URL. 서버에서 `service_role`로 URL을 발급하고 접근을 검증합니다. 제한은 5MB · PNG/JPG/PDF입니다.
+
+## PWA
+
+사용자·파트너 **단일 앱**입니다(`app/manifest.ts`). manifest는 origin당 하나가 원칙이라 두 앱으로 가르면 브라우저마다 다르게 설치됩니다. 홈 화면 바로가기(`shortcuts`)는 이용자 동선(예약하기·예약 현황)을 앞에, 파트너 홈을 뒤에 둡니다.
+
+서비스워커(`public/sw.js`)는 **아무것도 캐싱하지 않습니다.** 인증된 응답이 캐시되면 다른 사용자의 화면이 보일 수 있고, `/pay/*`가 stale 응답을 받으면 결제가 어긋납니다. 프로덕션 빌드에서만 등록하며, 잘못 배포했을 때는 `NEXT_PUBLIC_SW_KILL=1`로 재배포해 해제합니다.
 
 ## 정기 작업
 
