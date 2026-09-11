@@ -45,6 +45,11 @@ jobs:
             - name: 약관·방침 버전 무결성 (#105)
               run: npm run test:legal
 
+            # 닫아도 다음 날 또 뜨거나, 인앱 브라우저에 "설치하기" 가 떠서 눌러도
+            # 아무 일이 없으면 화면만 봐서는 모른다. 날짜와 UA 를 고정해 본다.
+            - name: PWA 설치 유도 — 재노출 정책·플랫폼 판정 (#117)
+              run: npm run test:pwa
+
     # 로컬 Supabase 스택을 띄워 마이그레이션과 권한 경계를 실제로 검증한다.
     database:
         name: 마이그레이션 · RLS · 권한 경계
