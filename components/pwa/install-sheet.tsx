@@ -16,11 +16,21 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Check, Copy, Ellipsis, Share, SquarePlus, X } from "lucide-react";
+import {
+    Check,
+    Copy,
+    Ellipsis,
+    EllipsisVertical,
+    Share,
+    SquarePlus,
+    X,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import { Modal } from "@/components/ui/modal";
 import {
     clearInstallEvent,
+    pwaLog,
     type BeforeInstallPromptEvent,
 } from "@/lib/pwa/install-event";
 import {
@@ -36,10 +46,20 @@ export type InstallHandlers = {
     dismiss: (via?: "native") => void;
     /** 받아들였다 — 네이티브 설치 수락 · 외부 브라우저로 이동 */
     accept: (via: "native" | "external") => void;
+    /** 네이티브 설치창을 열지 못했다 — Chrome 메뉴 안내로 넘긴다 */
+    fail: () => void;
 };
 
-/** iOS 는 설치 앱과 Safari 의 저장소가 분리된다(#116). 로그인 화면에서
- *  권하는 것이라 설치 → 앱 열기 → **또 로그인** 을 만난다. 미리 말한다. */
+/** 어떤 본문을 보여 줄지 — 보통은 플랫폼대로, 설치창 실패 시 메뉴 안내 */
+export type SheetVariant = "platform" | "android-menu";
+
+/**
+ * iOS 는 설치 앱과 Safari 의 저장소가 분리된다(#116). 로그인 화면에서
+ * 권하는 것이라 설치 → 앱 열기 → **또 로그인** 을 만난다. 미리 말한다.
+ *
+ *  ⚠️ **iOS 에만** 쓴다. Android 에서 Chrome 으로 설치한 앱은 Chrome 과
+ *     저장소를 공유해 로그인이 유지된다 — 거기에 이 문구를 쓰면 사실과 다르다.
+ */
 const RELOGIN_NOTE = "설치한 앱에서는 한 번 더 로그인해 주세요.";
 
 /**
@@ -67,6 +87,11 @@ export function canOffer(
  *
  *  `prompt()` 는 한 번만 쓸 수 있다. 부르는 순간 비운다 — 그러면 자동
  *  모달도 닫히고(canOffer 가 false) 네이티브 설치창만 남는다.
+ *
+ *  ⚠️ `prompt()` 가 실패하면 **반드시 잡는다.** 모달은 이미 닫혔으므로
+ *     잡지 않으면 사용자에게는 "눌렀는데 아무 일도 없음" 이 된다. 실제로
+ *     스테이징 실기기(Android Chrome)에서 그 증상이 났다. 실패하면 Chrome
+ *     메뉴로 설치하는 안내로 넘긴다.
  */
 export async function runNativePrompt(
     deferred: BeforeInstallPromptEvent | null,
@@ -74,12 +99,31 @@ export async function runNativePrompt(
 ): Promise<void> {
     if (!deferred) return;
     clearInstallEvent();
-    await deferred.prompt();
+    pwaLog("prompt() 호출");
+    try {
+        // prompt() 는 설치창이 뜰 때가 아니라 사용자가 응답할 때 끝난다.
+        // "호출" 뒤에 아무 줄도 없으면 설치창이 뜨지 않고 멈춘 것이다.
+        await deferred.prompt();
+        pwaLog("prompt() 응답 받음");
+    } catch (e) {
+        const err = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+        pwaLog(`prompt() 실패 — ${err}`);
+        handlers.fail();
+        return;
+    }
     const { outcome } = await deferred.userChoice;
+    pwaLog(`설치창 결과 — ${outcome}`);
     if (outcome === "accepted") {
         handlers.accept("native");
         // appinstalled 도 오지만 늦을 수 있다. 여기서 먼저 막아 둔다.
         recordInstall();
+        // Chrome 은 설치를 백그라운드에서 수십 초에 걸쳐 진행하고, 기종에
+        // 따라 아이콘이 홈 화면이 아니라 앱 목록에만 생긴다. 말없이 두면
+        // "설치가 안 됐다" 고 느낀다.
+        toast.success("설치를 시작했어요", {
+            description:
+                "잠시 뒤 홈 화면이나 앱 목록에서 함께가요를 찾아 주세요.",
+        });
     } else {
         handlers.dismiss("native");
     }
@@ -90,11 +134,13 @@ export function InstallSheet({
     platform,
     deferred,
     handlers,
+    variant = "platform",
 }: {
     open: boolean;
     platform: Platform;
     deferred: BeforeInstallPromptEvent | null;
     handlers: InstallHandlers;
+    variant?: SheetVariant;
 }) {
     return (
         // max-h-full — 크게보기(CSS zoom)는 dvh 와 배율이 어긋날 수 있어 부모
@@ -113,7 +159,15 @@ export function InstallSheet({
                 <X className="size-5" />
             </button>
 
-            <Body platform={platform} deferred={deferred} handlers={handlers} />
+            {variant === "android-menu" ? (
+                <AndroidMenuGuide onDismiss={() => handlers.dismiss()} />
+            ) : (
+                <Body
+                    platform={platform}
+                    deferred={deferred}
+                    handlers={handlers}
+                />
+            )}
         </Modal>
     );
 }
@@ -248,12 +302,33 @@ function AndroidInstall({
             <Header title="홈 화면에 함께가요 추가">
                 다음부터 홈 화면 아이콘으로 바로 열 수 있어요.
             </Header>
-            <p className="text-muted-foreground bg-muted mt-4 rounded-lg px-3 py-2 text-center text-sm break-keep">
-                {RELOGIN_NOTE}
-            </p>
             <div className="mt-5">
                 <PrimaryButton onClick={install}>설치하기</PrimaryButton>
                 <LaterButton onClick={() => handlers.dismiss()} />
+            </div>
+        </>
+    );
+}
+
+/* ---------- Android — 설치창을 못 열었을 때 Chrome 메뉴 안내 ---------- */
+
+function AndroidMenuGuide({ onDismiss }: { onDismiss: () => void }) {
+    return (
+        <>
+            <Header title="Chrome 메뉴에서 설치해 주세요">
+                설치 창이 열리지 않았어요. 아래 순서대로 누르면 설치할 수
+                있어요.
+            </Header>
+            <ol className="mt-5 space-y-3">
+                <Step n={1} icon={<EllipsisVertical className="size-4" />}>
+                    오른쪽 위 메뉴 버튼
+                </Step>
+                <Step n={2}>
+                    &lsquo;앱 설치&rsquo; 또는 &lsquo;홈 화면에 추가&rsquo;
+                </Step>
+            </ol>
+            <div className="mt-5">
+                <PrimaryButton onClick={onDismiss}>확인했어요</PrimaryButton>
             </div>
         </>
     );
