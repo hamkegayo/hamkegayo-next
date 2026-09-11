@@ -100,3 +100,32 @@ export function recordInstall(): void {
     snapshot = { ...env, state: next, eligible: false };
     emit();
 }
+
+/* ---------- 메뉴에서 여는 설치 시트 (#139) ---------- */
+
+/**
+ * 시트 열림 상태. 버튼은 여는 신호만 보내고 시트는 root layout 의
+ * InstallSheetHost 가 그린다 — 드로어는 링크를 누르면 닫히므로 드로어 안에
+ * 그리면 함께 사라진다.
+ */
+let sheetOpen = false;
+const sheetListeners = new Set<() => void>();
+
+export function subscribeInstallSheet(onChange: () => void): () => void {
+    sheetListeners.add(onChange);
+    return () => sheetListeners.delete(onChange);
+}
+
+export function getInstallSheet(): boolean {
+    return sheetOpen;
+}
+
+export function getServerInstallSheet(): boolean {
+    return false;
+}
+
+export function setInstallSheet(open: boolean): void {
+    if (sheetOpen === open) return;
+    sheetOpen = open;
+    sheetListeners.forEach((l) => l());
+}

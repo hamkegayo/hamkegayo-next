@@ -10,6 +10,7 @@ import { PageViewTracker } from "@/components/analytics/page-view-tracker";
 import { ConsentBanner } from "@/components/analytics/consent-banner";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { InstallTracker } from "@/components/pwa/install-tracker";
+import { InstallSheetHost } from "@/components/pwa/install-entry";
 import { CAPTURE_SCRIPT } from "@/lib/pwa/install-event";
 
 // 전역 폰트: Pretendard (Variable)
@@ -89,6 +90,8 @@ export default function RootLayout({
                     {CAPTURE_SCRIPT}
                 </Script>
                 <InstallTracker />
+                {/* 메뉴의 "앱 설치하기"(#139)가 여는 안내 시트 — 드로어 밖에 둔다 */}
+                <InstallSheetHost />
             </body>
         </html>
     );
