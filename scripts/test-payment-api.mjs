@@ -31,7 +31,9 @@ const secretKey = process.env.NICEPAY_SECRET_KEY?.trim();
 const APP = process.env.APP_URL ?? "http://localhost:3000";
 
 if (!url || !serviceKey) {
-    console.error("❌ NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 가 필요합니다.");
+    console.error(
+        "❌ NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 가 필요합니다.",
+    );
     process.exit(1);
 }
 if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.test(url)) {
@@ -60,7 +62,9 @@ function check(label, ok, detail = "") {
         console.log(`  \x1b[32mPASS\x1b[0m  ${label}`);
     } else {
         fail += 1;
-        console.log(`  \x1b[31mFAIL\x1b[0m  ${label}${detail ? ` — ${detail}` : ""}`);
+        console.log(
+            `  \x1b[31mFAIL\x1b[0m  ${label}${detail ? ` — ${detail}` : ""}`,
+        );
     }
 }
 
@@ -154,19 +158,22 @@ async function cleanup() {
     // 사고 원장은 예약과 무관한 행(UNKNOWN_ORDER)도 있어 order_id 로 따로 지운다.
     // 섹션 [3] 이 쓰는 NOT-OURS- 주문번호도 함께 정리한다.
     for (const prefix of [`${CODE_PREFIX}%`, "NOT-OURS-%"]) {
-        await admin
-            .from("payment_incidents")
-            .delete()
-            .like("order_id", prefix);
+        await admin.from("payment_incidents").delete().like("order_id", prefix);
     }
 
     for (const r of rows ?? []) {
-        await admin.from("payment_incidents").delete().eq("reservation_id", r.id);
+        await admin
+            .from("payment_incidents")
+            .delete()
+            .eq("reservation_id", r.id);
         await admin.from("points").delete().eq("reservation_id", r.id);
         await admin.from("settlements").delete().eq("service_id", r.id);
         await admin.from("services").delete().eq("reservation_id", r.id);
         await admin.from("payments").delete().eq("reservation_id", r.id);
-        await admin.from("reservation_applications").delete().eq("reservation_id", r.id);
+        await admin
+            .from("reservation_applications")
+            .delete()
+            .eq("reservation_id", r.id);
         await admin.from("reservations").delete().eq("id", r.id);
     }
     for (const id of made.users) {
@@ -197,7 +204,13 @@ async function makeUser(tag, role) {
 /** MATCHING + 파트너 선택 + PENDING 결제까지 만들어 둔다 */
 async function makeScenario(
     suffix,
-    { gross = 40000, discount = 0, deadlineMin = 30, selectPartner = true } = {},
+    {
+        gross = 40000,
+        discount = 0,
+        deadlineMin = 30,
+        selectPartner = true,
+        useDate = new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+    } = {},
 ) {
     const customer = await makeUser(`u${suffix}`, "USER");
     const partner = await makeUser(`p${suffix}`, "PARTNER");
@@ -218,7 +231,7 @@ async function makeScenario(
             relation: "자녀",
             treatment: "내과",
             purpose: "진료",
-            use_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+            use_date: useDate,
             arrive_time: "10:00",
             reserve_time: "10:30",
             duration: "2시간",
@@ -296,7 +309,11 @@ async function grantPoints(userId, amount) {
 }
 
 async function paymentStatus(id) {
-    const { data } = await admin.from("payments").select("status").eq("id", id).single();
+    const { data } = await admin
+        .from("payments")
+        .select("status")
+        .eq("id", id)
+        .single();
     return data?.status;
 }
 
@@ -317,7 +334,9 @@ try {
     });
     if (ping.status === 0) throw new Error("no response");
 } catch {
-    console.error(`❌ ${APP} 에 연결할 수 없습니다. 다른 터미널에서 npm run dev 를 실행하세요.`);
+    console.error(
+        `❌ ${APP} 에 연결할 수 없습니다. 다른 터미널에서 npm run dev 를 실행하세요.`,
+    );
     process.exit(1);
 }
 
@@ -334,7 +353,10 @@ try {
             orderId: s.orderId,
         });
         check("실패로 리다이렉트된다", r.pay === "fail", `pay=${r.pay}`);
-        check("PENDING 결제가 FAILED 로 정리된다", (await paymentStatus(s.paymentId)) === "FAILED");
+        check(
+            "PENDING 결제가 FAILED 로 정리된다",
+            (await paymentStatus(s.paymentId)) === "FAILED",
+        );
     }
 
     // ---------- signature 위조 ----------
@@ -349,8 +371,15 @@ try {
             authToken: "tok",
             signature: "deadbeef".repeat(8),
         });
-        check("위조 signature 를 거부한다", r.code === "INVALID_SIGNATURE", `code=${r.code}`);
-        check("결제가 FAILED 로 정리된다", (await paymentStatus(s.paymentId)) === "FAILED");
+        check(
+            "위조 signature 를 거부한다",
+            r.code === "INVALID_SIGNATURE",
+            `code=${r.code}`,
+        );
+        check(
+            "결제가 FAILED 로 정리된다",
+            (await paymentStatus(s.paymentId)) === "FAILED",
+        );
     }
 
     {
@@ -361,7 +390,11 @@ try {
             orderId: s.orderId,
             amount: String(s.gross),
         });
-        check("signature 누락을 거부한다", r.code === "INVALID_SIGNATURE", `code=${r.code}`);
+        check(
+            "signature 누락을 거부한다",
+            r.code === "INVALID_SIGNATURE",
+            `code=${r.code}`,
+        );
     }
 
     // ---------- 알 수 없는 주문번호 ----------
@@ -377,7 +410,11 @@ try {
             authToken: token,
             signature: sign(token, amount),
         });
-        check("우리가 만들지 않은 주문을 거부한다", r.code === "UNKNOWN_ORDER", `code=${r.code}`);
+        check(
+            "우리가 만들지 않은 주문을 거부한다",
+            r.code === "UNKNOWN_ORDER",
+            `code=${r.code}`,
+        );
     }
 
     // ---------- 금액 위변조 ----------
@@ -394,8 +431,15 @@ try {
             authToken: token,
             signature: sign(token, tampered), // 서명 자체는 정상
         });
-        check("금액이 다르면 승인하지 않는다", r.code === "AMOUNT_MISMATCH", `code=${r.code}`);
-        check("결제가 FAILED 로 정리된다", (await paymentStatus(s.paymentId)) === "FAILED");
+        check(
+            "금액이 다르면 승인하지 않는다",
+            r.code === "AMOUNT_MISMATCH",
+            `code=${r.code}`,
+        );
+        check(
+            "결제가 FAILED 로 정리된다",
+            (await paymentStatus(s.paymentId)) === "FAILED",
+        );
         check(
             "실패해도 rid 를 실어 결제 화면으로 되돌린다",
             r.rid === s.reservation.id,
@@ -403,8 +447,35 @@ try {
         );
     }
 
+    // ---------- PG 예약 가능 범위 ----------
+    console.log("\n[5] 승인 직전 예약일 범위 재확인");
+    {
+        const farFuture = new Date(Date.now() + 90 * 86400000)
+            .toISOString()
+            .slice(0, 10);
+        const s = await makeScenario("far-date", { useDate: farFuture });
+        const token = "tok-far-date";
+        const r = await postConfirm({
+            authResultCode: "0000",
+            tid: "fake-tid-far-date",
+            orderId: s.orderId,
+            amount: String(s.gross),
+            authToken: token,
+            signature: sign(token, s.gross),
+        });
+        check(
+            "결제일 포함 60일을 넘으면 승인하지 않는다",
+            r.code === "RESERVATION_DATE_OUT_OF_RANGE",
+            `code=${r.code}`,
+        );
+        check(
+            "범위 초과 결제가 FAILED 로 정리된다",
+            (await paymentStatus(s.paymentId)) === "FAILED",
+        );
+    }
+
     // ---------- 결제 기한 만료 ----------
-    console.log("\n[5] 승인 직전 만료 재확인");
+    console.log("\n[6] 승인 직전 만료 재확인");
     {
         const s = await makeScenario("expired", { deadlineMin: -1 });
         const token = "tok-expired";
@@ -416,12 +487,19 @@ try {
             authToken: token,
             signature: sign(token, s.gross),
         });
-        check("기한이 지났으면 승인하지 않는다", r.code === "PAYMENT_EXPIRED", `code=${r.code}`);
-        check("결제가 FAILED 로 정리된다", (await paymentStatus(s.paymentId)) === "FAILED");
+        check(
+            "기한이 지났으면 승인하지 않는다",
+            r.code === "PAYMENT_EXPIRED",
+            `code=${r.code}`,
+        );
+        check(
+            "결제가 FAILED 로 정리된다",
+            (await paymentStatus(s.paymentId)) === "FAILED",
+        );
     }
 
     // ---------- 파트너 선택 해제 ----------
-    console.log("\n[6] 승인 직전 재선택 확인");
+    console.log("\n[7] 승인 직전 재선택 확인");
     {
         const s = await makeScenario("released");
         await admin
@@ -438,16 +516,24 @@ try {
             authToken: token,
             signature: sign(token, s.gross),
         });
-        check("선택이 풀렸으면 승인하지 않는다", r.code === "PAYMENT_EXPIRED", `code=${r.code}`);
+        check(
+            "선택이 풀렸으면 승인하지 않는다",
+            r.code === "PAYMENT_EXPIRED",
+            `code=${r.code}`,
+        );
     }
 
     // ---------- PG 승인 실패 시 포인트 복원 ----------
-    console.log("\n[7] 승인 실패 시 보상 — 포인트가 복원된다");
+    console.log("\n[8] 승인 실패 시 보상 — 포인트가 복원된다");
     {
         const s = await makeScenario("points", { discount: 5000 });
 
         const afterSpend = await balance(s.customer.id);
-        check("선점으로 잔액이 0 이 됐다", afterSpend === 0, `잔액=${afterSpend}`);
+        check(
+            "선점으로 잔액이 0 이 됐다",
+            afterSpend === 0,
+            `잔액=${afterSpend}`,
+        );
 
         const token = "tok-points";
         const charge = s.gross - s.discount;
@@ -461,14 +547,17 @@ try {
         });
 
         check("PG 승인이 실패한다", r.pay === "fail", `code=${r.code}`);
-        check("결제가 FAILED 로 정리된다", (await paymentStatus(s.paymentId)) === "FAILED");
+        check(
+            "결제가 FAILED 로 정리된다",
+            (await paymentStatus(s.paymentId)) === "FAILED",
+        );
 
         const restored = await balance(s.customer.id);
         check("포인트 5000 이 복원된다", restored === 5000, `잔액=${restored}`);
     }
 
     // ---------- 이미 PAID 인 결제 재전송 ----------
-    console.log("\n[8] 중복 전송 — 이미 승인된 결제");
+    console.log("\n[9] 중복 전송 — 이미 승인된 결제");
     {
         const s = await makeScenario("dup");
         await admin
@@ -487,7 +576,10 @@ try {
         });
 
         check("성공 화면으로 보낸다", r.pay === "done", `pay=${r.pay}`);
-        check("PAID 상태가 유지된다", (await paymentStatus(s.paymentId)) === "PAID");
+        check(
+            "PAID 상태가 유지된다",
+            (await paymentStatus(s.paymentId)) === "PAID",
+        );
         check(
             "예약 플로우로 되돌린다 (#54 복원)",
             r.path === "/reservation",
@@ -501,21 +593,27 @@ try {
     }
 
     // ---------- 로그인 없이 prepare/status ----------
-    console.log("\n[9] 인증이 필요한 라우트");
+    console.log("\n[10] 인증이 필요한 라우트");
     {
         const prep = await fetch(`${APP}/api/payments/prepare`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ reservationId: "00000000-0000-0000-0000-000000000000" }),
+            body: JSON.stringify({
+                reservationId: "00000000-0000-0000-0000-000000000000",
+            }),
         });
-        check("비로그인 prepare 는 401", prep.status === 401, `HTTP ${prep.status}`);
+        check(
+            "비로그인 prepare 는 401",
+            prep.status === 401,
+            `HTTP ${prep.status}`,
+        );
 
         const st = await fetch(`${APP}/api/payments/status?orderId=whatever`);
         check("비로그인 status 는 401", st.status === 401, `HTTP ${st.status}`);
     }
 
     // ---------- prepare 소유권·상태 검증 ----------
-    console.log("\n[10] prepare — 소유권과 상태");
+    console.log("\n[11] prepare — 소유권과 상태");
     {
         const mine = await makeScenario("prep-mine");
         const other = await makeScenario("prep-other");
@@ -549,7 +647,9 @@ try {
 
     {
         // 파트너 미선택 상태
-        const s = await makeScenario("prep-nopartner", { selectPartner: false });
+        const s = await makeScenario("prep-nopartner", {
+            selectPartner: false,
+        });
         const cookie = await loginCookie(s.customer.email, s.customer.password);
         const r = await postPrepare(cookie, {
             reservationId: s.reservation.id,
@@ -577,8 +677,32 @@ try {
         );
     }
 
+    {
+        // PG사는 결제일을 포함해 60일 이내의 사전예약만 허용한다.
+        const farFuture = new Date(Date.now() + 90 * 86400000)
+            .toISOString()
+            .slice(0, 10);
+        const s = await makeScenario("prep-far-date", {
+            useDate: farFuture,
+        });
+        const cookie = await loginCookie(s.customer.email, s.customer.password);
+        const r = await postPrepare(cookie, {
+            reservationId: s.reservation.id,
+            pointsToUse: 0,
+        });
+        check(
+            "60일을 넘는 이용일은 결제 준비 단계에서 거절한다",
+            r.json?.code === "RESERVATION_DATE_OUT_OF_RANGE",
+            `code=${r.json?.code} HTTP ${r.status}`,
+        );
+        check(
+            "거절된 기존 결제 행은 임의로 변경하지 않는다",
+            (await paymentStatus(s.paymentId)) === "PENDING",
+        );
+    }
+
     // ---------- prepare 정상 경로 + 포인트 ----------
-    console.log("\n[11] prepare — 금액과 포인트");
+    console.log("\n[12] prepare — 금액과 포인트");
     {
         const s = await makeScenario("prep-ok");
         const cookie = await loginCookie(s.customer.email, s.customer.password);
@@ -605,8 +729,7 @@ try {
             .select("payment_deadline")
             .eq("id", s.reservation.id)
             .single();
-        const left =
-            new Date(after.payment_deadline).getTime() - Date.now();
+        const left = new Date(after.payment_deadline).getTime() - Date.now();
         check(
             "결제창 진입으로 기한이 연장된다",
             left > 9.5 * 60000,
@@ -682,7 +805,7 @@ try {
     // ---------- 결제 사고 적재 (#79) ----------
     // 사고는 "돈이 어긋난 상황" 이므로 기록이 남지 않으면 아무도 모른다.
     // 여기서는 승인 라우트가 실제로 적재하는지를 본다.
-    console.log("\n[12] 결제 사고 적재");
+    console.log("\n[13] 결제 사고 적재");
     {
         // 알 수 없는 주문번호로 승인 시도 → UNKNOWN_ORDER
         const token = "tok-incident";

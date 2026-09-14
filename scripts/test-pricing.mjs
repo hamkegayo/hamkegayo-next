@@ -28,6 +28,11 @@ import {
     TIME_OPTIONS,
     timeOptionsFor,
 } from "@/app/(user)/reservation/_lib/options";
+import {
+    addCalendarDays,
+    isBeyondAdvanceReservationWindow,
+    maxAdvanceReservationDate,
+} from "@/lib/reservation-window";
 
 let passed = 0;
 let failed = 0;
@@ -185,7 +190,10 @@ check(
     isPastSlot("2026-09-07", "6시 30분", SLOT_NOW) === true,
 );
 
-check("여유시간 안쪽도 막는다", isPastSlot("2026-09-07", "16시 00분", SLOT_NOW) === true);
+check(
+    "여유시간 안쪽도 막는다",
+    isPastSlot("2026-09-07", "16시 00분", SLOT_NOW) === true,
+);
 
 check(
     `여유시간(${MIN_LEAD_MINUTES}분) 뒤부터 열린다`,
@@ -207,6 +215,36 @@ check(
 check(
     "다른 날짜는 전체 옵션이 그대로",
     timeOptionsFor("2026-09-08", SLOT_NOW).length === TIME_OPTIONS.length,
+);
+
+// =============================================================
+console.log("\n▶ PG 예약 가능 범위 (결제일 포함 60일)");
+// =============================================================
+// KST 2026-09-10 12:00 == UTC 03:00. 결제일을 1일째로 세면
+// 60일째는 2026-11-08이고, 그 다음 날부터 결제할 수 없다.
+const PAYMENT_NOW = new Date("2026-09-10T03:00:00Z");
+
+check(
+    "결제일을 1일째로 계산해 마지막 예약일은 +59일",
+    maxAdvanceReservationDate(PAYMENT_NOW) === "2026-11-08",
+    maxAdvanceReservationDate(PAYMENT_NOW),
+);
+check(
+    "정확히 60일째는 허용",
+    isBeyondAdvanceReservationWindow("2026-11-08", PAYMENT_NOW) === false,
+);
+check(
+    "61일째부터 차단",
+    isBeyondAdvanceReservationWindow("2026-11-09", PAYMENT_NOW) === true,
+);
+check(
+    "월·연도 경계를 넘어도 날짜를 계산",
+    addCalendarDays("2026-12-15", 59) === "2027-02-12",
+    String(addCalendarDays("2026-12-15", 59)),
+);
+check(
+    "존재하지 않는 날짜는 계산하지 않음",
+    addCalendarDays("2026-02-30", 59) === null,
 );
 
 console.log(

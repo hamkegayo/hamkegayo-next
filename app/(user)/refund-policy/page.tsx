@@ -8,7 +8,7 @@ import { TERMS, termsArticle } from "@/lib/legal/terms";
 import { POINT_RESTORE_NOTE, REFUND_METHOD_NOTE } from "@/lib/legal/refund";
 
 export const metadata: Metadata = {
-    title: "취소·환불 정책 | 함께가요",
+    title: "취소·환불 정책",
     description:
         "함께가요 병원동행 서비스의 예약 취소 시점별 취소수수료, 환불 방법과 소요기간, 청약철회 및 최종정산 기준을 안내합니다.",
 };
