@@ -115,6 +115,7 @@ async function makeReservation(
     suffix,
     arriveTime,
     minutes,
+    useDate = "2026-09-07",
 ) {
     const { data, error } = await admin
         .from("reservations")
@@ -132,7 +133,7 @@ async function makeReservation(
             relation: "자녀",
             treatment: "내과",
             purpose: "검진",
-            use_date: "2026-09-07",
+            use_date: useDate,
             arrive_time: arriveTime,
             reserve_time: "10시 00분",
             duration: "2시간",
@@ -307,6 +308,73 @@ async function main() {
         "CONFIRMED 전이 + 기한 해제",
         confirmed?.status === "CONFIRMED" &&
             confirmed?.payment_deadline === null,
+    );
+
+    console.log("\n▶ PG 예약 가능 범위 — DB 최종 방어");
+
+    const farFuture = new Date(Date.now() + 90 * 86400000)
+        .toISOString()
+        .slice(0, 10);
+    const r4 = await makeReservation(
+        customerId,
+        partnerId,
+        "D",
+        "10시 00분",
+        120,
+        farFuture,
+    );
+    const { error: farSelectError } = await user.rpc(
+        "select_reservation_partner",
+        {
+            p_reservation_id: r4,
+            p_partner_id: partnerId,
+        },
+    );
+    check(
+        "범위 초과 예약의 파트너 선택 준비",
+        !farSelectError,
+        farSelectError?.message,
+    );
+
+    const { data: farPayment, error: farPaymentError } = await admin
+        .from("payments")
+        .insert({
+            reservation_id: r4,
+            type: "BASE",
+            status: "PAID",
+            order_id: `${CODE_PREFIX}-ORD-D`,
+            transaction_id: `${CODE_PREFIX}-TID-D`,
+            gross_amount: 40000,
+            commission_amount: 8000,
+            payout_amount: 32000,
+            commission_rate: 0.2,
+            paid_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+    check(
+        "범위 초과 검증용 결제 행 생성",
+        !farPaymentError,
+        farPaymentError?.message,
+    );
+
+    await expectRpcError(
+        "결제일 포함 60일을 넘으면 DB에서도 확정 거절",
+        admin.rpc("confirm_reservation_payment", {
+            p_reservation_id: r4,
+            p_payment_id: farPayment?.id,
+        }),
+        "reservation_date_out_of_range",
+    );
+
+    const { data: farReservation } = await admin
+        .from("reservations")
+        .select("status")
+        .eq("id", r4)
+        .single();
+    check(
+        "범위 초과 예약은 MATCHING 상태 유지",
+        farReservation?.status === "MATCHING",
     );
 
     console.log("\n▶ 결제 기한 만료");

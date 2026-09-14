@@ -3,6 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { calcPaymentAmounts, generateOrderId } from "@/lib/payments/order";
 import { PAYMENT_DEADLINE_MIN } from "@/lib/pricing";
 import type { PlanCode } from "@/lib/reservation";
+import {
+    ADVANCE_RESERVATION_ERROR_CODE,
+    ADVANCE_RESERVATION_PAYMENT_MESSAGE,
+    isBeyondAdvanceReservationWindow,
+} from "@/lib/reservation-window";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 
@@ -11,7 +16,7 @@ import { createClient } from "@/utils/supabase/server";
  *
  *  하는 일
  *    1. 세션에서 예약 소유자 확인
- *    2. 예약 행을 읽어 **서버가 금액을 재계산**한다 (클라이언트 값은 받지 않는다)
+ *    2. 예약일이 결제일 포함 60일 이내인지 확인하고 **서버가 금액을 재계산**한다
  *    3. 포인트를 선점한다 — 승인 후에 잔액 부족을 알면 이미 덜 받은 뒤다
  *    4. payments PENDING 행을 만든다 (order_id 가 멱등 키가 된다)
  *    5. 결제 기한을 +10분 연장한다 — 결제창을 띄우는 동안 만료되면 안 된다
@@ -70,7 +75,7 @@ export async function POST(request: NextRequest) {
     const { data: reservation, error: readError } = await admin
         .from("reservations")
         .select(
-            "id, code, customer_id, status, plan, duration_minutes, surcharge_rate, fee_rate, prepaid_amount, confirmed_partner_id, payment_deadline",
+            "id, code, customer_id, status, plan, duration_minutes, surcharge_rate, fee_rate, prepaid_amount, confirmed_partner_id, payment_deadline, use_date",
         )
         .eq("id", reservationId)
         .maybeSingle();
@@ -115,6 +120,16 @@ export async function POST(request: NextRequest) {
             {
                 error: "결제 시간이 지나 파트너 선택이 해제되었습니다.",
                 code: "PAYMENT_EXPIRED",
+            },
+            { status: 409 },
+        );
+    }
+
+    if (isBeyondAdvanceReservationWindow(reservation.use_date)) {
+        return NextResponse.json(
+            {
+                error: ADVANCE_RESERVATION_PAYMENT_MESSAGE,
+                code: ADVANCE_RESERVATION_ERROR_CODE,
             },
             { status: 409 },
         );

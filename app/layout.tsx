@@ -13,6 +13,7 @@ import { InstallTracker } from "@/components/pwa/install-tracker";
 import { InstallSheetHost } from "@/components/pwa/install-entry";
 import { PwaDebug } from "@/components/pwa/pwa-debug";
 import { CAPTURE_SCRIPT } from "@/lib/pwa/install-event";
+import { HOME_TITLE, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/seo";
 
 // 전역 폰트: Pretendard (Variable)
 const pretendard = localFont({
@@ -24,19 +25,20 @@ const pretendard = localFont({
 
 // 메타데이터 초기화
 export const metadata: Metadata = {
+    metadataBase: new URL(SITE_URL),
     title: {
         template: "%s | 함께가요", // 하위 페이지에서 title을 넣으면 자동으로 치환됨
-        default: "함께가요", // 메인 페이지용 디폴트 타이틀
+        default: HOME_TITLE,
     },
     // 의료 서비스로 오인되지 않도록 "진료·처방" 계열 표현을 쓰지 않는다.
-    description: "함께가요 - 병원 방문 이동과 절차를 돕는 동행 지원 서비스", // 메인 페이지용 디폴트 설명
+    description: SITE_DESCRIPTION,
     openGraph: {
         type: "website",
         locale: "ko_KR",
-        siteName: "함께가요",
-        title: "함께가요",
-        description: "함께가요 - 병원 방문 이동과 절차를 돕는 동행 지원 서비스",
-        url: "https://www.hamkegayo.kr",
+        siteName: SITE_NAME,
+        title: HOME_TITLE,
+        description: SITE_DESCRIPTION,
+        url: SITE_URL,
     },
     // 아이콘은 파일 규약으로 붙는다 — app/favicon.ico · app/apple-icon.png.
     // 여기에 icons 를 적으면 파일 규약보다 뒤에 오거나 겹친다.

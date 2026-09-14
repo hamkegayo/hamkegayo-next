@@ -62,6 +62,20 @@ export function UserFooter() {
                             {COMPANY.email}
                         </a>
                     </span>
+                    {/* 개인정보처리방침 제14조 — 공개된 카카오톡 문의 창구 */}
+                    <span className="inline-flex gap-1.5 whitespace-nowrap">
+                        <span className="text-muted-foreground/70">
+                            카카오톡
+                        </span>
+                        <a
+                            href={COMPANY.kakaoUrl}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="hover:text-foreground underline-offset-4 hover:underline"
+                        >
+                            {COMPANY.kakao} 채널 추가
+                        </a>
+                    </span>
                 </div>
 
                 <div className="mt-6 space-y-1.5">
