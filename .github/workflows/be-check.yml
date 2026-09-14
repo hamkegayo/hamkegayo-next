@@ -22,6 +22,8 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
             - uses: actions/setup-node@v4
               with:
@@ -31,6 +33,11 @@ jobs:
                   cache: "npm"
 
             - run: npm ci
+
+            - name: 신규 마이그레이션 위험 DDL 경고 (#132)
+              run: |
+                  npm run test:migration-lint
+                  npm run check:migrations
 
             # 돈을 계산하는 함수다. 구간 경계 하나가 틀리면 과다청구이거나 손실이다.
             - name: 요금 계산 단위 테스트 (#46 · #76)
@@ -56,6 +63,8 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
             - uses: actions/setup-node@v4
               with:
@@ -70,15 +79,37 @@ jobs:
                   # 서비스 이름이 조용히 바뀌어 CI 가 깨진다.
                   version: 2.117.0
 
-            # 러너는 매번 새 볼륨이라 start 가 마이그레이션을 처음부터 전부 적용한다.
-            # 즉 이 한 줄이 "마이그레이션이 zero 에서 깨끗이 서는가" 검사를 겸한다.
+            # 기준 브랜치의 스키마에 기존 행을 먼저 만든 뒤, 이 PR 이 추가한
+            # 마이그레이션만 나중에 적용한다. 빈 DB 에서 드러나지 않는 NOT NULL,
+            # UNIQUE, 타입 변경 문제를 실제 데이터 위에서 검증한다 (#132).
+            - name: PR 신규 마이그레이션 분리
+              id: pr-migrations
+              shell: bash
+              run: |
+                  BASE_REF="origin/${GITHUB_BASE_REF}"
+                  BASE_SHA="$(git merge-base "$BASE_REF" HEAD)"
+                  mapfile -t MIGRATIONS < <(
+                    git diff --diff-filter=A --name-only "$BASE_SHA" HEAD -- 'supabase/migrations/*.sql'
+                  )
+
+                  mkdir -p "$RUNNER_TEMP/pr-migrations"
+                  printf '%s\n' "${MIGRATIONS[@]}" > "$RUNNER_TEMP/pr-migrations.txt"
+                  for migration in "${MIGRATIONS[@]}"; do
+                    mv "$migration" "$RUNNER_TEMP/pr-migrations/$(basename "$migration")"
+                  done
+
+                  echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+                  echo "count=${#MIGRATIONS[@]}" >> "$GITHUB_OUTPUT"
+                  echo "분리한 신규 마이그레이션: ${#MIGRATIONS[@]}개"
+
+            # 러너는 매번 새 볼륨이라 start 가 기준 브랜치 마이그레이션을 처음부터 적용한다.
             # (별도 `db reset` 을 두었더니 컨테이너를 다시 띄우다 포트가 겹쳐 깨졌다.)
             #
             # 쓰지 않는 서비스는 제외한다 — 특히 mailpit(구 inbucket)이 54324 를
             # 잡으려다 "address already in use" 로 죽은 것이 실제 실패 원인이었다.
             # 메일은 Resend 목이라 mailpit 이 필요 없고, 나머지도 테스트가 쓰지 않는다.
             # 덤으로 기동이 빨라진다.
-            - name: Supabase 로컬 스택 기동 (마이그레이션 전량 적용 포함)
+            - name: Supabase 로컬 스택 기동 (기준 브랜치 마이그레이션 적용)
               run: |
                   supabase start -x mailpit,studio,imgproxy,edge-runtime,logflare,vector,supavisor,realtime,postgres-meta
 
@@ -92,6 +123,92 @@ jobs:
                     echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
                     echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
                   } > .env.local
+
+            - name: 기존 데이터 시드 · 행 수 기준선 저장
+              shell: bash
+              env:
+                  BASE_SHA: ${{ steps.pr-migrations.outputs.base_sha }}
+              run: |
+                  mkdir -p .migration-ci/scripts
+                  git show "$BASE_SHA:scripts/seed-dev.mjs" > .migration-ci/scripts/seed-dev.mjs
+                  git show "$BASE_SHA:scripts/_target-guard.mjs" > .migration-ci/scripts/_target-guard.mjs
+                  node --env-file=.env.local .migration-ci/scripts/seed-dev.mjs
+
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+                  create schema migration_ci;
+                  create table migration_ci.row_counts (
+                    table_schema text not null,
+                    table_name text not null,
+                    row_count bigint not null,
+                    primary key (table_schema, table_name)
+                  );
+
+                  do $$
+                  declare r record; n bigint;
+                  begin
+                    for r in
+                      select schemaname, tablename
+                        from pg_tables
+                       where schemaname = 'public'
+                    loop
+                      execute format('select count(*) from %I.%I', r.schemaname, r.tablename)
+                        into n;
+                      insert into migration_ci.row_counts values (r.schemaname, r.tablename, n);
+                    end loop;
+                  end $$;
+                  SQL
+
+            - name: PR 신규 마이그레이션을 기존 데이터 위에 적용
+              shell: bash
+              env:
+                  MIGRATION_COUNT: ${{ steps.pr-migrations.outputs.count }}
+              run: |
+                  while IFS= read -r migration; do
+                    if [[ -n "$migration" ]]; then
+                      mv "$RUNNER_TEMP/pr-migrations/$(basename "$migration")" "$migration"
+                    fi
+                  done < "$RUNNER_TEMP/pr-migrations.txt"
+
+                  if [[ "$MIGRATION_COUNT" -gt 0 ]]; then
+                    eval "$(supabase status -o env)"
+                    supabase migration up --db-url "$DB_URL"
+                  else
+                    echo "적용할 신규 마이그레이션이 없습니다."
+                  fi
+
+            - name: 기존 행 보존 · 제약 유효성 확인
+              shell: bash
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+                  do $$
+                  declare r record; n bigint;
+                  begin
+                    for r in select * from migration_ci.row_counts loop
+                      if to_regclass(format('%I.%I', r.table_schema, r.table_name)) is null then
+                        raise exception '기존 테이블이 사라졌다: %.%', r.table_schema, r.table_name;
+                      end if;
+
+                      execute format('select count(*) from %I.%I', r.table_schema, r.table_name)
+                        into n;
+                      if n < r.row_count then
+                        raise exception '기존 행 감소: %.% (% → %)',
+                          r.table_schema, r.table_name, r.row_count, n;
+                      end if;
+                    end loop;
+
+                    if exists (
+                      select 1
+                        from pg_constraint c
+                        join pg_namespace n on n.oid = c.connamespace
+                       where n.nspname = 'public'
+                         and not c.convalidated
+                    ) then
+                      raise exception '검증되지 않은 public 제약조건이 존재한다';
+                    end if;
+                  end $$;
+                  SQL
 
             # 버킷·크론이 마이그레이션에 딸려 오는지 확인한다.
             # 스테이징 신설(#114)이 이 전제 위에 서 있다.
@@ -110,7 +227,7 @@ jobs:
                   end $$;
                   SQL
 
-            - name: 테스트 계정 시드
+            - name: 최신 스키마 기준 테스트 계정 시드
               run: npm run seed:dev
 
             # 아래는 전부 "무엇이 되는가" 가 아니라 **"무엇이 안 되는가"** 를 보는 테스트다.
