@@ -46,5 +46,6 @@ yarn-error.log*
 next-env.d.ts
 plan*
 
-# claude (로컬 전용)
+# 에이전트 로컬 설정
 .claude/
+.agents/
