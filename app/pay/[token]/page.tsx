@@ -17,7 +17,7 @@ import { PayShell } from "../_components/pay-shell";
  */
 
 export const metadata: Metadata = {
-    title: "추가 결제 | 함께가요",
+    title: "추가 결제",
     // 링크가 검색에 잡히면 안 된다.
     robots: { index: false, follow: false },
 };

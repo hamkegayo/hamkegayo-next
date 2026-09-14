@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "관리자 | 함께가요",
+    title: "관리자",
     // 관리자 화면은 검색엔진에 노출하지 않는다
     robots: { index: false, follow: false },
 };

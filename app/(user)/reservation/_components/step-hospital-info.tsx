@@ -4,12 +4,12 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { Input } from "@/components/ui/input";
-import { formatPhoneNumber } from "@/lib/format";
+import { formatPhoneNumber, kstToday } from "@/lib/format";
+import { maxAdvanceReservationDate } from "@/lib/reservation-window";
 import { Section } from "@/app/(user)/_components/home/section";
 import { useReservationStore } from "../_store/reservation-store";
 import { step2Form, type Step2Values } from "../_lib/schema";
 import { DURATION_OPTIONS, timeOptionsFor } from "../_lib/options";
-import { kstToday } from "@/lib/format";
 import {
     END_METHOD_OPTIONS,
     HANDOVER_FAIL_WAIT_MIN,
@@ -106,6 +106,7 @@ export function StepHospitalInfo() {
                                     id="useDate"
                                     type="date"
                                     min={kstToday()}
+                                    max={maxAdvanceReservationDate()}
                                     className="cursor-pointer"
                                     onClick={(e) =>
                                         e.currentTarget.showPicker?.()
@@ -120,6 +121,10 @@ export function StepHospitalInfo() {
                                 <FieldError>
                                     {errors.useDate?.message}
                                 </FieldError>
+                                <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">
+                                    PG사 기준에 따라 오늘을 1일째로 계산해 60일
+                                    이내 날짜만 예약할 수 있습니다.
+                                </p>
                                 {noSlotToday && (
                                     <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">
                                         오늘은 예약 가능한 시간이 지났습니다.

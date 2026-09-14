@@ -10,7 +10,7 @@ import { PayShell } from "../_components/pay-shell";
  */
 
 export const metadata: Metadata = {
-    title: "결제 결과 | 함께가요",
+    title: "결제 결과",
     robots: { index: false, follow: false },
 };
 

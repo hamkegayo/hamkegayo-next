@@ -13,7 +13,7 @@ import { PartnerNavProvider } from "./_components/partner-nav-context";
 import { BlockedModal } from "@/components/layout/blocked-modal";
 
 export const metadata: Metadata = {
-    title: "파트너 | 함께가요",
+    title: "파트너",
 };
 
 export default async function PartnerLayout({

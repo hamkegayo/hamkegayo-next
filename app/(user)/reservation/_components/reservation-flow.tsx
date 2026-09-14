@@ -28,6 +28,8 @@ const PAY_ERROR_MESSAGE: Record<string, string> = {
     CONFIRM_FAILED:
         "결제는 취소되었습니다. 예약이 확정되지 않았으니 다시 시도해 주세요.",
     PAYMENT_NOT_PENDING: "이미 처리된 결제입니다.",
+    RESERVATION_DATE_OUT_OF_RANGE:
+        "PG사 기준에 따라 결제일을 1일째로 계산해 60일 이내 날짜만 결제할 수 있습니다. 기존 예약을 취소하고 날짜를 다시 선택해 주세요.",
 };
 
 /** 예약 STEP 오케스트레이터 — 현재 단계 렌더 + STEP0 모달 */

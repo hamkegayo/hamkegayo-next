@@ -4,7 +4,7 @@ import { getSessionProfile } from "./_lib/profile";
 import { MypageSidebar } from "./_components/mypage-sidebar";
 
 export const metadata: Metadata = {
-    title: "마이페이지 | 함께가요",
+    title: "마이페이지",
 };
 
 export default async function MypageLayout({

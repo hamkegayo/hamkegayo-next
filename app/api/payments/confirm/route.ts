@@ -3,6 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getPaymentGateway, parseAuthResult } from "@/lib/payments/nicepay";
 import { reportIncident } from "@/lib/payments/incident";
 import { PaymentGatewayError } from "@/lib/payments/types";
+import {
+    ADVANCE_RESERVATION_ERROR_CODE,
+    isBeyondAdvanceReservationWindow,
+} from "@/lib/reservation-window";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 /**
@@ -15,7 +19,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
  *    ① signature 검증        위변조된 인증 결과를 걸러낸다
  *    ② 결제 행 조회          orderId 로 우리가 만든 PENDING 을 찾는다
  *    ③ 금액 대조             결제창 금액 vs DB 금액. 다르면 승인하지 않는다
- *    ④ 만료·재선택 재확인    선택이 풀렸으면 승인하지 않는다
+ *    ④ 예약일·상태 재확인    60일 초과·만료·선택 해제면 승인하지 않는다
  *    ⑤ PG 승인               ← 여기서 돈이 빠진다
  *    ⑥ finalize_payment()    PAID 전이 + 예약 확정을 한 트랜잭션에
  *    ⑦ 실패 시 승인 취소 + 포인트 복원
@@ -116,7 +120,7 @@ export async function POST(request: NextRequest) {
     const { data: payment } = await admin
         .from("payments")
         .select(
-            "id, reservation_id, type, status, gross_amount, discount_amount, token_expires_at, reservations!inner(id, code, status, confirmed_partner_id, payment_deadline)",
+            "id, reservation_id, type, status, gross_amount, discount_amount, token_expires_at, reservations!inner(id, code, status, confirmed_partner_id, payment_deadline, use_date)",
         )
         .eq("order_id", auth.orderId)
         .maybeSingle();
@@ -141,6 +145,7 @@ export async function POST(request: NextRequest) {
         status: string;
         confirmed_partner_id: string | null;
         payment_deadline: string | null;
+        use_date: string;
     };
 
     // 추가결제(#75)는 이미 확정된 예약에 붙는 청구다. 예약 상태 검증(④)과
@@ -180,7 +185,24 @@ export async function POST(request: NextRequest) {
         return fail(request, "AMOUNT_MISMATCH", rid);
     }
 
-    // ---------- ④ 만료·재선택 재확인 ----------
+    // ---------- ④ 예약 가능 범위·만료·재선택 재확인 ----------
+    if (
+        !isExtension &&
+        isBeyondAdvanceReservationWindow(reservation.use_date)
+    ) {
+        console.warn(
+            `[payments/confirm] 예약 가능 범위 초과 order=${auth.orderId} useDate=${reservation.use_date}`,
+        );
+        await netCancelQuietly(auth.orderId);
+        await failPayment(
+            admin,
+            payment.id,
+            "PG 예약 가능 범위 초과",
+            auth.orderId,
+        );
+        return fail(request, ADVANCE_RESERVATION_ERROR_CODE, rid);
+    }
+
     //  추가결제는 링크 토큰의 유효기간으로 대신한다. 예약은 이미 확정됐고
     //  파트너 선택이 풀리는 일도 없다.
     const expired = isExtension

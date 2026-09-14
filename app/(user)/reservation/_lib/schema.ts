@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import {
+    ADVANCE_RESERVATION_FIELD_MESSAGE,
+    isBeyondAdvanceReservationWindow,
+    isCalendarDate,
+} from "@/lib/reservation-window";
 import { isPastSlot, MIN_LEAD_MINUTES, reservationStartAt } from "./options";
 
 const required = "필수 입력 항목입니다.";
@@ -121,7 +126,27 @@ function checkSchedule(
     v: { useDate: string; arriveTime: string; reserveTime: string },
     ctx: z.RefinementCtx,
 ) {
-    if (!v.useDate || !v.arriveTime || !v.reserveTime) return;
+    if (!v.useDate) return;
+
+    if (!isCalendarDate(v.useDate)) {
+        ctx.addIssue({
+            code: "custom",
+            path: ["useDate"],
+            message: "올바른 이용 날짜를 선택해 주세요.",
+        });
+        return;
+    }
+
+    if (isBeyondAdvanceReservationWindow(v.useDate)) {
+        ctx.addIssue({
+            code: "custom",
+            path: ["useDate"],
+            message: ADVANCE_RESERVATION_FIELD_MESSAGE,
+        });
+        return;
+    }
+
+    if (!v.arriveTime || !v.reserveTime) return;
 
     if (isPastSlot(v.useDate, v.arriveTime)) {
         ctx.addIssue({

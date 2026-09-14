@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MessageCircle } from "lucide-react";
 
 import { COMPANY } from "@/lib/legal/company";
 import { ContactLink } from "./contact-link";
@@ -27,6 +28,15 @@ export function HomeCta() {
                         className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-6 py-3 text-sm font-bold transition-colors"
                     >
                         전화 상담 받기
+                    </ContactLink>
+                    <ContactLink
+                        href={COMPANY.kakaoUrl}
+                        method="support"
+                        external
+                        className="bg-kakao text-kakao-foreground inline-flex items-center justify-center gap-1.5 rounded-lg px-6 py-3 text-sm font-bold whitespace-nowrap transition-colors hover:brightness-95"
+                    >
+                        <MessageCircle className="size-4" />
+                        카카오톡 채널 추가
                     </ContactLink>
                 </div>
             </div>
