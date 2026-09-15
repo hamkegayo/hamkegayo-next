@@ -231,6 +231,9 @@ jobs:
               run: npm run seed:dev
 
             # 아래는 전부 "무엇이 되는가" 가 아니라 **"무엇이 안 되는가"** 를 보는 테스트다.
+            - name: 결제·정산 스키마와 심사용 무기한 토큰 (#49 · #81)
+              run: npm run test:payments
+
             - name: 동의 이력 불변성 (#58)
               run: npm run test:agreements
 
@@ -260,6 +263,6 @@ jobs:
             - name: 약관 재동의 안내·중복 방지 (#91)
               run: npm run test:reconsent
 
-            # ⚠️ test:nicepay · test:payapi · test:payments 는 여기서 돌리지 않는다.
+            # ⚠️ test:nicepay · test:payapi 는 여기서 돌리지 않는다.
             #    NICEPAY 샌드박스 실호출이라 외부 의존이 생기고 키를 시크릿으로 넣어야 한다.
             #    PG 사고가 CI 실패로 둔갑하면 아무도 CI 를 믿지 않게 된다.
