@@ -315,7 +315,7 @@ async function main() {
     const farFuture = new Date(Date.now() + 90 * 86400000)
         .toISOString()
         .slice(0, 10);
-    const r4 = await makeReservation(
+    const farReservationId = await makeReservation(
         customerId,
         partnerId,
         "D",
@@ -326,7 +326,7 @@ async function main() {
     const { error: farSelectError } = await user.rpc(
         "select_reservation_partner",
         {
-            p_reservation_id: r4,
+            p_reservation_id: farReservationId,
             p_partner_id: partnerId,
         },
     );
@@ -339,7 +339,7 @@ async function main() {
     const { data: farPayment, error: farPaymentError } = await admin
         .from("payments")
         .insert({
-            reservation_id: r4,
+            reservation_id: farReservationId,
             type: "BASE",
             status: "PAID",
             order_id: `${CODE_PREFIX}-ORD-D`,
@@ -361,7 +361,7 @@ async function main() {
     await expectRpcError(
         "결제일 포함 60일을 넘으면 DB에서도 확정 거절",
         admin.rpc("confirm_reservation_payment", {
-            p_reservation_id: r4,
+            p_reservation_id: farReservationId,
             p_payment_id: farPayment?.id,
         }),
         "reservation_date_out_of_range",
@@ -370,7 +370,7 @@ async function main() {
     const { data: farReservation } = await admin
         .from("reservations")
         .select("status")
-        .eq("id", r4)
+        .eq("id", farReservationId)
         .single();
     check(
         "범위 초과 예약은 MATCHING 상태 유지",
@@ -810,7 +810,7 @@ async function main() {
             p_reason: "EXTENSION",
             p_order_id: `${CODE_PREFIX}-ORD-7-E`,
             p_token: token7,
-            p_token_expires: expires7,
+            p_token_expires: null,
             p_review_threshold: 150000,
         },
     );
@@ -831,7 +831,7 @@ async function main() {
         p_reason: "EXTENSION",
         p_order_id: `${CODE_PREFIX}-ORD-7-E2`,
         p_token: `${token7}-dup`,
-        p_token_expires: expires7,
+        p_token_expires: null,
         p_review_threshold: 150000,
     });
     const { count: extCount } = await admin
@@ -855,6 +855,11 @@ async function main() {
         "토큰으로 금액을 조회할 수 있다",
         !chargeErr && charge?.amount === 15000,
         chargeErr?.message,
+    );
+    check(
+        "만료일이 없는 심사용 토큰은 계속 유효하다",
+        charge?.expired === false,
+        JSON.stringify(charge),
     );
 
     const leakedFields = Object.entries(charge ?? {}).filter(([, v]) =>

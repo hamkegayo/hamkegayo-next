@@ -15,6 +15,8 @@
 //   로컬   node --env-file=.env.local scripts/make-review-fixtures.mjs
 //   운영   NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
 //            node scripts/make-review-fixtures.mjs --prod
+//   기존 심사 URL 만료 해제
+//          ... scripts/make-review-fixtures.mjs --prod --remove-link-expiry
 //   정리   ... scripts/make-review-fixtures.mjs --prod --cleanup
 //
 //   ⚠️ 운영 키를 파일에 적어 두지 않는다. 위처럼 그 실행에만 넘긴다.
@@ -34,10 +36,20 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const args = new Set(process.argv.slice(2));
 const cleanupOnly = args.has("--cleanup");
+const removeLinkExpiryOnly = args.has("--remove-link-expiry");
 const prodAck = args.has("--prod");
 
+if (cleanupOnly && removeLinkExpiryOnly) {
+    console.error(
+        "❌ --cleanup 과 --remove-link-expiry 는 함께 쓸 수 없습니다.",
+    );
+    process.exit(1);
+}
+
 if (!url || !serviceKey) {
-    console.error("❌ NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 가 필요합니다.");
+    console.error(
+        "❌ NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 가 필요합니다.",
+    );
     process.exit(1);
 }
 
@@ -47,7 +59,9 @@ const host = new URL(url).host;
 if (!isLocal && !prodAck) {
     console.error(`❌ 로컬이 아닌 데이터베이스입니다 : ${host}`);
     console.error("   운영에 만들려면 --prod 를 붙여 다시 실행하세요.");
-    console.error("   (다른 테스트 스크립트와 반대입니다 — 이 스크립트는 운영용입니다)");
+    console.error(
+        "   (다른 테스트 스크립트와 반대입니다 — 이 스크립트는 운영용입니다)",
+    );
     process.exit(1);
 }
 
@@ -80,29 +94,25 @@ const PARTNER_EMAIL = `${PARTNER_LOGIN}@partner.hamkegayo.internal`;
 const PARTNER_PASSWORD = "Review2026!";
 
 // ---------------------------------------------------------------
-// 기간 — 심사가 끝나기 전에 화면이 죽지 않도록
+// 기간 — 예약금 결제 화면이 심사 중에 죽지 않도록
 //
-//  NICEPAY 심사는 2주쯤 걸린다. 처음엔 토큰 3일 · 이용일 7일로 잡았는데
-//  그러면 **심사 도중에 두 화면이 모두 못 쓰게 된다.**
+//  NICEPAY 심사는 2주쯤 걸린다. 예약 이용일이 지나면 expire_matchings
+//  크론이 MATCHING 예약을 자동 만료시켜 파트너를 고를 수 없게 된다.
 //
-//   · 링크결제 — 토큰이 만료되면 /pay/<token> 이 만료 화면을 띄운다
-//   · 예약금 결제 — 이용일이 지나면 expire_matchings 크론이 MATCHING 예약을
-//     자동 만료시킨다(20260708000013). 파트너를 고를 수 없게 된다.
-//
-//  심사 기간에 일주일을 더해 잡는다. 심사가 늘어지거나 재심사가 붙어도
-//  스크립트를 다시 돌리지 않아도 된다.
+//  예약 이용일은 심사 기간에 일주일을 더해 잡는다. 링크결제 토큰은 NICEPAY
+//  요청대로 고정 만료일 없이 만들고, 심사 완료 후 --cleanup 으로 폐기한다.
 // ---------------------------------------------------------------
 
 /** 예상 심사 기간(일) */
 const REVIEW_DAYS = 14;
 /** 여유 — 심사 지연·재심사분 */
 const GRACE_DAYS = 7;
-/** 링크결제 토큰 유효기간 · 이용일까지 남은 날수 */
-const VALID_DAYS = REVIEW_DAYS + GRACE_DAYS;
+/** 예약금 결제 화면용 예약 이용일까지 남은 날수 */
+const RESERVATION_VALID_DAYS = REVIEW_DAYS + GRACE_DAYS;
 
 /** 이용일 — 심사 기간 내내 미래로 남는 평일. 주말 할증을 피해 금액을 단순하게 둔다. */
 function reviewUseDate() {
-    const at = new Date(Date.now() + VALID_DAYS * 86_400_000);
+    const at = new Date(Date.now() + RESERVATION_VALID_DAYS * 86_400_000);
     // KST 기준 날짜로 맞춘다 (서버가 UTC 로 돌 수 있다).
     const ymd = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Seoul",
@@ -129,6 +139,75 @@ async function cleanup() {
         const u = await findUser(email);
         if (u) await admin.auth.admin.deleteUser(u.id);
     }
+}
+
+/** NICEPAY 에 이미 전달한 REVIEW-LINK URL은 유지하고 만료만 제거한다. */
+async function removeReviewLinkExpiry() {
+    const { data: reservations, error: reservationError } = await admin
+        .from("reservations")
+        .select("id, status")
+        .eq("code", `${CODE_PREFIX}-LINK`);
+    if (reservationError) throw reservationError;
+    if (reservations?.length !== 1) {
+        throw new Error(
+            `REVIEW-LINK 예약이 정확히 1건이어야 합니다. 현재 ${reservations?.length ?? 0}건`,
+        );
+    }
+    if (reservations[0].status !== "COMPLETED") {
+        throw new Error(
+            `REVIEW-LINK 예약 상태가 COMPLETED여야 합니다. 현재 ${reservations[0].status}`,
+        );
+    }
+
+    const { data: payments, error: paymentError } = await admin
+        .from("payments")
+        .select(
+            "id, order_id, pay_token, token_expires_at, gross_amount, collection_state",
+        )
+        .eq("reservation_id", reservations[0].id)
+        .eq("type", "EXTENSION")
+        .eq("status", "PENDING");
+    if (paymentError) throw paymentError;
+    if (payments?.length !== 1 || !payments[0].pay_token) {
+        throw new Error(
+            `토큰이 남아 있는 PENDING 추가결제가 정확히 1건이어야 합니다. 현재 ${payments?.length ?? 0}건`,
+        );
+    }
+    if (
+        payments[0].gross_amount !== 5000 ||
+        payments[0].collection_state !== "UNPAID_EXPIRED"
+    ) {
+        throw new Error(
+            "REVIEW-LINK 결제의 금액 또는 독촉 제외 상태가 예상과 다릅니다.",
+        );
+    }
+
+    const before = payments[0];
+    const { data: updated, error: updateError } = await admin
+        .from("payments")
+        .update({ token_expires_at: null })
+        .eq("id", before.id)
+        .eq("order_id", before.order_id)
+        .eq("pay_token", before.pay_token)
+        .eq("status", "PENDING")
+        .select("id, order_id, pay_token, token_expires_at")
+        .maybeSingle();
+    if (updateError) throw updateError;
+    if (
+        !updated ||
+        updated.order_id !== before.order_id ||
+        updated.pay_token !== before.pay_token ||
+        updated.token_expires_at !== null
+    ) {
+        throw new Error(
+            "동시 변경이 감지되어 심사용 링크 만료 해제를 중단했습니다.",
+        );
+    }
+
+    console.log("\n✅ 기존 REVIEW-LINK URL을 유지한 채 만료를 해제했습니다.");
+    console.log(`   결제 ID : ${updated.id}`);
+    console.log("   유효기간 : 카드사 심사 완료 시까지");
+    console.log("   심사가 끝나면 반드시 --cleanup 으로 정리하세요.\n");
 }
 
 /** 계정 하나 — 있으면 비밀번호만 맞추고 없으면 만든다 */
@@ -196,6 +275,11 @@ async function makeReservation({ code, customerId, status, useDate }) {
 }
 
 async function main() {
+    if (removeLinkExpiryOnly) {
+        await removeReviewLinkExpiry();
+        return;
+    }
+
     // 반복 실행해도 같은 결과가 나오도록 먼저 지운다.
     await cleanup();
     if (cleanupOnly) {
@@ -256,10 +340,6 @@ async function main() {
 
     const token = randomBytes(32).toString("base64url");
     const orderId = `${linkRes.code}-${Date.now().toString(36)}`;
-    const expires = new Date(
-        Date.now() + VALID_DAYS * 86_400_000,
-    ).toISOString();
-
     const { data: charge, error: chargeErr } = await admin.rpc(
         "create_extension_payment",
         {
@@ -268,7 +348,9 @@ async function main() {
             p_reason: "EXTENSION",
             p_order_id: orderId,
             p_token: token,
-            p_token_expires: expires,
+            // NICEPAY 요구: 카드사 심사가 끝날 때까지 같은 URL로 확인할 수 있어야 한다.
+            // 일반 고객 링크의 만료 정책은 건드리지 않고 심사용 픽스처만 예외로 둔다.
+            p_token_expires: null,
             // 소프트 상한에 걸리면 링크가 발송 보류 상태가 된다. 심사용은 넘긴다.
             p_review_threshold: 10_000_000,
         },
@@ -318,11 +400,12 @@ async function main() {
 
 ■ ② 테스트용 링크결제 URL  (로그인 불필요)
    ${siteUrl}/pay/${token}
-   금액 5,000원 · 유효기간 ${VALID_DAYS}일 (${expires.slice(0, 10)} 까지)
+   금액 5,000원 · 카드사 심사 완료 시까지 이용 가능
 
 ■ 참고
-   · 위 두 화면은 ${useDate} 까지 이용하실 수 있습니다.
-     기간이 더 필요하시면 말씀해 주시면 연장해 드리겠습니다.
+   · 예약금 결제 화면은 ${useDate} 까지 이용하실 수 있습니다.
+   · 링크결제 URL은 카드사 심사가 끝날 때까지 유지되며,
+     심사 완료 후 즉시 폐기합니다.
    · 현재 테스트(샌드박스) 키로 연동되어 있어 실제 청구는 발생하지 않습니다.
    · 사업자정보 · 이용약관 · 취소·환불 정책은 모든 결제 화면 하단에 있습니다.
      ${siteUrl}/refund-policy
