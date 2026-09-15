@@ -14,6 +14,8 @@
         "check:links": "node scripts/check-links.mjs",
         "test:pricing": "node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs scripts/test-pricing.mjs",
         "test:legal": "node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs scripts/test-legal-version.mjs",
+        "check:migrations": "node scripts/check-migrations.mjs",
+        "test:migration-lint": "node scripts/test-migration-lint.mjs",
         "test:pwa": "node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs scripts/test-pwa-prompt.mjs",
         "test:service": "node --env-file=.env.local scripts/test-service-flow.mjs",
         "test:admin": "node --env-file=.env.local scripts/test-admin-access.mjs",
