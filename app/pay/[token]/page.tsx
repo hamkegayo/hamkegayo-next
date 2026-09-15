@@ -94,6 +94,7 @@ export default async function ExtensionPayPage({
     }
 
     const clientId = process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY ?? "";
+    const isNicepayReviewLink = charge.code === "REVIEW-LINK";
 
     return (
         <PayShell>
@@ -112,11 +113,26 @@ export default async function ExtensionPayPage({
                     </dd>
                 </div>
                 <div className="flex justify-between py-3 text-sm">
-                    <dt className="text-muted-foreground">이용일</dt>
-                    <dd className="text-foreground font-semibold">
+                    <dt className="text-muted-foreground">
+                        {isNicepayReviewLink ? "서비스 이용일" : "이용일"}
+                    </dt>
+                    <dd className="text-foreground text-right font-semibold">
                         {charge.use_date}
+                        {isNicepayReviewLink && (
+                            <span className="text-muted-foreground block text-xs font-normal">
+                                링크 만료일이 아닙니다.
+                            </span>
+                        )}
                     </dd>
                 </div>
+                {isNicepayReviewLink && (
+                    <div className="flex justify-between gap-4 py-3 text-sm">
+                        <dt className="text-muted-foreground">링크 유효기간</dt>
+                        <dd className="text-foreground text-right font-semibold">
+                            카드사 심사 완료 시까지
+                        </dd>
+                    </div>
+                )}
                 <div className="flex justify-between py-3 text-sm">
                     <dt className="text-muted-foreground">청구 사유</dt>
                     <dd className="text-foreground font-semibold">
