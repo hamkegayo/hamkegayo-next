@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import {
+    getPartnerEmailChangeErrorMessage,
     isValidPartnerIntro,
     PARTNER_INTRO_MAX_LENGTH_MESSAGE,
 } from "@/lib/partner-profile";
@@ -101,7 +102,7 @@ export async function changePartnerEmail(
     if (error || !data) {
         return {
             ok: false,
-            message: "이메일 변경에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+            message: getPartnerEmailChangeErrorMessage(error?.code),
         };
     }
 

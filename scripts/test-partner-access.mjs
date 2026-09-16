@@ -214,9 +214,16 @@ async function main() {
         .update({ intro: "타인 수정 시도" })
         .eq("profile_id", otherId)
         .select("profile_id");
+    const { data: foreignAccount } = await admin
+        .from("partner_accounts")
+        .select("intro")
+        .eq("profile_id", otherId)
+        .single();
     check(
-        "다른 파트너 자기소개는 수정할 수 없음",
-        !foreignIntro.error && (foreignIntro.data ?? []).length === 0,
+        "다른 파트너 자기소개는 RLS로 수정할 수 없음",
+        !foreignIntro.error &&
+            (foreignIntro.data ?? []).length === 0 &&
+            foreignAccount?.intro !== "타인 수정 시도",
         foreignIntro.error?.message,
     );
 
@@ -233,6 +240,16 @@ async function main() {
     check(
         "브라우저에서 OTP 없이 이메일을 직접 바꿀 수 없음",
         !!emailBypass.error,
+    );
+
+    const duplicateEmail = await admin
+        .from("profiles")
+        .update({ email: OTHER_EMAIL.toUpperCase() })
+        .eq("id", partner.id);
+    check(
+        "다른 회원의 이메일은 대소문자가 달라도 UNIQUE 제약으로 거절됨",
+        duplicateEmail.error?.code === "23505",
+        duplicateEmail.error?.message,
     );
 
     await admin
