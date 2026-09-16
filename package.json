@@ -18,6 +18,7 @@
         "test:migration-lint": "node scripts/test-migration-lint.mjs",
         "test:pwa": "node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs scripts/test-pwa-prompt.mjs",
         "test:reservation-age": "node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs scripts/test-reservation-age.mjs",
+        "test:partner-profile": "node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs scripts/test-partner-profile.mjs",
         "test:service": "node --env-file=.env.local scripts/test-service-flow.mjs",
         "test:admin": "node --env-file=.env.local scripts/test-admin-access.mjs",
         "test:partner": "node --env-file=.env.local scripts/test-partner-access.mjs",

@@ -1,4 +1,4 @@
-// 파트너 개인정보 접근 3단계 재현 테스트 (#66 · #67) — 로컬 전용.
+// 파트너 프로필·개인정보 접근 재현 테스트 (#64 · #66 · #67) — 로컬 전용.
 //
 // 실행 (Node 20.6+):
 //   node --env-file=.env.local scripts/test-partner-access.mjs
@@ -164,7 +164,9 @@ async function seedReservation(customerId, code, extra = {}) {
 }
 
 async function main() {
-    console.log("\x1b[1m#66 · #67 파트너 개인정보 접근 3단계 검증\x1b[0m");
+    console.log(
+        "\x1b[1m#64 · #66 · #67 파트너 프로필·개인정보 접근 검증\x1b[0m",
+    );
     await cleanup();
 
     const userClient = await signIn(USER_EMAIL, USER_PASSWORD);
@@ -179,6 +181,64 @@ async function main() {
 
     const otherId = await makeOtherPartner();
     const otherClient = await signIn(OTHER_EMAIL, OTHER_PASSWORD);
+
+    // =============================================================
+    section("0. 파트너 기본정보 쓰기 경계 (#64)");
+    // =============================================================
+    const { data: beforeAccount } = await admin
+        .from("partner_accounts")
+        .select("intro")
+        .eq("profile_id", partner.id)
+        .single();
+
+    const ownIntro = await partnerClient
+        .from("partner_accounts")
+        .update({ intro: "파트너 자기소개 테스트" })
+        .eq("profile_id", partner.id)
+        .select("intro");
+    check(
+        "본인 자기소개는 수정할 수 있음",
+        !ownIntro.error &&
+            ownIntro.data?.[0]?.intro === "파트너 자기소개 테스트",
+        ownIntro.error?.message,
+    );
+
+    const tooLongIntro = await partnerClient
+        .from("partner_accounts")
+        .update({ intro: "가".repeat(301) })
+        .eq("profile_id", partner.id);
+    check("301자 자기소개는 DB에서도 거절됨", !!tooLongIntro.error);
+
+    const foreignIntro = await partnerClient
+        .from("partner_accounts")
+        .update({ intro: "타인 수정 시도" })
+        .eq("profile_id", otherId)
+        .select("profile_id");
+    check(
+        "다른 파트너 자기소개는 수정할 수 없음",
+        !foreignIntro.error && (foreignIntro.data ?? []).length === 0,
+        foreignIntro.error?.message,
+    );
+
+    const loginIdBypass = await partnerClient
+        .from("partner_accounts")
+        .update({ login_id: "hijacked-login-id" })
+        .eq("profile_id", partner.id);
+    check("브라우저에서 login_id를 직접 바꿀 수 없음", !!loginIdBypass.error);
+
+    const emailBypass = await partnerClient
+        .from("profiles")
+        .update({ email: "bypass@example.com" })
+        .eq("id", partner.id);
+    check(
+        "브라우저에서 OTP 없이 이메일을 직접 바꿀 수 없음",
+        !!emailBypass.error,
+    );
+
+    await admin
+        .from("partner_accounts")
+        .update({ intro: beforeAccount?.intro ?? null })
+        .eq("profile_id", partner.id);
 
     const openId = await seedReservation(customer.id, `${CODE_PREFIX}-OPEN`);
 
