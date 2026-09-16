@@ -19,10 +19,12 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@v4
 
-            - name: Setup Node.js 20
+            # package.json의 무빌드 TypeScript 정책 테스트는 Node 22의
+            # --experimental-strip-types를 사용한다.
+            - name: Setup Node.js 22
               uses: actions/setup-node@v4
               with:
-                  node-version: "20"
+                  node-version: "22"
                   # npm 의존성 캐싱 -> CI 속도 향상(npm i 를 할 때, 변경된 패키지만 설치)
                   cache: "npm"
 
