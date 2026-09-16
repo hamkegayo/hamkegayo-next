@@ -206,7 +206,7 @@ export function StepPayment() {
                         className={
                             urgent
                                 ? "flex items-center justify-between rounded-2xl border border-red-200 bg-red-50 px-5 py-4 dark:border-red-900/50 dark:bg-red-950/30"
-                                : "border-border bg-muted/30 flex items-center justify-between rounded-2xl border px-5 py-4"
+                                : "border-border bg-muted/50 flex items-center justify-between rounded-2xl border px-5 py-4"
                         }
                     >
                         <div className="flex items-center gap-2">
@@ -251,7 +251,7 @@ export function StepPayment() {
                     )}
 
                     {/* 결제 금액 */}
-                    <div className="bg-muted/30 mt-4 rounded-2xl p-6">
+                    <div className="bg-muted/50 mt-4 rounded-2xl p-6">
                         <h2 className="text-foreground text-lg font-bold">
                             결제 금액
                         </h2>
@@ -374,7 +374,7 @@ export function StepPayment() {
                         </dl>
                     </div>
 
-                    <label className="border-border bg-muted/30 mt-3 flex cursor-pointer items-start gap-3 rounded-2xl border p-5">
+                    <label className="border-border bg-muted/50 mt-3 flex cursor-pointer items-start gap-3 rounded-2xl border p-5">
                         <Checkbox
                             checked={confirmed}
                             onCheckedChange={(v) => setConfirmed(v === true)}

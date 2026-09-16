@@ -114,7 +114,7 @@ export function StepServiceSelect() {
                                         "bg-background flex flex-col rounded-2xl border-2 p-6 transition-colors md:p-8",
                                         active
                                             ? "border-brand shadow-sm"
-                                            : "bg-muted/30 border-transparent",
+                                            : "bg-muted/50 border-transparent",
                                     )}
                                 >
                                     <div className="text-brand flex items-center justify-center gap-2">
@@ -172,7 +172,7 @@ export function StepServiceSelect() {
                     </div>
 
                     {/* 서비스 이용 안내 */}
-                    <div className="bg-muted/30 rounded-2xl p-6 md:p-8">
+                    <div className="bg-muted/50 rounded-2xl p-6 md:p-8">
                         <div className="flex items-center gap-2">
                             <span className="border-muted-foreground text-muted-foreground flex size-5 items-center justify-center rounded-full border text-[11px] font-bold">
                                 i

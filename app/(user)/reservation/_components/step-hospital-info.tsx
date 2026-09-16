@@ -102,7 +102,7 @@ export function StepHospitalInfo() {
                     noValidate
                     className="mx-auto max-w-3xl space-y-6"
                 >
-                    <div className="bg-muted/30 rounded-2xl p-6 md:p-8">
+                    <div className="bg-muted/50 rounded-2xl p-6 md:p-8">
                         <h2 className="text-foreground text-lg font-bold">
                             병원 및 일정 정보
                         </h2>
@@ -283,7 +283,7 @@ export function StepHospitalInfo() {
                       정한 항목이다. 이 셋이 비어 있으면 파트너는 업무를
                       시작하지 않는다.
                     */}
-                    <div className="bg-muted/30 rounded-2xl p-6 md:p-8">
+                    <div className="bg-muted/50 rounded-2xl p-6 md:p-8">
                         <h2 className="text-foreground text-lg font-bold">
                             이동 및 귀가
                         </h2>
@@ -371,7 +371,7 @@ export function StepHospitalInfo() {
                     </div>
 
                     {needsHandover && (
-                        <div className="bg-muted/30 rounded-2xl p-6 md:p-8">
+                        <div className="bg-muted/50 rounded-2xl p-6 md:p-8">
                             <h2 className="text-foreground text-lg font-bold">
                                 인계자 정보
                             </h2>
