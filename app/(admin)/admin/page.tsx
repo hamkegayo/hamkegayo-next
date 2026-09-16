@@ -1,5 +1,11 @@
 import type { Metadata } from "next";
-import { ClipboardCheck, ScrollText, Wallet } from "lucide-react";
+import Link from "next/link";
+import {
+    AlertTriangle,
+    ClipboardCheck,
+    ScrollText,
+    Wallet,
+} from "lucide-react";
 
 import { getAdminOverview } from "./_lib/admin.server";
 import { kstDateTime } from "@/lib/format";
@@ -17,6 +23,9 @@ const ACTION_LABEL: Record<string, string> = {
     ACCOUNT_STATUS: "계정 상태 변경",
     QUALIFICATION_REVIEW: "자격 심사",
     SETTLEMENT_STATUS: "정산 상태 변경",
+    PAYMENT_INCIDENT_LIST: "결제 사고 목록 조회",
+    PAYMENT_INCIDENT_STATUS: "결제 사고 상태 변경",
+    PAYMENT_INCIDENT_CONTACT: "결제 사고 고객 안내 기록",
 };
 
 function formatAt(iso: string): string {
@@ -31,16 +40,26 @@ export default async function AdminHome() {
             icon: ClipboardCheck,
             label: "자격 심사 대기",
             value: overview.pendingQualifications,
+            href: null,
         },
         {
             icon: Wallet,
             label: "지급 대기 정산",
             value: overview.pendingSettlements,
+            href: null,
         },
         {
             icon: ScrollText,
             label: "예약",
             value: overview.reservationCount,
+            href: null,
+        },
+        {
+            icon: AlertTriangle,
+            label: "미처리 결제 사고",
+            value: overview.openPaymentIncidents,
+            href: "/admin/payments",
+            unavailable: overview.paymentIncidentSummaryUnavailable,
         },
     ];
 
@@ -54,21 +73,56 @@ export default async function AdminHome() {
                 상태입니다.
             </p>
 
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
-                {cards.map(({ icon: Icon, label, value }) => (
-                    <div
-                        key={label}
-                        className="border-border bg-background rounded-2xl border p-6"
-                    >
-                        <p className="text-muted-foreground flex items-center gap-2 text-sm">
-                            <Icon className="size-4" />
-                            {label}
-                        </p>
-                        <p className="text-foreground mt-2 text-3xl font-extrabold">
-                            {value.toLocaleString()}
-                        </p>
-                    </div>
-                ))}
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {cards.map(
+                    ({
+                        icon: Icon,
+                        label,
+                        value,
+                        href,
+                        unavailable = false,
+                    }) => {
+                        const content = (
+                            <>
+                                <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                                    <Icon className="size-4" />
+                                    {label}
+                                </p>
+                                <p className="text-foreground mt-2 text-3xl font-extrabold">
+                                    {unavailable
+                                        ? "확인 필요"
+                                        : value.toLocaleString()}
+                                </p>
+                                {label === "미처리 결제 사고" &&
+                                    !unavailable &&
+                                    overview.criticalPaymentIncidents > 0 && (
+                                        <p className="mt-2 text-xs font-bold text-red-600">
+                                            최상{" "}
+                                            {overview.criticalPaymentIncidents}
+                                            건
+                                        </p>
+                                    )}
+                            </>
+                        );
+
+                        return href ? (
+                            <Link
+                                key={label}
+                                href={href}
+                                className="border-border bg-background hover:border-brand rounded-2xl border p-6 transition-colors"
+                            >
+                                {content}
+                            </Link>
+                        ) : (
+                            <div
+                                key={label}
+                                className="border-border bg-background rounded-2xl border p-6"
+                            >
+                                {content}
+                            </div>
+                        );
+                    },
+                )}
             </div>
 
             <div className="border-border bg-background mt-5 rounded-2xl border p-6 md:p-7">

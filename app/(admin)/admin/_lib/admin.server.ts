@@ -16,6 +16,11 @@ export type AdminOverview = {
     pendingSettlements: number;
     /** 예약 총 건수 (개인정보 없는 목록 RPC 기준) */
     reservationCount: number;
+    /** 미처리 결제 사고 */
+    openPaymentIncidents: number;
+    /** 미처리 중 최상 심각도 */
+    criticalPaymentIncidents: number;
+    paymentIncidentSummaryUnavailable: boolean;
     /** 최근 접속기록 */
     recentAccess: {
         id: number;
@@ -30,6 +35,9 @@ const EMPTY: AdminOverview = {
     pendingQualifications: 0,
     pendingSettlements: 0,
     reservationCount: 0,
+    openPaymentIncidents: 0,
+    criticalPaymentIncidents: 0,
+    paymentIncidentSummaryUnavailable: false,
     recentAccess: [],
 };
 
@@ -41,7 +49,7 @@ export async function getAdminOverview(): Promise<AdminOverview> {
         } = await supabase.auth.getUser();
         if (!user) return EMPTY;
 
-        const [profile, quals, settlements, reservations, logs] =
+        const [profile, quals, settlements, reservations, incidents, logs] =
             await Promise.all([
                 supabase
                     .from("profiles")
@@ -57,6 +65,7 @@ export async function getAdminOverview(): Promise<AdminOverview> {
                     .select("id", { count: "exact", head: true })
                     .eq("status", "PENDING"),
                 supabase.rpc("admin_list_reservations", { p_limit: 200 }),
+                supabase.rpc("admin_payment_incident_summary"),
                 supabase
                     .from("access_logs")
                     .select("id, action, occurred_at, reason")
@@ -64,11 +73,23 @@ export async function getAdminOverview(): Promise<AdminOverview> {
                     .limit(10),
             ]);
 
+        const incidentSummary = (incidents.data?.[0] ?? null) as {
+            open_count?: number;
+            critical_count?: number;
+        } | null;
+        const paymentIncidentSummaryUnavailable =
+            Boolean(incidents.error) || incidentSummary === null;
+
         return {
             name: profile.data?.name ?? "관리자",
             pendingQualifications: quals.count ?? 0,
             pendingSettlements: settlements.count ?? 0,
             reservationCount: reservations.data?.length ?? 0,
+            openPaymentIncidents: Number(incidentSummary?.open_count ?? 0),
+            criticalPaymentIncidents: Number(
+                incidentSummary?.critical_count ?? 0,
+            ),
+            paymentIncidentSummaryUnavailable,
             recentAccess: (logs.data ?? []).map((r) => ({
                 id: r.id as number,
                 action: r.action as string,
@@ -77,6 +98,6 @@ export async function getAdminOverview(): Promise<AdminOverview> {
             })),
         };
     } catch {
-        return EMPTY;
+        return { ...EMPTY, paymentIncidentSummaryUnavailable: true };
     }
 }

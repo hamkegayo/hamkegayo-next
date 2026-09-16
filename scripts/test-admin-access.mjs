@@ -131,6 +131,10 @@ async function findUserByEmail(email) {
 }
 
 async function cleanup(adminId) {
+    await admin
+        .from("payment_incidents")
+        .delete()
+        .like("order_id", `${CODE_PREFIX}%`);
     await admin.from("reservations").delete().like("code", `${CODE_PREFIX}%`);
     if (adminId) {
         await admin.from("access_logs").delete().eq("actor_id", adminId);
@@ -328,7 +332,9 @@ async function main() {
         .limit(1)
         .maybeSingle();
     if (!partnerRow) {
-        console.error("❌ 파트너 계정이 없습니다. npm run seed:dev 를 먼저 실행하세요.");
+        console.error(
+            "❌ 파트너 계정이 없습니다. npm run seed:dev 를 먼저 실행하세요.",
+        );
         process.exit(1);
     }
     const partnerId = partnerRow.profile_id;
@@ -420,7 +426,8 @@ async function main() {
         svcList.error?.message,
     );
 
-    const svcRow = (svcList.data ?? []).find((s) => s.id === seededSvc.id) ?? {};
+    const svcRow =
+        (svcList.data ?? []).find((s) => s.id === seededSvc.id) ?? {};
     check(
         "시각 3종(도착·시작·종료)이 모두 반환됨",
         !!svcRow.arrived_at && !!svcRow.started_at && !!svcRow.ended_at,
@@ -482,11 +489,160 @@ async function main() {
         `노출된 컬럼: ${leaked.join(", ")}`,
     );
 
+    // =============================================================
+    section("5-1. 결제 사고 추적 — 목록·상태·고객 안내 (#80)");
+    // =============================================================
+    const { data: incident, error: incidentSeedError } = await admin
+        .from("payment_incidents")
+        .insert({
+            reservation_id: seededRes.id,
+            order_id: `${CODE_PREFIX}-PAYMENT`,
+            kind: "CANCEL_FAILED",
+            severity: "CRITICAL",
+            amount: 20000,
+            detail: { gatewayCode: "TEST", gatewayMessage: "테스트 오류" },
+        })
+        .select("id")
+        .single();
+    if (incidentSeedError) throw incidentSeedError;
+
+    const directIncident = await adminClient
+        .from("payment_incidents")
+        .select("id")
+        .eq("id", incident.id);
+    check(
+        "관리자도 payment_incidents를 직접 조회하지 못함",
+        !directIncident.error && (directIncident.data ?? []).length === 0,
+        directIncident.error?.message,
+    );
+    const directIncidentActions = await adminClient
+        .from("payment_incident_actions")
+        .select("id")
+        .eq("incident_id", incident.id);
+    check(
+        "관리자도 payment_incident_actions를 직접 조회하지 못함",
+        !!directIncidentActions.error ||
+            (directIncidentActions.data ?? []).length === 0,
+        directIncidentActions.error?.message,
+    );
+
+    const incidentSummary = await adminClient.rpc(
+        "admin_payment_incident_summary",
+    );
+    check(
+        "대시보드 요약에 미처리 최상 사고가 집계됨",
+        !incidentSummary.error &&
+            Number(incidentSummary.data?.[0]?.open_count ?? 0) >= 1 &&
+            Number(incidentSummary.data?.[0]?.critical_count ?? 0) >= 1,
+        incidentSummary.error?.message,
+    );
+
+    const incidentList = await adminClient.rpc("admin_list_payment_incidents", {
+        p_status: null,
+    });
+    check(
+        "관리자 RPC로 PG 응답과 관련 예약을 조회할 수 있음",
+        !incidentList.error &&
+            (incidentList.data ?? []).some(
+                (row) =>
+                    row.id === incident.id &&
+                    row.reservation_id === seededRes.id &&
+                    row.detail?.gatewayCode === "TEST",
+            ),
+        incidentList.error?.message,
+    );
+
+    const skippedState = await adminClient.rpc(
+        "admin_update_payment_incident",
+        {
+            p_id: incident.id,
+            p_status: "RESOLVED",
+            p_memo: "중간 단계 생략 시도",
+        },
+    );
+    check("OPEN에서 RESOLVED로 바로 변경할 수 없음", !!skippedState.error);
+
+    const acknowledged = await adminClient.rpc(
+        "admin_update_payment_incident",
+        {
+            p_id: incident.id,
+            p_status: "ACKNOWLEDGED",
+            p_memo: "PG 관리자 콘솔 확인 시작",
+        },
+    );
+    check(
+        "OPEN 사고를 ACKNOWLEDGED로 변경할 수 있음",
+        !acknowledged.error,
+        acknowledged.error?.message,
+    );
+
+    const nullContactMethod = await adminClient.rpc(
+        "admin_record_payment_incident_contact",
+        {
+            p_id: incident.id,
+            p_method: null,
+            p_note: "안내 수단 누락",
+        },
+    );
+    check("고객 안내 수단이 NULL이면 거절됨", !!nullContactMethod.error);
+
+    const contacted = await adminClient.rpc(
+        "admin_record_payment_incident_contact",
+        {
+            p_id: incident.id,
+            p_method: "PHONE",
+            p_note: "TEST_PAYMENT_CONTACT_NOTE",
+        },
+    );
+    check(
+        "고객 안내 방법·내용을 기록할 수 있음",
+        !contacted.error,
+        contacted.error?.message,
+    );
+
+    const incidentResolved = await adminClient.rpc(
+        "admin_update_payment_incident",
+        {
+            p_id: incident.id,
+            p_status: "RESOLVED",
+            p_memo: "PG 콘솔 확인 및 고객 안내 완료",
+        },
+    );
+    check(
+        "ACKNOWLEDGED 사고를 RESOLVED로 변경할 수 있음",
+        !incidentResolved.error,
+        incidentResolved.error?.message,
+    );
+
+    const resolvedList = await adminClient.rpc("admin_list_payment_incidents", {
+        p_status: "RESOLVED",
+    });
+    const resolvedIncident = (resolvedList.data ?? []).find(
+        (row) => row.id === incident.id,
+    );
+    check(
+        "상태 변경 2건과 고객 안내 1건이 불변 이력으로 조회됨",
+        !resolvedList.error && resolvedIncident?.history?.length === 3,
+        resolvedList.error?.message ??
+            `history=${resolvedIncident?.history?.length ?? 0}`,
+    );
+
     const noReason = await adminClient.rpc("admin_get_reservation", {
         p_id: seededRes.id,
         p_reason: "   ",
     });
     check("사유 없는 상세 열람은 거절됨", !!noReason.error);
+
+    const incidentReservation = await adminClient.rpc(
+        "admin_get_payment_incident_reservation",
+        { p_incident_id: incident.id },
+    );
+    check(
+        "결제 사고와 실제 연결된 예약만 상세 열람 가능",
+        !incidentReservation.error &&
+            incidentReservation.data?.id === seededRes.id,
+        incidentReservation.error?.message,
+    );
 
     const detail = await adminClient.rpc("admin_get_reservation", {
         p_id: seededRes.id,
@@ -513,14 +669,31 @@ async function main() {
         "접속기록에 처리한 정보주체가 기록됨",
         readLog?.subject_id === userId,
     );
-    check("접속기록에 열람 사유가 기록됨", readLog?.reason === "TEST-50 민원 확인");
     check(
-        "접속기록에 취급자 역할이 기록됨",
-        readLog?.actor_role === "ADMIN",
+        "접속기록에 열람 사유가 기록됨",
+        readLog?.reason === "TEST-50 민원 확인",
     );
+    check("접속기록에 취급자 역할이 기록됨", readLog?.actor_role === "ADMIN");
     check(
         "목록 조회도 접속기록에 남음",
         (logs ?? []).some((l) => l.action === "RESERVATION_LIST"),
+    );
+    check(
+        "결제 사고 조회·상태 변경·고객 안내도 접속기록에 남음",
+        [
+            "PAYMENT_INCIDENT_LIST",
+            "PAYMENT_INCIDENT_STATUS",
+            "PAYMENT_INCIDENT_CONTACT",
+        ].every((action) => (logs ?? []).some((l) => l.action === action)),
+    );
+    const contactLog = (logs ?? []).find(
+        (l) => l.action === "PAYMENT_INCIDENT_CONTACT",
+    );
+    check(
+        "고객 안내 내용은 접속기록에 중복 저장하지 않음",
+        contactLog?.reason === "PHONE" &&
+            !String(contactLog.reason).includes("TEST_PAYMENT_CONTACT_NOTE"),
+        contactLog?.reason,
     );
 
     const ownLogs = await adminClient
@@ -561,8 +734,33 @@ async function main() {
         ["admin_list_reservations", {}],
         ["admin_list_services", {}],
         ["admin_get_reservation", { p_id: seededRes.id, p_reason: "x" }],
+        [
+            "admin_get_payment_incident_reservation",
+            { p_incident_id: incident.id },
+        ],
+        ["admin_payment_incident_summary", {}],
+        ["admin_list_payment_incidents", { p_status: null }],
+        [
+            "admin_update_payment_incident",
+            {
+                p_id: seededRes.id,
+                p_status: "ACKNOWLEDGED",
+                p_memo: "권한 없는 상태 변경",
+            },
+        ],
+        [
+            "admin_record_payment_incident_contact",
+            {
+                p_id: seededRes.id,
+                p_method: "PHONE",
+                p_note: "권한 없는 고객 안내",
+            },
+        ],
         ["admin_grant_role", { p_target: userId }],
-        ["admin_set_account_status", { p_target: userId, p_status: "SUSPENDED" }],
+        [
+            "admin_set_account_status",
+            { p_target: userId, p_status: "SUSPENDED" },
+        ],
         ["admin_list_service_notices", {}],
         [
             "admin_correct_service_time",
@@ -762,8 +960,7 @@ async function main() {
     });
     check(
         "관리자는 처리 대기 신고를 볼 수 있다",
-        !listed.error &&
-            (listed.data ?? []).some((n) => n.id === noticeId.id),
+        !listed.error && (listed.data ?? []).some((n) => n.id === noticeId.id),
         listed.error?.message,
     );
 
@@ -781,7 +978,11 @@ async function main() {
         p_id: noticeId.id,
         p_memo: "실제 시각으로 시작시각을 정정했습니다.",
     });
-    check("안내를 남기면 닫힌다", resolved.data === true, resolved.error?.message);
+    check(
+        "안내를 남기면 닫힌다",
+        resolved.data === true,
+        resolved.error?.message,
+    );
 
     // ---------- 시각 정정 ----------
     const shortReason = await adminClient.rpc("admin_correct_service_time", {
@@ -852,7 +1053,10 @@ async function main() {
     // =============================================================
     section("10. 정지된 관리자는 즉시 차단된다");
     // =============================================================
-    await admin.from("profiles").update({ status: "SUSPENDED" }).eq("id", adminId);
+    await admin
+        .from("profiles")
+        .update({ status: "SUSPENDED" })
+        .eq("id", adminId);
 
     const suspendedLive = await adminClient.rpc("is_admin_live");
     check(
@@ -883,9 +1087,7 @@ async function main() {
         .like("code", `${CODE_PREFIX}%`);
     console.log(`\n정리 — TEST 예약 잔여 | ${(leftovers ?? []).length}`);
 
-    console.log(
-        `\n\x1b[1m${passed}건 통과 / ${failed}건 실패\x1b[0m`,
-    );
+    console.log(`\n\x1b[1m${passed}건 통과 / ${failed}건 실패\x1b[0m`);
     process.exit(failed === 0 ? 0 : 1);
 }
 
