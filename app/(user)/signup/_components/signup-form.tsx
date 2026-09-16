@@ -191,7 +191,9 @@ export function SignupForm() {
                 <h1 className="text-foreground text-3xl font-extrabold">
                     {title}
                 </h1>
-                <p className="text-muted-foreground mt-3">{description}</p>
+                <p className="text-description-foreground mt-3">
+                    {description}
+                </p>
             </div>
 
             {/* 폼 */}

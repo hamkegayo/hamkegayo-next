@@ -151,7 +151,7 @@ export function StepMatching() {
                                     ? "예약이 취소되었어요"
                                     : "더 이상 매칭 중이 아니에요"}
                             </h2>
-                            <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+                            <p className="text-description-foreground mt-3 text-sm leading-relaxed">
                                 {cancelled
                                     ? closed.reason
                                         ? CANCEL_NOTE[closed.reason]
@@ -211,7 +211,7 @@ export function StepMatching() {
                                 <h2 className="text-foreground text-lg font-bold">
                                     추천 파트너에게 매칭 요청을 보냈어요
                                 </h2>
-                                <p className="text-muted-foreground mt-1 text-sm">
+                                <p className="text-description-foreground mt-1 text-sm">
                                     조건에 맞는 파트너가 수락하면 바로
                                     알려드릴게요.
                                 </p>
@@ -279,7 +279,7 @@ export function StepMatching() {
                                     <p className="text-foreground font-bold">
                                         파트너 {accepted}명이 매칭을 수락했어요!
                                     </p>
-                                    <p className="text-muted-foreground mt-0.5 text-sm">
+                                    <p className="text-description-foreground mt-0.5 text-sm">
                                         지금 선택하시거나, 더 많은 파트너의
                                         수락을 기다릴 수 있어요.
                                     </p>
@@ -294,7 +294,7 @@ export function StepMatching() {
                             현재 수락한 파트너{" "}
                             <span className="text-brand">({accepted})</span>
                         </p>
-                        <p className="text-muted-foreground mt-1 text-sm">
+                        <p className="text-description-foreground mt-1 text-sm">
                             새로운 수락자가 생기면 실시간으로 목록에
                             업데이트됩니다.
                         </p>
@@ -369,7 +369,7 @@ export function StepMatching() {
                     </div>
 
                     {/* 안내 */}
-                    <p className="text-muted-foreground mt-3 text-center text-xs">
+                    <p className="text-description-foreground mt-3 text-center text-xs">
                         파트너가 수락하면 이 화면에서 바로 선택할 수 있어요.
                         진료일이 지나도록 확정하지 않으면 예약은 자동
                         취소됩니다.

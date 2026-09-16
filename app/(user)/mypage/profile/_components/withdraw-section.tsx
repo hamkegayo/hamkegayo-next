@@ -51,7 +51,7 @@ export function WithdrawSection() {
     return (
         <div className="border-border bg-background rounded-2xl border p-6 md:p-7">
             <h2 className="text-foreground text-lg font-bold">회원 탈퇴</h2>
-            <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+            <p className="text-description-foreground mt-2 text-sm leading-relaxed">
                 탈퇴하시면 함께가요 서비스를 더 이상 이용하실 수 없습니다.
                 이름·연락처 등 회원 정보는 즉시 분리 보관으로 전환되어 접근이
                 차단됩니다.
@@ -83,7 +83,7 @@ export function WithdrawSection() {
                         <p className="text-foreground text-sm font-bold">
                             탈퇴 후에도 남는 정보가 있습니다
                         </p>
-                        <ul className="text-muted-foreground mt-2.5 space-y-1.5 text-xs leading-relaxed">
+                        <ul className="text-description-foreground mt-2.5 space-y-1.5 text-xs leading-relaxed">
                             <li>
                                 · 결제·환불·정산 기록 —{" "}
                                 <span className="text-foreground font-semibold">
@@ -105,7 +105,7 @@ export function WithdrawSection() {
                                 (분리 보관)
                             </li>
                         </ul>
-                        <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
+                        <p className="text-description-foreground mt-3 text-xs leading-relaxed">
                             보관 기간이 지나면 자동으로 파기됩니다. 자세한
                             내용은{" "}
                             <a
@@ -120,7 +120,7 @@ export function WithdrawSection() {
                         </p>
                     </div>
 
-                    <p className="text-muted-foreground mt-4 text-xs leading-relaxed">
+                    <p className="text-description-foreground mt-4 text-xs leading-relaxed">
                         미결제 금액, 진행 예정인 예약, 지급되지 않은 정산금이
                         있으면 탈퇴가 제한됩니다.
                     </p>

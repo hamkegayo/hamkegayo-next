@@ -22,7 +22,7 @@ export function HomeHero() {
                         <br />
                         <span className="text-brand">함께가요</span>
                     </h1>
-                    <p className="text-muted-foreground mt-5 leading-relaxed">
+                    <p className="text-description-foreground mt-5 leading-relaxed">
                         병원까지 이동, 접수, 대기, 귀가까지
                         <br />
                         전문 동행 파트너가 끝까지 함께합니다.

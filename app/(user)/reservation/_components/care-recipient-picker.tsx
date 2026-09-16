@@ -30,7 +30,7 @@ export function CareRecipientPicker({
             <h3 className="text-foreground text-lg font-bold">
                 이용자 정보 불러오기
             </h3>
-            <p className="text-muted-foreground mt-1.5 text-sm">
+            <p className="text-description-foreground mt-1.5 text-sm">
                 마이페이지에 저장해 둔 환자 정보를 불러옵니다.
             </p>
 
@@ -44,7 +44,7 @@ export function CareRecipientPicker({
                     <p className="text-foreground text-sm font-semibold">
                         저장된 환자 정보가 없습니다.
                     </p>
-                    <p className="text-muted-foreground mt-1.5 text-sm">
+                    <p className="text-description-foreground mt-1.5 text-sm">
                         마이페이지에서 먼저 등록하시면 다음 예약부터 불러올 수
                         있습니다.
                     </p>

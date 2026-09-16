@@ -132,7 +132,7 @@ export function LoginForm() {
                 <h1 className="text-foreground text-3xl font-extrabold">
                     {title}
                 </h1>
-                <p className="text-muted-foreground mt-3">
+                <p className="text-description-foreground mt-3">
                     서비스 이용을 위해 로그인을 해주세요.
                 </p>
             </div>

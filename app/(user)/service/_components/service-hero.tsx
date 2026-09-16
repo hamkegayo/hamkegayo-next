@@ -20,7 +20,7 @@ export function ServiceHero() {
                         <br />
                         제공합니다.
                     </h1>
-                    <p className="text-muted-foreground mt-5 leading-relaxed">
+                    <p className="text-description-foreground mt-5 leading-relaxed">
                         언제든, 필요한 순간,
                         <br />
                         믿을 수 있는 파트너가 함께합니다.

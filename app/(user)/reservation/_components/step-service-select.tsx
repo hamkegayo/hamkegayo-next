@@ -192,7 +192,7 @@ export function StepServiceSelect() {
                                         {lines.map((line) => (
                                             <p
                                                 key={line}
-                                                className="text-muted-foreground text-sm leading-relaxed"
+                                                className="text-description-foreground text-sm leading-relaxed"
                                             >
                                                 {line}
                                             </p>

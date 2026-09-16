@@ -89,7 +89,7 @@ function PlanCard({ plan }: { plan: Plan }) {
                     ({plan.scope})
                 </span>
             </h3>
-            <p className="text-muted-foreground mt-4 text-sm leading-relaxed">
+            <p className="text-description-foreground mt-4 text-sm leading-relaxed">
                 {plan.desc}
             </p>
 

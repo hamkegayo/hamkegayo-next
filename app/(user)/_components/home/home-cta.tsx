@@ -12,7 +12,7 @@ export function HomeCta() {
                 <h2 className="text-brand text-2xl font-extrabold md:text-3xl">
                     병원 동행, 함께가요
                 </h2>
-                <p className="text-muted-foreground mt-3">
+                <p className="text-description-foreground mt-3">
                     지금 바로 신청하고 부모님의 병원길을 함께하세요.
                 </p>
                 <div className="mt-8 flex flex-wrap justify-center gap-3">

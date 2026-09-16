@@ -107,7 +107,7 @@ export default function MypageSupport() {
                     <h1 className="text-foreground mt-2 text-2xl font-extrabold md:text-3xl">
                         고객센터
                     </h1>
-                    <p className="text-muted-foreground mt-4 text-sm leading-relaxed">
+                    <p className="text-description-foreground mt-4 text-sm leading-relaxed">
                         예약 전 문의, 파트너 검증, 서비스 유형 선택, 개인정보와
                         리포트 관련 문의까지 고객이 가장 자주 묻는 내용을 한곳에
                         모았습니다.
@@ -123,7 +123,7 @@ export default function MypageSupport() {
                     <p className="text-foreground mt-3 font-bold">
                         {COMPANY.hours}
                     </p>
-                    <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+                    <p className="text-description-foreground mt-3 text-sm leading-relaxed">
                         상담 시간 외에 남기신 문의는 다음 영업일에 순서대로
                         답변드립니다.
                     </p>
@@ -170,7 +170,7 @@ export default function MypageSupport() {
                         {PRINCIPLES.map((p) => (
                             <li
                                 key={p}
-                                className="text-muted-foreground flex gap-2 text-sm leading-relaxed"
+                                className="text-description-foreground flex gap-2 text-sm leading-relaxed"
                             >
                                 <span className="bg-brand mt-1.5 size-1.5 shrink-0 rounded-full" />
                                 {p}
@@ -220,7 +220,7 @@ export default function MypageSupport() {
                                 <div className="overflow-hidden">
                                     <p
                                         className={cn(
-                                            "text-muted-foreground px-5 pb-4 text-sm leading-relaxed transition-opacity duration-200",
+                                            "text-description-foreground px-5 pb-4 text-sm leading-relaxed transition-opacity duration-200",
                                             isOpen
                                                 ? "opacity-100"
                                                 : "opacity-0",
