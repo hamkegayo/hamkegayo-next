@@ -53,5 +53,8 @@ jobs:
             - name: Test reservation age policy
               run: npm run test:reservation-age
 
+            - name: Test partner profile validation
+              run: npm run test:partner-profile
+
             - name: Build Next.js
               run: npm run build
