@@ -42,7 +42,7 @@ export default async function ReviewDetailPage({
                 <h1 className="text-foreground text-3xl font-extrabold">
                     이용 후기
                 </h1>
-                <p className="text-muted-foreground mt-3">
+                <p className="text-description-foreground mt-3">
                     함께가요와 동행한 가족들이 직접 남겨주신 생생한
                     이야기입니다.
                 </p>

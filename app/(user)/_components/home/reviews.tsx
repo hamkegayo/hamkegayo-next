@@ -10,7 +10,7 @@ export function Reviews() {
                 <h2 className="text-foreground text-center text-2xl font-extrabold md:text-3xl">
                     실제 이용자 후기
                 </h2>
-                <p className="text-muted-foreground mt-3 text-center text-sm">
+                <p className="text-description-foreground mt-3 text-center text-sm">
                     서비스 건수{" "}
                     <span className="text-brand font-bold">12,800건</span> 이상,
                     서비스 만족도{" "}

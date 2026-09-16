@@ -301,7 +301,7 @@ export function FaqList() {
                                                     <div className="overflow-hidden">
                                                         <p
                                                             className={cn(
-                                                                "text-muted-foreground px-6 pb-5 text-sm leading-relaxed transition-opacity duration-200",
+                                                                "text-description-foreground px-6 pb-5 text-sm leading-relaxed transition-opacity duration-200",
                                                                 isOpen
                                                                     ? "opacity-100"
                                                                     : "opacity-0",

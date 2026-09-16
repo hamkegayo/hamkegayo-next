@@ -107,13 +107,13 @@ export function StepPartnerSelect() {
                             {applicants.length}
                         </span>
                     </h3>
-                    <p className="text-muted-foreground mt-1 text-sm">
+                    <p className="text-description-foreground mt-1 text-sm">
                         한 분을 선택하면 결제 단계로 넘어갑니다. 결제가 완료되면
                         예약이 확정되고 다른 지원 파트너는 자동으로 마감됩니다.
                     </p>
 
                     {closed && (
-                        <p className="border-border text-muted-foreground mt-4 rounded-xl border border-dashed px-4 py-3 text-sm leading-relaxed">
+                        <p className="border-border text-description-foreground mt-4 rounded-xl border border-dashed px-4 py-3 text-sm leading-relaxed">
                             이 예약은 더 이상 매칭 중이 아닙니다. 마이페이지에서
                             상태를 확인해 주세요.
                         </p>
@@ -127,7 +127,7 @@ export function StepPartnerSelect() {
                             <p className="text-foreground font-bold">
                                 아직 수락한 파트너가 없어요
                             </p>
-                            <p className="text-muted-foreground text-sm">
+                            <p className="text-description-foreground text-sm">
                                 파트너가 요청을 수락하면 여기에 표시됩니다.
                             </p>
                         </div>
@@ -218,7 +218,7 @@ export function StepPartnerSelect() {
                 confirmLabel="선택하고 결제하기"
                 confirmDisabled={pending}
             >
-                <p className="text-muted-foreground mt-3 text-left text-sm leading-relaxed">
+                <p className="text-description-foreground mt-3 text-left text-sm leading-relaxed">
                     <span className="text-foreground font-bold">
                         {selected?.name}
                     </span>{" "}

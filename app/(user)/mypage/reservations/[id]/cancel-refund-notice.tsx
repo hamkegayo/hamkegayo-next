@@ -70,7 +70,7 @@ export function CancelRefundNotice({
 
     if (!preview) {
         return (
-            <p className="text-muted-foreground mt-4 text-left text-sm leading-relaxed">
+            <p className="text-description-foreground mt-4 text-left text-sm leading-relaxed">
                 아직 결제가 완료되지 않은 예약이라 환불할 금액이 없습니다.
             </p>
         );
@@ -105,12 +105,12 @@ export function CancelRefundNotice({
                     <span>{BRACKET_NOTE[preview.bracket]}</span>
                 </p>
             ) : (
-                <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
+                <p className="text-description-foreground mt-3 text-xs leading-relaxed">
                     {BRACKET_NOTE[preview.bracket]}
                 </p>
             )}
 
-            <p className="text-muted-foreground mt-2 text-xs leading-relaxed">
+            <p className="text-description-foreground mt-2 text-xs leading-relaxed">
                 {preview.usedPoints > 0 ? `${POINT_RESTORE_NOTE} ` : ""}
                 {REFUND_METHOD_NOTE}
             </p>

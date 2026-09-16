@@ -287,7 +287,7 @@ export function ReservationDetailView({ r }: { r: ReservationDetailView }) {
                             )}
 
                             {!r.payment.isFinal && (
-                                <p className="text-muted-foreground border-border border-t pt-3 text-xs leading-relaxed">
+                                <p className="text-description-foreground border-border border-t pt-3 text-xs leading-relaxed">
                                     선결제 후 서비스가 종료되면 실제
                                     이용시간으로 최종 요금을 산정합니다. 남는
                                     금액은 환불하고, 모자란 금액은 추가결제를
@@ -374,7 +374,7 @@ export function ReservationDetailView({ r }: { r: ReservationDetailView }) {
 
                     {/* 안내사항 */}
                     <Card title="안내사항">
-                        <ul className="text-muted-foreground space-y-2 text-sm leading-relaxed">
+                        <ul className="text-description-foreground space-y-2 text-sm leading-relaxed">
                             <li>
                                 서비스 전날 파트너가 연락드려 최종 확인합니다.
                             </li>
@@ -398,7 +398,7 @@ export function ReservationDetailView({ r }: { r: ReservationDetailView }) {
                 // 동의가 아니다.
                 confirmDisabled={pending || previewLoading}
             >
-                <p className="text-muted-foreground mt-3 text-left text-sm leading-relaxed">
+                <p className="text-description-foreground mt-3 text-left text-sm leading-relaxed">
                     확정된 예약이 취소되며, 배정된 파트너에게 취소가 안내됩니다.
                     되돌릴 수 없습니다.
                 </p>

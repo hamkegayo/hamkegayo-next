@@ -122,7 +122,7 @@ export function TrustReasons() {
                                     <h3 className="text-foreground text-lg font-bold">
                                         {title}
                                     </h3>
-                                    <p className="text-muted-foreground mt-2 leading-relaxed whitespace-pre-line">
+                                    <p className="text-description-foreground mt-2 leading-relaxed whitespace-pre-line">
                                         {desc}
                                     </p>
                                 </div>

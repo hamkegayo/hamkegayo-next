@@ -36,7 +36,7 @@ export function BlockedModal({
                 <h3 className="text-foreground mt-4 text-lg font-extrabold">
                     {title}
                 </h3>
-                <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+                <p className="text-description-foreground mt-2 text-sm leading-relaxed">
                     {description}
                 </p>
             </div>

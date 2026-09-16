@@ -277,7 +277,7 @@ export function StepReview() {
                             <h2 className="text-foreground text-lg font-bold">
                                 예상 결제 금액
                             </h2>
-                            <p className="bg-brand/5 text-muted-foreground mt-3 rounded-lg px-3 py-2 text-xs leading-relaxed">
+                            <p className="bg-brand/5 text-description-foreground mt-3 rounded-lg px-3 py-2 text-xs leading-relaxed">
                                 지금은 결제하지 않습니다. 파트너를 선택한 뒤{" "}
                                 <span className="text-brand font-semibold">
                                     {PAYMENT_DEADLINE_MIN}분 안에 결제
@@ -321,7 +321,7 @@ export function StepReview() {
                                     </span>
                                 </div>
 
-                                <p className="text-muted-foreground text-xs leading-relaxed">
+                                <p className="text-description-foreground text-xs leading-relaxed">
                                     시간당 {plan.price.toLocaleString()}원 ·
                                     최소 2시간분을 먼저 결제합니다. 서비스 종료
                                     후 실제 이용시간으로 정산하여 남으면 환불,
@@ -329,7 +329,7 @@ export function StepReview() {
                                 </p>
                             </div>
 
-                            <p className="text-muted-foreground mt-4 text-xs leading-relaxed">
+                            <p className="text-description-foreground mt-4 text-xs leading-relaxed">
                                 결제는 카드·간편결제로 진행되며 카드 정보는
                                 결제사가 직접 처리합니다. 저희는 카드 정보를
                                 저장하지 않습니다.
@@ -341,7 +341,7 @@ export function StepReview() {
                             <h3 className="text-foreground font-bold">
                                 서비스 안내문
                             </h3>
-                            <div className="text-muted-foreground mt-4 space-y-3 text-sm leading-relaxed">
+                            <div className="text-description-foreground mt-4 space-y-3 text-sm leading-relaxed">
                                 <p>
                                     예약 확정을 위해 최소 2시간분의 이용요금을
                                     먼저 결제합니다. 서비스 종료 후 실제

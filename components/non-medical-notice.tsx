@@ -12,7 +12,7 @@ export function NonMedicalNotice({ className }: { className?: string }) {
     return (
         <p
             className={cn(
-                "text-muted-foreground text-xs leading-relaxed",
+                "text-description-foreground text-xs leading-relaxed",
                 className,
             )}
         >

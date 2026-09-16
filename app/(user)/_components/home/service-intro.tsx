@@ -41,7 +41,7 @@ export function ServiceIntro() {
                             <h3 className="text-foreground mt-4 font-bold">
                                 {title}
                             </h3>
-                            <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+                            <p className="text-description-foreground mt-2 text-sm leading-relaxed">
                                 {desc}
                             </p>
                         </div>

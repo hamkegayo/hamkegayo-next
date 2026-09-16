@@ -17,7 +17,7 @@ export function FaqContactCta() {
                         <p className="text-foreground font-bold">
                             이 외에 궁금한 점이 있으신가요?
                         </p>
-                        <p className="text-muted-foreground mt-0.5 text-sm">
+                        <p className="text-description-foreground mt-0.5 text-sm">
                             고객센터를 통해 빠르고 정확하게 안내해 드리겠습니다.
                         </p>
                     </div>

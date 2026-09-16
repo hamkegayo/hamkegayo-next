@@ -153,7 +153,7 @@ export function StepUserInfo() {
             />
 
             <Section>
-                <p className="text-muted-foreground text-center text-sm">
+                <p className="text-description-foreground text-center text-sm">
                     * 환자 정보는 마이페이지에서 관리할 수 있습니다.
                 </p>
                 <div className="mt-1 text-center">
@@ -224,7 +224,7 @@ export function StepUserInfo() {
                                 <FieldError>
                                     {errors.userBirth?.message}
                                 </FieldError>
-                                <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">
+                                <p className="text-description-foreground mt-1.5 text-xs leading-relaxed">
                                     서비스 이용일 기준 만 19세 이상만 이용할 수
                                     있습니다.
                                 </p>
@@ -586,7 +586,7 @@ export function StepUserInfo() {
                                     />
                                 </div>
                             </div>
-                            <p className="text-muted-foreground mt-3 text-xs">
+                            <p className="text-description-foreground mt-3 text-xs">
                                 ※ 진단서, 검사결과지 등 민감정보가 포함된 서류는
                                 기본 제공되지 않으며, 요청 시에만 제공됩니다.
                             </p>

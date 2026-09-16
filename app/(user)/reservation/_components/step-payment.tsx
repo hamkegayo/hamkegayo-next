@@ -232,7 +232,7 @@ export function StepPayment() {
                         </span>
                     </div>
 
-                    <p className="text-muted-foreground mt-2 flex items-start gap-1.5 text-xs leading-relaxed">
+                    <p className="text-description-foreground mt-2 flex items-start gap-1.5 text-xs leading-relaxed">
                         <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
                         시간 안에 결제하지 않으면 파트너 선택이 해제되고 다시
                         선택하셔야 합니다. 결제창에 들어가면 10분이 연장됩니다.
@@ -326,7 +326,7 @@ export function StepPayment() {
                                     전액
                                 </button>
                             </div>
-                            <p className="text-muted-foreground mt-2 text-xs">
+                            <p className="text-description-foreground mt-2 text-xs">
                                 1P = 1원. 결제 금액 전액을 포인트로 결제할 수는
                                 없습니다.
                             </p>

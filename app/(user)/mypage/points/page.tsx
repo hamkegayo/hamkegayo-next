@@ -51,7 +51,7 @@ export default async function MypagePoints() {
                             {expiring.toLocaleString()} P
                         </span>
                     </div>
-                    <p className="text-muted-foreground text-xs">
+                    <p className="text-description-foreground text-xs">
                         30일 이내에 유효기간이 끝나는 포인트입니다.
                     </p>
                 </div>
@@ -119,7 +119,7 @@ export default async function MypagePoints() {
                                     <UserRound className="text-muted-foreground size-4" />
                                     적립방법
                                 </p>
-                                <ul className="text-muted-foreground mt-2 space-y-1 pl-6 text-sm">
+                                <ul className="text-description-foreground mt-2 space-y-1 pl-6 text-sm">
                                     <li>서비스 이용 시 결제 금액의 1% 적립</li>
                                     <li>이벤트 참여 시 추가 적립</li>
                                 </ul>
@@ -129,7 +129,7 @@ export default async function MypagePoints() {
                                     <CreditCard className="text-muted-foreground size-4" />
                                     사용방법
                                 </p>
-                                <ul className="text-muted-foreground mt-2 space-y-1 pl-6 text-sm">
+                                <ul className="text-description-foreground mt-2 space-y-1 pl-6 text-sm">
                                     <li>예약 결제 시 포인트 사용 가능</li>
                                     <li>1P = 1원으로 사용 가능</li>
                                 </ul>
@@ -147,7 +147,7 @@ export default async function MypagePoints() {
                                     ? `${expiring.toLocaleString()} P 가 곧 소멸됩니다.`
                                     : "소멸 예정 포인트가 없습니다."}
                             </p>
-                            <p className="text-muted-foreground mt-1 text-sm">
+                            <p className="text-description-foreground mt-1 text-sm">
                                 유효기간이 지나면 포인트가 자동으로 소멸됩니다.
                             </p>
                         </div>

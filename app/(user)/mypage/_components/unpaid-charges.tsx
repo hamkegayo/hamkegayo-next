@@ -36,7 +36,7 @@ export async function UnpaidCharges() {
             <h2 className="text-foreground text-lg font-bold">
                 결제하지 않은 금액이 있어요
             </h2>
-            <p className="text-muted-foreground mt-1.5 text-sm leading-relaxed">
+            <p className="text-description-foreground mt-1.5 text-sm leading-relaxed">
                 {hasOverdue
                     ? "결제 기한이 지난 건이 있습니다. 결제를 완료하시기 전에는 새 예약을 신청하실 수 없어요."
                     : "서비스 이용 후 확정된 추가 요금입니다."}
