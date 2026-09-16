@@ -48,5 +48,8 @@ jobs:
                   # package.json에 "typecheck": "tsc --noEmit" 스크립트가 있어야 함
                   npm run typecheck
 
+            - name: Test reservation age policy
+              run: npm run test:reservation-age
+
             - name: Build Next.js
               run: npm run build

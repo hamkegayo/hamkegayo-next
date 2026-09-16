@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
-import { formatPhoneNumber } from "@/lib/format";
+import { formatPhoneNumber, kstToday } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import { DateField } from "@/components/ui/date-field";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -216,9 +216,7 @@ export function StepUserInfo() {
                                                 if (errors.userBirth)
                                                     clearErrors("userBirth");
                                             }}
-                                            max={new Date()
-                                                .toISOString()
-                                                .slice(0, 10)}
+                                            max={kstToday()}
                                             invalid={!!errors.userBirth}
                                         />
                                     )}
@@ -226,6 +224,10 @@ export function StepUserInfo() {
                                 <FieldError>
                                     {errors.userBirth?.message}
                                 </FieldError>
+                                <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">
+                                    서비스 이용일 기준 만 19세 이상만 이용할 수
+                                    있습니다.
+                                </p>
                             </div>
 
                             <div>

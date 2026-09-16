@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
 import { formatPhoneNumber, kstToday } from "@/lib/format";
 import { maxAdvanceReservationDate } from "@/lib/reservation-window";
+import { isAtLeastAgeOnDate, MIN_SERVICE_AGE_MESSAGE } from "@/lib/service-age";
 import { Section } from "@/app/(user)/_components/home/section";
 import { useReservationStore } from "../_store/reservation-store";
 import { step2Form, type Step2Values } from "../_lib/schema";
@@ -28,6 +29,7 @@ export function StepHospitalInfo() {
         handleSubmit,
         clearErrors,
         control,
+        setError,
         setValue,
         formState: { errors },
     } = useForm<Step2Values>({
@@ -71,6 +73,14 @@ export function StepHospitalInfo() {
     const needsHandover = endMethod === "ADULT_HANDOVER";
 
     const onSubmit = (v: Step2Values) => {
+        if (!isAtLeastAgeOnDate(data.userBirth, v.useDate)) {
+            setError("useDate", {
+                type: "validate",
+                message: MIN_SERVICE_AGE_MESSAGE,
+            });
+            return;
+        }
+
         patch(v);
         next();
     };
