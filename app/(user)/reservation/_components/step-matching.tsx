@@ -201,7 +201,7 @@ export function StepMatching() {
 
             <Section>
                 <div className="mx-auto max-w-3xl">
-                    <div className="bg-muted/30 rounded-2xl p-6 md:p-8">
+                    <div className="bg-muted/50 rounded-2xl p-6 md:p-8">
                         {/* 헤더 */}
                         <div className="flex items-start gap-4">
                             <div className="bg-brand/10 text-brand flex size-12 shrink-0 items-center justify-center rounded-full">

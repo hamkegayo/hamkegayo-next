@@ -28,7 +28,7 @@ export function StepBand({
     subtitles: string[];
 }) {
     return (
-        <div className="border-border bg-muted/40 border-b">
+        <div className="border-border bg-muted/60 border-b">
             <div className="mx-auto max-w-3xl px-4 py-12 text-center">
                 <h1 className="text-foreground text-2xl font-extrabold md:text-3xl">
                     <span className="text-brand">{index}.</span> {title}

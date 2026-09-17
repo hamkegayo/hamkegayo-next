@@ -172,7 +172,7 @@ export function StepServiceSelect() {
                     </div>
 
                     {/* 서비스 이용 안내 */}
-                    <div className="bg-muted/30 rounded-2xl p-6 md:p-8">
+                    <div className="bg-muted/50 rounded-2xl p-6 md:p-8">
                         <div className="flex items-center gap-2">
                             <span className="border-muted-foreground text-muted-foreground flex size-5 items-center justify-center rounded-full border text-[11px] font-bold">
                                 i

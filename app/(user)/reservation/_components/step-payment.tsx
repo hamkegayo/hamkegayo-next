@@ -251,7 +251,7 @@ export function StepPayment() {
                     )}
 
                     {/* 결제 금액 */}
-                    <div className="bg-muted/30 mt-4 rounded-2xl p-6">
+                    <div className="bg-muted/50 mt-4 rounded-2xl p-6">
                         <h2 className="text-foreground text-lg font-bold">
                             결제 금액
                         </h2>
