@@ -313,6 +313,14 @@ async function main() {
     const aal1Rpc = await adminClient.rpc("admin_list_reservations", {});
     check("aal1 관리자는 예약 목록 RPC 거절됨", !!aal1Rpc.error);
 
+    await admin
+        .from("admin_accounts")
+        .upsert({ profile_id: adminId, duty: "심사" });
+    const aal1Review = await adminClient.rpc("can_review_qualifications");
+    check(
+        "심사 담당이어도 2단계 인증 전에는 심사 불가",
+        aal1Review.data === false,
+    );
     await upgradeToAal2(adminClient);
 
     const aal2IsAdmin = await adminClient.rpc("is_admin");
@@ -1051,7 +1059,188 @@ async function main() {
     );
 
     // =============================================================
-    section("10. 정지된 관리자는 즉시 차단된다");
+    section("10. 자격 심사 담당 권한·사유·중복 처리 (#56)");
+    const qualification = await admin
+        .from("partner_qualifications")
+        .insert({
+            partner_id: partnerId,
+            type: "TEST-56",
+            path: `${partnerId}/test-56.pdf`,
+            filename: "test-56.pdf",
+            size: 1,
+        })
+        .select("id")
+        .single();
+    if (qualification.error) throw qualification.error;
+    const qualificationId = qualification.data.id;
+    const proofPath = `${partnerId}/test-56.pdf`;
+    const proofUpload = await admin.storage
+        .from("partner-qualifications")
+        .upload(proofPath, Buffer.from("%PDF-1.4\nTEST-56\n%%EOF"), {
+            contentType: "application/pdf",
+            upsert: true,
+        });
+    if (proofUpload.error) throw proofUpload.error;
+    const reviewArgs = {
+        p_id: qualificationId,
+        p_expected: "PENDING",
+        p_status: "VERIFIED",
+        p_reason: "TEST-56 증빙 확인 완료",
+    };
+    await admin
+        .from("admin_accounts")
+        .upsert({ profile_id: adminId, duty: "정산" });
+    const wrongDuty = await adminClient.rpc(
+        "admin_review_qualification",
+        reviewArgs,
+    );
+    check("정산 담당은 자격 심사 불가", wrongDuty.error?.code === "42501");
+    const oldBypass = await adminClient.rpc("admin_verify_qualification", {
+        p_id: qualificationId,
+        p_status: "VERIFIED",
+        p_reason: reviewArgs.p_reason,
+    });
+    check(
+        "구 심사 RPC도 담당업무 우회 불가",
+        oldBypass.error?.code === "42501",
+    );
+    const userReview = await userClient.rpc(
+        "admin_review_qualification",
+        reviewArgs,
+    );
+    check("일반 사용자는 자격 심사 불가", userReview.error?.code === "42501");
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "심사" })
+        .eq("profile_id", adminId);
+    const noFileLog = await adminClient.rpc("can_read_qualification_file", {
+        p_path: proofPath,
+    });
+    const unsignedProof = await adminClient.storage
+        .from("partner-qualifications")
+        .createSignedUrl(proofPath, 300);
+    check("열람 기록 없이 서명 URL 발급 불가", Boolean(unsignedProof.error));
+    check("열람 기록 없이 증빙 접근 불가", noFileLog.data === false);
+    const shortFileReason = await adminClient.rpc(
+        "admin_get_qualification_file",
+        { p_id: qualificationId, p_reason: " " },
+    );
+    check("증빙 사유 필수", shortFileReason.error?.code === "22023");
+    const fileRead = await adminClient.rpc("admin_get_qualification_file", {
+        p_id: qualificationId,
+        p_reason: "TEST-56 증빙 원문 확인",
+    });
+    check(
+        "심사 담당이 사유를 남기면 파일 경로 반환",
+        fileRead.data === `${partnerId}/test-56.pdf`,
+        fileRead.error?.message,
+    );
+    const loggedFile = await adminClient.rpc("can_read_qualification_file", {
+        p_path: proofPath,
+    });
+    const signedProof = await adminClient.storage
+        .from("partner-qualifications")
+        .createSignedUrl(proofPath, 300);
+    check(
+        "열람 기록 직후 서명 URL 발급 성공",
+        Boolean(signedProof.data?.signedUrl) && !signedProof.error,
+        signedProof.error?.message,
+    );
+    check("열람 기록이 있는 파일만 접근 가능", loggedFile.data === true);
+    const otherFile = await adminClient.rpc("can_read_qualification_file", {
+        p_path: `${partnerId}/other.pdf`,
+    });
+    check("다른 파일에는 열람 허가가 전파되지 않음", otherFile.data === false);
+    const badReason = await adminClient.rpc("admin_review_qualification", {
+        ...reviewArgs,
+        p_reason: " ",
+    });
+    check("심사 사유 필수", badReason.error?.code === "22023");
+    const accepted = await adminClient.rpc(
+        "admin_review_qualification",
+        reviewArgs,
+    );
+    check("심사 담당 인증 완료 성공", !accepted.error, accepted.error?.message);
+    const duplicateReview = await adminClient.rpc(
+        "admin_review_qualification",
+        reviewArgs,
+    );
+    check(
+        "중복·오래된 상태로 심사 시 거부",
+        duplicateReview.error?.code === "P0002",
+    );
+    const verified = await admin
+        .from("partner_qualifications")
+        .select("status")
+        .eq("id", qualificationId)
+        .single();
+    check("심사 결과 실제 저장", verified.data?.status === "VERIFIED");
+    const verifiedNotice = await admin
+        .from("notifications")
+        .select("type, title, body, link")
+        .eq("recipient_id", partnerId)
+        .eq("type", "QUALIFICATION_VERIFIED")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    check(
+        "인증 완료 사유를 파트너에게 알림",
+        verifiedNotice.data?.body?.includes(reviewArgs.p_reason) &&
+            verifiedNotice.data?.link === "/partner/profile",
+        verifiedNotice.error?.message,
+    );
+    const revisionReason = "TEST-56 증빙 보완 후 다시 제출해 주세요";
+    const revision = await adminClient.rpc("admin_review_qualification", {
+        p_id: qualificationId,
+        p_expected: "VERIFIED",
+        p_status: "PENDING",
+        p_reason: revisionReason,
+    });
+    check("심사 대기 전환 성공", !revision.error, revision.error?.message);
+    const revisionNotice = await admin
+        .from("notifications")
+        .select("body, link")
+        .eq("recipient_id", partnerId)
+        .eq("type", "QUALIFICATION_REVIEW_REQUIRED")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    check(
+        "수정 요청 사유를 파트너에게 알림",
+        revisionNotice.data?.body?.includes(revisionReason) &&
+            revisionNotice.data?.link === "/partner/profile",
+        revisionNotice.error?.message,
+    );
+    const reviewLogs = await admin
+        .from("access_logs")
+        .select("action, subject_id")
+        .eq("target_id", qualificationId);
+    check(
+        "증빙 열람과 심사 기록에 파트너 식별자 포함",
+        ["QUALIFICATION_FILE_READ", "QUALIFICATION_REVIEW"].every((action) =>
+            reviewLogs.data?.some(
+                (log) => log.action === action && log.subject_id === partnerId,
+            ),
+        ),
+    );
+    await admin
+        .from("partner_qualifications")
+        .delete()
+        .eq("id", qualificationId);
+    const proofRemoval = await admin.storage
+        .from("partner-qualifications")
+        .remove([proofPath]);
+    if (proofRemoval.error) throw proofRemoval.error;
+    await admin
+        .from("notifications")
+        .delete()
+        .eq("recipient_id", partnerId)
+        .in("type", [
+            "QUALIFICATION_VERIFIED",
+            "QUALIFICATION_REVIEW_REQUIRED",
+        ]);
+
+    section("11. 정지된 관리자는 즉시 차단된다");
     // =============================================================
     await admin
         .from("profiles")
@@ -1059,6 +1248,8 @@ async function main() {
         .eq("id", adminId);
 
     const suspendedLive = await adminClient.rpc("is_admin_live");
+    const suspendedReview = await adminClient.rpc("can_review_qualifications");
+    check("정지된 심사 담당 권한 즉시 해제", suspendedReview.data === false);
     check(
         "정지 즉시 is_admin_live() = false (JWT 갱신 전에도)",
         suspendedLive.data === false,

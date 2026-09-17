@@ -22,6 +22,7 @@ const ACTION_LABEL: Record<string, string> = {
     ADMIN_REVOKE: "관리자 권한 말소",
     ACCOUNT_STATUS: "계정 상태 변경",
     QUALIFICATION_REVIEW: "자격 심사",
+    QUALIFICATION_FILE_READ: "자격 증빙 열람",
     SETTLEMENT_STATUS: "정산 상태 변경",
     PAYMENT_INCIDENT_LIST: "결제 사고 목록 조회",
     PAYMENT_INCIDENT_STATUS: "결제 사고 상태 변경",
@@ -163,10 +164,12 @@ export default async function AdminHome() {
                 )}
             </div>
 
-            <p className="text-muted-foreground mt-6 text-xs">
-                파트너 계정 발급 · 자격 심사 · 정산 목록 화면은 #56 에서
-                추가됩니다.
-            </p>
+            <Link
+                href="/admin/qualifications"
+                className="text-brand mt-6 inline-block font-semibold underline"
+            >
+                파트너 자격 심사
+            </Link>
         </div>
     );
 }
