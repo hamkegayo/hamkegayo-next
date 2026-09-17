@@ -54,6 +54,8 @@ const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL ?? "admin-test-50@example.com";
 const ADMIN_PASSWORD = "adminTest50!";
 /** 승격 대상으로 쓸 전용(이용 이력 없는) 계정 — #56 의 계정 발급이 만들 형태 */
 const DEDICATED_EMAIL = "admin-new-50@example.com";
+const ISSUED_PARTNER_EMAIL = "issued-partner-56@partner.hamkegayo.internal";
+const ISSUED_PARTNER_LOGIN = "issued-partner-56";
 const CODE_PREFIX = "TEST-50";
 
 const admin = createClient(url, serviceKey, {
@@ -144,6 +146,8 @@ async function cleanup(adminId) {
     // 승격 테스트용 전용 계정 — profiles/admin_* 는 cascade 로 함께 지워진다
     const dedicated = await findUserByEmail(DEDICATED_EMAIL);
     if (dedicated) await admin.auth.admin.deleteUser(dedicated.id);
+    const issuedPartner = await findUserByEmail(ISSUED_PARTNER_EMAIL);
+    if (issuedPartner) await admin.auth.admin.deleteUser(issuedPartner.id);
 }
 
 /** 테스트용 관리자 계정을 만들고 2단계 인증까지 마친 클라이언트를 돌려준다 */
@@ -328,6 +332,70 @@ async function main() {
 
     const aal2Live = await adminClient.rpc("is_admin_live");
     check("2단계 인증 후 is_admin_live() = true", aal2Live.data === true);
+
+    const issuedPartner = await admin.auth.admin.createUser({
+        email: ISSUED_PARTNER_EMAIL,
+        password: "issuedPartner56!",
+        email_confirm: true,
+    });
+    if (issuedPartner.error) throw issuedPartner.error;
+    const issuedPartnerId = issuedPartner.data.user.id;
+    const deniedIssue = await adminClient.rpc(
+        "admin_register_partner_account",
+        {
+            p_target: issuedPartnerId,
+            p_login_id: ISSUED_PARTNER_LOGIN,
+            p_reason: "TEST-56 파트너 전용 계정 발급",
+        },
+    );
+    check("심사 담당은 계정 발급 불가", deniedIssue.error?.code === "42501");
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "계정" })
+        .eq("profile_id", adminId);
+    const issueAllowed = await adminClient.rpc("can_issue_accounts");
+    check("계정 담당은 MFA 후 계정 발급 가능", issueAllowed.data === true);
+    const issued = await adminClient.rpc("admin_register_partner_account", {
+        p_target: issuedPartnerId,
+        p_login_id: ISSUED_PARTNER_LOGIN,
+        p_reason: "TEST-56 파트너 전용 계정 발급",
+    });
+    check(
+        "파트너 가입 대기 계정 발급 성공",
+        !issued.error,
+        issued.error?.message,
+    );
+    const [issuedProfile, issuedAccount, issuedLog] = await Promise.all([
+        admin
+            .from("profiles")
+            .select("role, status")
+            .eq("id", issuedPartnerId)
+            .single(),
+        admin
+            .from("partner_accounts")
+            .select("login_id")
+            .eq("profile_id", issuedPartnerId)
+            .single(),
+        admin
+            .from("access_logs")
+            .select("action, actor_id")
+            .eq("target_id", issuedPartnerId)
+            .maybeSingle(),
+    ]);
+    check(
+        "발급 계정은 PARTNER/PENDING 상태",
+        issuedProfile.data?.role === "PARTNER" &&
+            issuedProfile.data?.status === "PENDING",
+    );
+    check(
+        "발급 아이디 매핑 저장",
+        issuedAccount.data?.login_id === ISSUED_PARTNER_LOGIN,
+    );
+    check(
+        "계정 발급자 접속기록 저장",
+        issuedLog.data?.action === "PARTNER_ACCOUNT_ISSUE" &&
+            issuedLog.data?.actor_id === adminId,
+    );
 
     // =============================================================
     section("3. 관리자가 볼 수 없어야 하는 것 (처리방침 제10조 3)");

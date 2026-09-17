@@ -27,6 +27,7 @@ const ACTION_LABEL: Record<string, string> = {
     PAYMENT_INCIDENT_LIST: "결제 사고 목록 조회",
     PAYMENT_INCIDENT_STATUS: "결제 사고 상태 변경",
     PAYMENT_INCIDENT_CONTACT: "결제 사고 고객 안내 기록",
+    PARTNER_ACCOUNT_ISSUE: "파트너 계정 발급",
 };
 
 function formatAt(iso: string): string {
@@ -164,6 +165,12 @@ export default async function AdminHome() {
                 )}
             </div>
 
+            <Link
+                href="/admin/accounts"
+                className="text-brand mt-6 mr-5 inline-block font-semibold underline"
+            >
+                파트너 계정 발급
+            </Link>
             <Link
                 href="/admin/qualifications"
                 className="text-brand mt-6 inline-block font-semibold underline"
