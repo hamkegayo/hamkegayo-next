@@ -172,7 +172,7 @@ export function StepUserInfo() {
                     className="mx-auto mt-8 max-w-3xl space-y-6"
                 >
                     {/* 이용자 정보 */}
-                    <div className="bg-muted/30 rounded-2xl p-6 md:p-8">
+                    <div className="bg-muted/50 rounded-2xl p-6 md:p-8">
                         <h2 className="text-foreground text-lg font-bold">
                             이용자 정보
                         </h2>
@@ -426,7 +426,7 @@ export function StepUserInfo() {
                     </div>
 
                     {/* 진료 정보 */}
-                    <div className="bg-muted/30 rounded-2xl p-6 md:p-8">
+                    <div className="bg-muted/50 rounded-2xl p-6 md:p-8">
                         <h2 className="text-foreground text-lg font-bold">
                             진료 정보
                         </h2>

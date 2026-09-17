@@ -14,6 +14,7 @@ import { BlockedModal } from "@/components/layout/blocked-modal";
 
 export const metadata: Metadata = {
     title: "파트너",
+    robots: { index: false, follow: false },
 };
 
 export default async function PartnerLayout({

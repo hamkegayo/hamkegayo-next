@@ -122,7 +122,7 @@ export function StepReview() {
             <Section>
                 <div className="grid gap-6 lg:grid-cols-2">
                     {/* 좌측: 신청 내역 요약 */}
-                    <div className="bg-muted/30 rounded-2xl p-6 md:p-8">
+                    <div className="bg-muted/50 rounded-2xl p-6 md:p-8">
                         <h2 className="text-foreground text-lg font-bold">
                             신청 내역을 확인해주세요!
                         </h2>
@@ -273,7 +273,7 @@ export function StepReview() {
 
                     {/* 우측: 예상 비용 + 안내 */}
                     <div className="space-y-6">
-                        <div className="bg-muted/30 rounded-2xl p-6 md:p-8">
+                        <div className="bg-muted/50 rounded-2xl p-6 md:p-8">
                             <h2 className="text-foreground text-lg font-bold">
                                 예상 결제 금액
                             </h2>
@@ -337,7 +337,7 @@ export function StepReview() {
                         </div>
 
                         {/* 서비스 안내문 */}
-                        <div className="bg-muted/30 rounded-2xl p-6 md:p-8">
+                        <div className="bg-muted/50 rounded-2xl p-6 md:p-8">
                             <h3 className="text-foreground font-bold">
                                 서비스 안내문
                             </h3>

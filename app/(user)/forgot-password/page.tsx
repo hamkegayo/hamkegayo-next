@@ -4,6 +4,7 @@ import { ForgotPasswordForm } from "./_components/forgot-password-form";
 
 export const metadata: Metadata = {
     title: "비밀번호 찾기",
+    robots: { index: false, follow: false },
 };
 
 export default function ForgotPasswordPage() {
