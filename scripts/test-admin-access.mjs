@@ -1073,6 +1073,14 @@ async function main() {
         .single();
     if (qualification.error) throw qualification.error;
     const qualificationId = qualification.data.id;
+    const proofPath = `${partnerId}/test-56.pdf`;
+    const proofUpload = await admin.storage
+        .from("partner-qualifications")
+        .upload(proofPath, Buffer.from("%PDF-1.4\nTEST-56\n%%EOF"), {
+            contentType: "application/pdf",
+            upsert: true,
+        });
+    if (proofUpload.error) throw proofUpload.error;
     const reviewArgs = {
         p_id: qualificationId,
         p_expected: "PENDING",
@@ -1106,8 +1114,12 @@ async function main() {
         .update({ duty: "심사" })
         .eq("profile_id", adminId);
     const noFileLog = await adminClient.rpc("can_read_qualification_file", {
-        p_path: `${partnerId}/test-56.pdf`,
+        p_path: proofPath,
     });
+    const unsignedProof = await adminClient.storage
+        .from("partner-qualifications")
+        .createSignedUrl(proofPath, 60);
+    check("열람 기록 없이 서명 URL 발급 불가", Boolean(unsignedProof.error));
     check("열람 기록 없이 증빙 접근 불가", noFileLog.data === false);
     const shortFileReason = await adminClient.rpc(
         "admin_get_qualification_file",
@@ -1124,8 +1136,16 @@ async function main() {
         fileRead.error?.message,
     );
     const loggedFile = await adminClient.rpc("can_read_qualification_file", {
-        p_path: `${partnerId}/test-56.pdf`,
+        p_path: proofPath,
     });
+    const signedProof = await adminClient.storage
+        .from("partner-qualifications")
+        .createSignedUrl(proofPath, 60);
+    check(
+        "열람 기록 직후 서명 URL 발급 성공",
+        Boolean(signedProof.data?.signedUrl) && !signedProof.error,
+        signedProof.error?.message,
+    );
     check("열람 기록이 있는 파일만 접근 가능", loggedFile.data === true);
     const otherFile = await adminClient.rpc("can_read_qualification_file", {
         p_path: `${partnerId}/other.pdf`,
@@ -1171,6 +1191,10 @@ async function main() {
         .from("partner_qualifications")
         .delete()
         .eq("id", qualificationId);
+    const proofRemoval = await admin.storage
+        .from("partner-qualifications")
+        .remove([proofPath]);
+    if (proofRemoval.error) throw proofRemoval.error;
 
     section("11. 정지된 관리자는 즉시 차단된다");
     // =============================================================
