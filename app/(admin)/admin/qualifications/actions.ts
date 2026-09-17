@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 
+const QUALIFICATION_FILE_URL_TTL_SECONDS = 5 * 60;
+
 export async function reviewQualification(input: {
     id: string;
     expected: "PENDING" | "VERIFIED";
@@ -47,7 +49,7 @@ export async function openQualificationFile(id: string, reason: string) {
     }
     const { data, error: fileError } = await supabase.storage
         .from("partner-qualifications")
-        .createSignedUrl(path, 60);
+        .createSignedUrl(path, QUALIFICATION_FILE_URL_TTL_SECONDS);
     if (fileError || !data)
         return {
             ok: false as const,

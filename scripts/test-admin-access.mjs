@@ -1118,7 +1118,7 @@ async function main() {
     });
     const unsignedProof = await adminClient.storage
         .from("partner-qualifications")
-        .createSignedUrl(proofPath, 60);
+        .createSignedUrl(proofPath, 300);
     check("열람 기록 없이 서명 URL 발급 불가", Boolean(unsignedProof.error));
     check("열람 기록 없이 증빙 접근 불가", noFileLog.data === false);
     const shortFileReason = await adminClient.rpc(
@@ -1140,7 +1140,7 @@ async function main() {
     });
     const signedProof = await adminClient.storage
         .from("partner-qualifications")
-        .createSignedUrl(proofPath, 60);
+        .createSignedUrl(proofPath, 300);
     check(
         "열람 기록 직후 서명 URL 발급 성공",
         Boolean(signedProof.data?.signedUrl) && !signedProof.error,
@@ -1175,6 +1175,42 @@ async function main() {
         .eq("id", qualificationId)
         .single();
     check("심사 결과 실제 저장", verified.data?.status === "VERIFIED");
+    const verifiedNotice = await admin
+        .from("notifications")
+        .select("type, title, body, link")
+        .eq("recipient_id", partnerId)
+        .eq("type", "QUALIFICATION_VERIFIED")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    check(
+        "인증 완료 사유를 파트너에게 알림",
+        verifiedNotice.data?.body?.includes(reviewArgs.p_reason) &&
+            verifiedNotice.data?.link === "/partner/profile",
+        verifiedNotice.error?.message,
+    );
+    const revisionReason = "TEST-56 증빙 보완 후 다시 제출해 주세요";
+    const revision = await adminClient.rpc("admin_review_qualification", {
+        p_id: qualificationId,
+        p_expected: "VERIFIED",
+        p_status: "PENDING",
+        p_reason: revisionReason,
+    });
+    check("심사 대기 전환 성공", !revision.error, revision.error?.message);
+    const revisionNotice = await admin
+        .from("notifications")
+        .select("body, link")
+        .eq("recipient_id", partnerId)
+        .eq("type", "QUALIFICATION_REVIEW_REQUIRED")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    check(
+        "수정 요청 사유를 파트너에게 알림",
+        revisionNotice.data?.body?.includes(revisionReason) &&
+            revisionNotice.data?.link === "/partner/profile",
+        revisionNotice.error?.message,
+    );
     const reviewLogs = await admin
         .from("access_logs")
         .select("action, subject_id")
@@ -1195,6 +1231,14 @@ async function main() {
         .from("partner-qualifications")
         .remove([proofPath]);
     if (proofRemoval.error) throw proofRemoval.error;
+    await admin
+        .from("notifications")
+        .delete()
+        .eq("recipient_id", partnerId)
+        .in("type", [
+            "QUALIFICATION_VERIFIED",
+            "QUALIFICATION_REVIEW_REQUIRED",
+        ]);
 
     section("11. 정지된 관리자는 즉시 차단된다");
     // =============================================================

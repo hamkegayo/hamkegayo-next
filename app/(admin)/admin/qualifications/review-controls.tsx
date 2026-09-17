@@ -12,23 +12,41 @@ export function ReviewControls({
     id: string;
     status: "PENDING" | "VERIFIED";
 }) {
-    const [reason, setReason] = useState("");
+    const [accessReason, setAccessReason] = useState("");
+    const [reviewReason, setReviewReason] = useState("");
     const [fileUrl, setFileUrl] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [confirmOpen, setConfirmOpen] = useState(false);
-    const valid = reason.trim().length >= 5 && reason.length <= 500;
+    const accessValid =
+        accessReason.trim().length >= 5 && accessReason.length <= 500;
+    const reviewValid =
+        reviewReason.trim().length >= 5 && reviewReason.length <= 500;
     return (
         <div className="mt-4 space-y-3">
             <label
                 className="block text-sm font-semibold"
-                htmlFor={`reason-${id}`}
+                htmlFor={`access-reason-${id}`}
             >
-                열람·심사 사유 (5~500자)
+                증빙 열람 사유 (관리자 기록용, 5~500자)
             </label>
             <textarea
-                id={`reason-${id}`}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                id={`access-reason-${id}`}
+                value={accessReason}
+                onChange={(e) => setAccessReason(e.target.value)}
+                maxLength={500}
+                disabled={pending}
+                className="border-input bg-background w-full rounded-lg border p-3 text-sm"
+            />
+            <label
+                className="block text-sm font-semibold"
+                htmlFor={`review-reason-${id}`}
+            >
+                심사 결과 안내 (파트너에게 전달, 5~500자)
+            </label>
+            <textarea
+                id={`review-reason-${id}`}
+                value={reviewReason}
+                onChange={(e) => setReviewReason(e.target.value)}
                 maxLength={500}
                 disabled={pending}
                 className="border-input bg-background w-full rounded-lg border p-3 text-sm"
@@ -36,7 +54,7 @@ export function ReviewControls({
             <div className="flex flex-wrap gap-3">
                 <button
                     type="button"
-                    disabled={pending || !valid}
+                    disabled={pending || !accessValid}
                     className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50"
                     onClick={() =>
                         startTransition(async () => {
@@ -44,7 +62,7 @@ export function ReviewControls({
                             try {
                                 const result = await openQualificationFile(
                                     id,
-                                    reason,
+                                    accessReason,
                                 );
                                 if (!result.ok) {
                                     toast.error(result.message);
@@ -61,7 +79,7 @@ export function ReviewControls({
                 </button>
                 <button
                     type="button"
-                    disabled={pending || !valid}
+                    disabled={pending || !reviewValid}
                     className="bg-brand text-brand-foreground rounded-lg px-4 py-2 text-sm disabled:opacity-50"
                     onClick={() => setConfirmOpen(true)}
                 >
@@ -80,12 +98,12 @@ export function ReviewControls({
                 title="자격 심사 결과 저장"
                 description={
                     status === "PENDING"
-                        ? "증빙을 확인했으며 인증 완료로 처리하시겠습니까?"
-                        : "인증을 해제하고 심사 대기로 되돌리시겠습니까?"
+                        ? "인증 완료 처리 후 입력한 안내 사유를 파트너에게 알림으로 전달합니다."
+                        : "심사 대기로 되돌린 뒤 수정 요청 사유를 파트너에게 알림으로 전달합니다."
                 }
                 confirmLabel="저장"
                 cancelLabel="취소"
-                confirmDisabled={pending || !valid}
+                confirmDisabled={pending || !reviewValid}
                 onConfirm={() => {
                     const next = status === "PENDING" ? "VERIFIED" : "PENDING";
                     startTransition(async () => {
@@ -94,11 +112,12 @@ export function ReviewControls({
                                 id,
                                 expected: status,
                                 status: next,
-                                reason,
+                                reason: reviewReason,
                             });
                             if (result.ok) {
                                 toast.success(result.message);
-                                setReason("");
+                                setAccessReason("");
+                                setReviewReason("");
                                 setFileUrl(null);
                                 setConfirmOpen(false);
                             } else toast.error(result.message);
@@ -116,7 +135,7 @@ export function ReviewControls({
                     referrerPolicy="no-referrer"
                     className="text-brand block text-sm underline"
                 >
-                    증빙 파일 열기 (링크 유효시간 1분)
+                    증빙 파일 열기 (링크 유효시간 5분)
                 </a>
             )}
         </div>
