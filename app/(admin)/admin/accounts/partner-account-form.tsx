@@ -59,8 +59,8 @@ export function PartnerAccountForm() {
                     placeholder="partner01"
                 />
                 <p className="text-description-foreground mt-1 text-xs">
-                    영문 소문자·숫자로 시작하며 점, 밑줄, 하이픈을 사용할 수
-                    있습니다.
+                    영문 대문자는 입력 즉시 소문자로 변환됩니다. 영문·숫자로
+                    시작하며 점, 밑줄, 하이픈을 사용할 수 있습니다.
                 </p>
             </div>
             <div>

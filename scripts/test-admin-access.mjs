@@ -357,7 +357,7 @@ async function main() {
     check("계정 담당은 MFA 후 계정 발급 가능", issueAllowed.data === true);
     const issued = await adminClient.rpc("admin_register_partner_account", {
         p_target: issuedPartnerId,
-        p_login_id: ISSUED_PARTNER_LOGIN,
+        p_login_id: ISSUED_PARTNER_LOGIN.toUpperCase(),
         p_reason: "TEST-56 파트너 전용 계정 발급",
     });
     check(
@@ -388,7 +388,7 @@ async function main() {
             issuedProfile.data?.status === "PENDING",
     );
     check(
-        "발급 아이디 매핑 저장",
+        "대문자 입력도 소문자로 정규화해 발급 아이디 저장",
         issuedAccount.data?.login_id === ISSUED_PARTNER_LOGIN,
     );
     check(
