@@ -5,6 +5,7 @@ import { MypageSidebar } from "./_components/mypage-sidebar";
 
 export const metadata: Metadata = {
     title: "마이페이지",
+    robots: { index: false, follow: false },
 };
 
 export default async function MypageLayout({
