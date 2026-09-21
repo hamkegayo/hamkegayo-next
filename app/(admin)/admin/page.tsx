@@ -24,6 +24,10 @@ const ACTION_LABEL: Record<string, string> = {
     QUALIFICATION_REVIEW: "자격 심사",
     QUALIFICATION_FILE_READ: "자격 증빙 열람",
     SETTLEMENT_STATUS: "정산 상태 변경",
+    SETTLEMENT_LIST: "정산 목록 조회",
+    SETTLEMENT_APPROVE: "정산 승인",
+    SETTLEMENT_HOLD: "정산 보류",
+    SETTLEMENT_RELEASE: "정산 보류 해제",
     PAYMENT_INCIDENT_LIST: "결제 사고 목록 조회",
     PAYMENT_INCIDENT_STATUS: "결제 사고 상태 변경",
     PAYMENT_INCIDENT_CONTACT: "결제 사고 고객 안내 기록",
@@ -42,13 +46,13 @@ export default async function AdminHome() {
             icon: ClipboardCheck,
             label: "자격 심사 대기",
             value: overview.pendingQualifications,
-            href: null,
+            href: "/admin/qualifications",
         },
         {
             icon: Wallet,
             label: "지급 대기 정산",
             value: overview.pendingSettlements,
-            href: null,
+            href: "/admin/settlements",
         },
         {
             icon: ScrollText,
@@ -176,6 +180,12 @@ export default async function AdminHome() {
                 className="text-brand mt-6 inline-block font-semibold underline"
             >
                 파트너 자격 심사
+            </Link>
+            <Link
+                href="/admin/settlements"
+                className="text-brand mt-6 ml-5 inline-block font-semibold underline"
+            >
+                정산 관리
             </Link>
         </div>
     );

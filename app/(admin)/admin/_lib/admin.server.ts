@@ -63,7 +63,7 @@ export async function getAdminOverview(): Promise<AdminOverview> {
                 supabase
                     .from("settlements")
                     .select("id", { count: "exact", head: true })
-                    .eq("status", "PENDING"),
+                    .neq("status", "PAID"),
                 supabase.rpc("admin_list_reservations", { p_limit: 200 }),
                 supabase.rpc("admin_payment_incident_summary"),
                 supabase
