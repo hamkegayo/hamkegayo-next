@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getTransferBatches } from "./_lib/batches.server";
+import { TransferFileButton } from "./transfer-file-button";
 
 export const metadata: Metadata = {
     title: "이체 배치",
@@ -92,9 +93,25 @@ export default async function TransferBatchesPage({
                             {selected?.code ?? "배치 상세"}
                         </h2>
                         {selected && (
-                            <p className="text-muted-foreground mt-1 text-sm">
-                                생성 사유: {selected.reason}
-                            </p>
+                            <>
+                                <p className="text-muted-foreground mt-1 text-sm">
+                                    생성 사유: {selected.reason}
+                                </p>
+                                <div className="mt-4 flex flex-wrap items-center gap-3">
+                                    <TransferFileButton
+                                        batchId={selected.id}
+                                        disabled={
+                                            selected.status !== "DRAFT" &&
+                                            selected.status !== "FILE_ISSUED"
+                                        }
+                                    />
+                                    <p className="text-muted-foreground text-xs">
+                                        배치 생성자와 다른 정산 담당자만 최초
+                                        발급할 수 있습니다. CSV에는 전체
+                                        계좌번호가 포함됩니다.
+                                    </p>
+                                </div>
+                            </>
                         )}
                         <div className="border-border mt-4 overflow-x-auto rounded-lg border">
                             <table className="w-full min-w-[640px] text-left text-sm">
