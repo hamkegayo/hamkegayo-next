@@ -11,7 +11,7 @@ export function PartnerAccountForm() {
 
     return (
         <form
-            className="border-border bg-background mt-8 max-w-xl space-y-4 rounded-2xl border p-6"
+            className="border-border bg-background h-full space-y-4 rounded-2xl border p-6 md:p-8"
             onSubmit={(event) => {
                 event.preventDefault();
                 startTransition(async () => {

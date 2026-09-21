@@ -5,7 +5,7 @@ import { isValidEmail, normalizeEmail } from "@/lib/otp";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 
-const DUTIES = new Set(["계정", "심사", "정산", "전체"]);
+const DUTIES = new Set(["계정", "심사", "정산"]);
 
 export async function POST(request: NextRequest) {
     if (request.headers.get("origin") !== request.nextUrl.origin) {
@@ -51,6 +51,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
             { message: "이름, 이메일, 담당 업무와 발급 사유를 확인해 주세요." },
             { status: 400 },
+        );
+    }
+
+    const { data: canIssueDuty } = await supabase.rpc("can_issue_admin_duty", {
+        p_duty: duty,
+    });
+    if (canIssueDuty !== true) {
+        return NextResponse.json(
+            { message: "선택한 담당 업무를 발급할 권한이 없습니다." },
+            { status: 403 },
         );
     }
 
@@ -105,5 +115,8 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    return NextResponse.json({ email, temporaryPassword }, { status: 201 });
+    return NextResponse.json(
+        { id: target, email, temporaryPassword },
+        { status: 201, headers: { "Cache-Control": "no-store" } },
+    );
 }
