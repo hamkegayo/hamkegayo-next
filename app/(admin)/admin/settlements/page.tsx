@@ -66,6 +66,12 @@ export default async function AdminSettlementsPage({
                 결제와 정산계좌를 확인한 뒤 승인합니다. 승인은 지급 완료가
                 아니며 이체 배치에 포함할 준비 상태입니다.
             </p>
+            <Link
+                href="/admin/settlements/batches"
+                className="text-brand mt-3 inline-block text-sm font-bold underline"
+            >
+                이체 배치 목록 보기 →
+            </Link>
 
             <form className="border-border bg-background mt-6 grid gap-4 rounded-xl border p-5 md:grid-cols-5">
                 <label className="text-sm font-semibold">
