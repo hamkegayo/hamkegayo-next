@@ -897,6 +897,7 @@ async function main() {
         email: DEDICATED_EMAIL,
         password: "dedicated50!",
         email_confirm: true,
+        app_metadata: { must_change_password: true },
     });
     if (dedicated.error) throw dedicated.error;
     const dedicatedId = dedicated.data.user.id;
@@ -908,6 +909,52 @@ async function main() {
         status: "ACTIVE",
     });
 
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "심사" })
+        .eq("profile_id", adminId);
+    const wrongDutyGrant = await adminClient.rpc("admin_grant_role", {
+        p_target: dedicatedId,
+        p_duty: "정산",
+        p_reason: "TEST-56 계정 담당 외 발급 차단",
+    });
+    check(
+        "계정 담당이 아닌 관리자는 관리자 계정 발급 불가",
+        wrongDutyGrant.error?.code === "42501",
+    );
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "계정" })
+        .eq("profile_id", adminId);
+    const [
+        accountCanReview,
+        accountCanSettle,
+        accountCanAccount,
+        accountCanAll,
+    ] = await Promise.all([
+        adminClient.rpc("can_issue_admin_duty", { p_duty: "심사" }),
+        adminClient.rpc("can_issue_admin_duty", { p_duty: "정산" }),
+        adminClient.rpc("can_issue_admin_duty", { p_duty: "계정" }),
+        adminClient.rpc("can_issue_admin_duty", { p_duty: "전체" }),
+    ]);
+    check("계정 담당은 심사 duty 발급 가능", accountCanReview.data === true);
+    check("계정 담당은 정산 duty 발급 가능", accountCanSettle.data === true);
+    check("계정 담당은 계정 duty 발급 불가", accountCanAccount.data === false);
+    check("계정 담당은 전체 duty 발급 불가", accountCanAll.data === false);
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "전체" })
+        .eq("profile_id", adminId);
+    const [allCanAccount, allCanAll] = await Promise.all([
+        adminClient.rpc("can_issue_admin_duty", { p_duty: "계정" }),
+        adminClient.rpc("can_issue_admin_duty", { p_duty: "전체" }),
+    ]);
+    check("전체 담당은 계정 duty 발급 가능", allCanAccount.data === true);
+    check("전체 duty는 UI/RPC 발급 불가", allCanAll.data === false);
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "계정" })
+        .eq("profile_id", adminId);
     const grant = await adminClient.rpc("admin_grant_role", {
         p_target: dedicatedId,
         p_duty: "정산",
@@ -925,6 +972,43 @@ async function main() {
         .eq("id", dedicatedId)
         .single();
     check("부여 후 role 이 ADMIN", granted.role === "ADMIN");
+
+    const { data: dedicatedAuth } =
+        await admin.auth.admin.getUserById(dedicatedId);
+    check(
+        "관리자 권한 부여 후에도 최초 비밀번호 변경 표식 유지",
+        dedicatedAuth.user?.app_metadata.must_change_password === true,
+    );
+
+    const reissueApproval = await adminClient.rpc(
+        "admin_authorize_password_reissue",
+        {
+            p_target: dedicatedId,
+            p_reason: "TEST-56 전달 실패로 임시 비밀번호 재발급",
+        },
+    );
+    check(
+        "최초 비밀번호 변경 전에는 권한 범위 내 재발급 승인",
+        !reissueApproval.error,
+        reissueApproval.error?.message,
+    );
+    await admin.auth.admin.updateUserById(dedicatedId, {
+        app_metadata: {
+            ...dedicatedAuth.user?.app_metadata,
+            must_change_password: false,
+        },
+    });
+    const reissueAfterChange = await adminClient.rpc(
+        "admin_authorize_password_reissue",
+        {
+            p_target: dedicatedId,
+            p_reason: "TEST-56 변경 완료 계정 재발급 차단",
+        },
+    );
+    check(
+        "최초 비밀번호 변경 완료 후에는 재발급 불가",
+        reissueAfterChange.error?.code === "23514",
+    );
 
     const { data: grantRows } = await admin
         .from("admin_role_grants")

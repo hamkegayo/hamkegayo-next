@@ -11,7 +11,7 @@ export function PartnerAccountForm() {
 
     return (
         <form
-            className="border-border bg-background mt-6 max-w-xl space-y-4 rounded-2xl border p-6"
+            className="border-border bg-background h-full space-y-4 rounded-2xl border p-6 md:p-8"
             onSubmit={(event) => {
                 event.preventDefault();
                 startTransition(async () => {
@@ -40,6 +40,13 @@ export function PartnerAccountForm() {
                 });
             }}
         >
+            <div>
+                <h2 className="text-lg font-bold">파트너 계정 발급</h2>
+                <p className="text-description-foreground mt-1 text-sm">
+                    로그인 아이디만 발급하며, 개인정보와 비밀번호는 파트너가
+                    직접 등록합니다.
+                </p>
+            </div>
             <div>
                 <label htmlFor="login-id" className="text-sm font-semibold">
                     파트너 로그인 아이디
