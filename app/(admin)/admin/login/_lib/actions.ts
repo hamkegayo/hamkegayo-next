@@ -17,7 +17,8 @@ const ADMIN_HOME = "/admin";
 
 /** 로그인 1단계 결과 — 다음에 무엇을 해야 하는지 */
 export type AdminLoginResult =
-    { ok: true; next: "enroll" | "verify" } | { ok: false; message: string };
+    | { ok: true; next: "password" | "enroll" | "verify" }
+    | { ok: false; message: string };
 
 export type EnrollResult =
     | { ok: true; factorId: string; qr: string; secret: string }
@@ -54,6 +55,10 @@ export async function loginAdmin(input: {
     if (data.user.app_metadata?.status !== "ACTIVE") {
         await supabase.auth.signOut();
         return { ok: false, message: "정지된 계정입니다." };
+    }
+
+    if (data.user.app_metadata?.must_change_password === true) {
+        return { ok: true, next: "password" };
     }
 
     const { data: factors } = await supabase.auth.mfa.listFactors();

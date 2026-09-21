@@ -897,6 +897,7 @@ async function main() {
         email: DEDICATED_EMAIL,
         password: "dedicated50!",
         email_confirm: true,
+        app_metadata: { must_change_password: true },
     });
     if (dedicated.error) throw dedicated.error;
     const dedicatedId = dedicated.data.user.id;
@@ -908,6 +909,23 @@ async function main() {
         status: "ACTIVE",
     });
 
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "심사" })
+        .eq("profile_id", adminId);
+    const wrongDutyGrant = await adminClient.rpc("admin_grant_role", {
+        p_target: dedicatedId,
+        p_duty: "정산",
+        p_reason: "TEST-56 계정 담당 외 발급 차단",
+    });
+    check(
+        "계정 담당이 아닌 관리자는 관리자 계정 발급 불가",
+        wrongDutyGrant.error?.code === "42501",
+    );
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "계정" })
+        .eq("profile_id", adminId);
     const grant = await adminClient.rpc("admin_grant_role", {
         p_target: dedicatedId,
         p_duty: "정산",
@@ -925,6 +943,13 @@ async function main() {
         .eq("id", dedicatedId)
         .single();
     check("부여 후 role 이 ADMIN", granted.role === "ADMIN");
+
+    const { data: dedicatedAuth } =
+        await admin.auth.admin.getUserById(dedicatedId);
+    check(
+        "관리자 권한 부여 후에도 최초 비밀번호 변경 표식 유지",
+        dedicatedAuth.user?.app_metadata.must_change_password === true,
+    );
 
     const { data: grantRows } = await admin
         .from("admin_role_grants")
