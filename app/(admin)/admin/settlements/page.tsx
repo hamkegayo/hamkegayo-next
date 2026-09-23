@@ -5,7 +5,6 @@ import {
     type AdminSettlement,
 } from "./_lib/settlements.server";
 import { SettlementsTable } from "./settlements-table";
-import { LogoutButton } from "../logout-button";
 
 export const metadata: Metadata = {
     title: "정산 관리",
@@ -54,15 +53,12 @@ export default async function AdminSettlementsPage({
 
     return (
         <div className="mx-auto w-full max-w-7xl">
-            <div className="flex items-center justify-between gap-4">
-                <Link
-                    href="/admin"
-                    className="text-brand text-sm font-bold underline"
-                >
-                    ← 관리자 홈
-                </Link>
-                <LogoutButton />
-            </div>
+            <Link
+                href="/admin"
+                className="text-brand text-sm font-bold underline"
+            >
+                ← 관리자 홈
+            </Link>
             <h1 className="mt-4 text-2xl font-extrabold md:text-3xl">
                 정산 관리
             </h1>
