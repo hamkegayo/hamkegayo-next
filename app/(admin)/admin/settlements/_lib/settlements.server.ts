@@ -16,6 +16,8 @@ export type AdminSettlement = {
     paidAt: string | null;
     hasPayoutAccount: boolean;
     paymentReady: boolean;
+    batchId: string | null;
+    batchCode: string | null;
 };
 
 type RawSettlement = {
@@ -43,20 +45,33 @@ export async function getAdminSettlements(filters: {
     status: AdminSettlement["status"] | null;
 }) {
     const supabase = await createClient();
-    const [{ data: allowed }, settlements, partners] = await Promise.all([
-        supabase.rpc("can_manage_settlements"),
-        supabase.rpc("admin_list_settlements", {
-            p_from: filters.from,
-            p_to: filters.to,
-            p_partner: filters.partner,
-            p_status: filters.status,
-            p_limit: 500,
-        }),
-        supabase.rpc("admin_list_payout_accounts"),
-    ]);
+    const [{ data: allowed }, settlements, partners, assignments] =
+        await Promise.all([
+            supabase.rpc("can_manage_settlements"),
+            supabase.rpc("admin_list_settlements", {
+                p_from: filters.from,
+                p_to: filters.to,
+                p_partner: filters.partner,
+                p_status: filters.status,
+                p_limit: 500,
+            }),
+            supabase.rpc("admin_list_payout_accounts"),
+            supabase.rpc("admin_list_batched_settlement_ids"),
+        ]);
     if (allowed !== true)
         return { allowed: false as const, rows: [], partners: [] };
     if (settlements.error) throw settlements.error;
+    if (assignments.error) throw assignments.error;
+
+    const batchBySettlement = new Map(
+        (
+            (assignments.data ?? []) as {
+                settlement_id: string;
+                batch_id: string;
+                batch_code: string;
+            }[]
+        ).map((row) => [row.settlement_id, row]),
+    );
 
     return {
         allowed: true as const,
@@ -76,6 +91,8 @@ export async function getAdminSettlements(filters: {
             paidAt: row.paid_at,
             hasPayoutAccount: row.has_payout_account,
             paymentReady: row.payment_ready,
+            batchId: batchBySettlement.get(row.id)?.batch_id ?? null,
+            batchCode: batchBySettlement.get(row.id)?.batch_code ?? null,
         })),
         partners: (
             (partners.data ?? []) as {

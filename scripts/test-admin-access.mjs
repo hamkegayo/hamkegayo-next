@@ -133,6 +133,9 @@ async function findUserByEmail(email) {
 }
 
 async function cleanup(adminId) {
+    if (adminId) {
+        await admin.from("transfer_batches").delete().eq("created_by", adminId);
+    }
     await admin
         .from("payment_incidents")
         .delete()
@@ -624,7 +627,68 @@ async function main() {
     );
     if (previousPayout) {
         await admin.from("partner_payouts").insert(previousPayout);
+    } else {
+        await admin.from("partner_payouts").insert({
+            partner_id: partnerId,
+            bank_code: "004",
+            bank_name: "국민은행",
+            account_number: "123456789012",
+            account_last4: "9012",
+            holder_name: "테스트파트너",
+        });
     }
+
+    const reapprovedSettlement = await adminClient.rpc(
+        "admin_approve_settlements",
+        {
+            p_ids: [settlement.id],
+            p_reason: "TEST-56 이체 배치 생성 전 재승인",
+        },
+    );
+    check("계좌 복구 후 정산 재승인", reapprovedSettlement.data === 1);
+    const transferBatch = await adminClient.rpc("admin_create_transfer_batch", {
+        p_ids: [settlement.id],
+        p_reason: "TEST-56 승인 정산 이체 배치 생성",
+    });
+    check(
+        "승인 정산을 파트너별 이체 배치로 생성",
+        !transferBatch.error &&
+            transferBatch.data?.settlementCount === 1 &&
+            transferBatch.data?.partnerCount === 1 &&
+            transferBatch.data?.totalNet === 40000,
+        transferBatch.error?.message,
+    );
+    const duplicateBatch = await adminClient.rpc(
+        "admin_create_transfer_batch",
+        {
+            p_ids: [settlement.id],
+            p_reason: "TEST-56 동일 정산 중복 편입 차단",
+        },
+    );
+    check(
+        "동일 정산의 중복 배치 편입 차단",
+        duplicateBatch.error?.code === "23514",
+    );
+    const batchedHold = await adminClient.rpc("admin_hold_settlements", {
+        p_ids: [settlement.id],
+        p_reason: "TEST-56 배치 편입 뒤 보류 차단",
+    });
+    check(
+        "활성 배치에 편입된 정산의 보류 차단",
+        batchedHold.error?.code === "23514",
+    );
+    const transferItems = await adminClient.rpc(
+        "admin_list_transfer_batch_items",
+        { p_batch_id: transferBatch.data?.id },
+    );
+    const transferItem = transferItems.data?.[0] ?? {};
+    check(
+        "이체 배치 목록은 계좌 끝 4자리만 반환",
+        !transferItems.error &&
+            transferItem.account_last4 === "9012" &&
+            !("account_number" in transferItem),
+        transferItems.error?.message,
+    );
 
     // =============================================================
     section("5. 예약 RPC — 개인정보를 반환하지 않는다");
@@ -925,6 +989,12 @@ async function main() {
         ],
         ["admin_grant_role", { p_target: userId }],
         ["admin_list_settlements", { p_limit: 10 }],
+        ["admin_list_transfer_batches", { p_limit: 10 }],
+        ["admin_list_batched_settlement_ids", {}],
+        [
+            "admin_create_transfer_batch",
+            { p_ids: [seededSvc.id], p_reason: "권한 없는 이체 배치 생성" },
+        ],
         [
             "admin_approve_settlements",
             { p_ids: [seededSvc.id], p_reason: "권한 없는 정산 승인" },

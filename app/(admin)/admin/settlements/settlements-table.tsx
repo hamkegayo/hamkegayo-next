@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { AdminSettlement } from "./_lib/settlements.server";
 import {
     approveSettlements,
+    createTransferBatch,
     holdSettlements,
     releaseSettlements,
 } from "./actions";
@@ -23,13 +24,15 @@ export function SettlementsTable({ rows }: { rows: AdminSettlement[] }) {
     const [pending, startTransition] = useTransition();
 
     const act = (
-        kind: "approve" | "hold" | "release",
+        kind: "approve" | "hold" | "release" | "batch",
         requestedIds = selected,
     ) => {
         const ids = requestedIds.filter((id) => {
             const row = rows.find((item) => item.id === id);
             if (!row) return false;
             if (kind === "approve") return row.status === "PENDING";
+            if (kind === "batch")
+                return row.status === "APPROVED" && !row.batchId;
             if (kind === "release") return row.status === "HOLD";
             return row.status === "PENDING" || row.status === "APPROVED";
         });
@@ -43,15 +46,21 @@ export function SettlementsTable({ rows }: { rows: AdminSettlement[] }) {
             const result =
                 kind === "approve"
                     ? await approveSettlements(ids, reason)
-                    : kind === "hold"
-                      ? await holdSettlements(ids, reason)
-                      : await releaseSettlements(ids, reason);
+                    : kind === "batch"
+                      ? await createTransferBatch(ids, reason)
+                      : kind === "hold"
+                        ? await holdSettlements(ids, reason)
+                        : await releaseSettlements(ids, reason);
             if (!result.ok) {
                 toast.error(result.message);
                 return;
             }
             setSelected([]);
-            toast.success(`${result.count}건을 처리했습니다.`);
+            toast.success(
+                "code" in result
+                    ? `${result.code} 배치를 만들었습니다.`
+                    : `${result.count}건을 처리했습니다.`,
+            );
         });
     };
 
@@ -73,6 +82,14 @@ export function SettlementsTable({ rows }: { rows: AdminSettlement[] }) {
                     className="bg-brand text-brand-foreground rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50"
                 >
                     선택 일괄 승인
+                </button>
+                <button
+                    type="button"
+                    disabled={pending || selected.length === 0}
+                    onClick={() => act("batch")}
+                    className="border-brand text-brand rounded-lg border px-4 py-2 text-sm font-bold disabled:opacity-50"
+                >
+                    선택 이체 배치 생성
                 </button>
                 <button
                     type="button"
@@ -123,6 +140,7 @@ export function SettlementsTable({ rows }: { rows: AdminSettlement[] }) {
                             <th className="p-3 text-right">지급액</th>
                             <th className="p-3">준비 상태</th>
                             <th className="p-3">상태</th>
+                            <th className="p-3">이체 배치</th>
                             <th className="p-3">처리</th>
                         </tr>
                     </thead>
@@ -178,6 +196,9 @@ export function SettlementsTable({ rows }: { rows: AdminSettlement[] }) {
                                 </td>
                                 <td className="p-3 font-semibold">
                                     {LABEL[row.status]}
+                                </td>
+                                <td className="p-3 text-xs">
+                                    {row.batchCode ?? "-"}
                                 </td>
                                 <td className="p-3">
                                     {row.status === "HOLD" ? (
