@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 
 import { getAdminOverview } from "./_lib/admin.server";
+import { LogoutButton } from "./logout-button";
 import { kstDateTime } from "@/lib/format";
 
 export const metadata: Metadata = {
@@ -181,12 +182,15 @@ export default async function AdminHome() {
             >
                 파트너 자격 심사
             </Link>
-            <Link
-                href="/admin/settlements"
-                className="text-brand mt-6 ml-5 inline-block font-semibold underline"
-            >
-                정산 관리
-            </Link>
+            <div className="mt-6 inline-flex items-center gap-5">
+                <Link
+                    href="/admin/settlements"
+                    className="text-brand inline-block font-semibold underline"
+                >
+                    정산 관리
+                </Link>
+                <LogoutButton />
+            </div>
         </div>
     );
 }
