@@ -30,6 +30,7 @@
         "test:reset": "node --env-file=.env.local scripts/test-reset.mjs",
         "test:reconsent": "node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs --env-file=.env.local scripts/test-reconsent.mjs",
         "test:agreements": "node --env-file=.env.local scripts/test-agreements.mjs",
+        "test:social-auth": "node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs scripts/test-social-auth.mjs",
         "prepare": "husky"
     },
     "dependencies": {

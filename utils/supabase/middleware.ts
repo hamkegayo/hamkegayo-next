@@ -18,6 +18,13 @@ const LOGIN_REQUIRED = [
 ];
 // 로그인 상태에서 접근 시 홈으로 돌려보낼 라우트
 const AUTH_PAGES = ["/login", "/signup"];
+const SOCIAL_SIGNUP = "/signup/social";
+const INCOMPLETE_ACCOUNT_PAGES = [
+    SOCIAL_SIGNUP,
+    "/terms",
+    "/privacy",
+    "/refund-policy",
+];
 
 function matches(pathname: string, prefixes: string[]): boolean {
     return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -80,8 +87,13 @@ export async function updateSession(request: NextRequest) {
         const PARTNER_HOME = "/partner";
         const ADMIN_HOME = "/admin";
 
-        // 이미 로그인했는데 로그인/회원가입 페이지 접근 → 역할별 홈으로
-        if (matches(pathname, AUTH_PAGES)) {
+        // OAuth 인증은 끝났지만 프로필·약관 동의가 없는 계정은 가입 완료 화면만 허용한다.
+        if (!role && !matches(pathname, INCOMPLETE_ACCOUNT_PAGES)) {
+            return redirect(SOCIAL_SIGNUP);
+        }
+
+        // 이미 가입한 사용자가 로그인/회원가입 페이지 접근 → 역할별 홈으로
+        if (matches(pathname, AUTH_PAGES) && pathname !== SOCIAL_SIGNUP) {
             if (role === "PARTNER") return redirect(PARTNER_HOME);
             if (role === "ADMIN") return redirect(ADMIN_HOME);
             return redirect("/");

@@ -141,6 +141,13 @@ cp .env.example .env.local
 
 > 애널리틱스는 **운영 호스트 + 사용자 동의** 두 조건을 모두 만족할 때만 로드됩니다.
 
+### 소셜 로그인 설정
+
+- 카카오는 Supabase Dashboard의 기본 `Kakao` provider를 사용합니다.
+- 네이버는 Supabase Dashboard에 OAuth2 custom provider `custom:naver`를 생성합니다.
+- 두 제공자의 외부 콜백은 Supabase가 표시하는 `https://<project-ref>.supabase.co/auth/v1/callback`이며, Supabase Redirect URL에는 스테이징·운영의 `/auth/callback`을 각각 등록합니다.
+- 이메일 제공을 필수로 설정하고 최소 scope만 요청합니다. 제공자 동의와 함께가요 약관 동의는 별개이며, 최초 로그인 뒤 `/signup/social`에서 서비스 동의를 받습니다.
+
 ## 3. 스크립트
 
 ```bash
