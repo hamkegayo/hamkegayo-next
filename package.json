@@ -25,6 +25,7 @@
         "test:nicepay": "node --env-file=.env.local scripts/test-nicepay.mjs",
         "test:payapi": "node --env-file=.env.local scripts/test-payment-api.mjs",
         "test:withdrawal": "node --env-file=.env.local scripts/test-withdrawal.mjs",
+        "test:retention": "node --env-file=.env.local scripts/test-retention-purge.mjs",
         "test:payout": "node --env-file=.env.local scripts/test-payout-account.mjs",
         "test:reset": "node --env-file=.env.local scripts/test-reset.mjs",
         "test:reconsent": "node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs --env-file=.env.local scripts/test-reconsent.mjs",
