@@ -677,6 +677,46 @@ async function main() {
         "활성 배치에 편입된 정산의 보류 차단",
         batchedHold.error?.code === "23514",
     );
+    const sameAdminIssue = await adminClient.rpc("admin_issue_transfer_file", {
+        p_batch_id: transferBatch.data?.id,
+        p_reason: "TEST-56 생성자 파일 발급 차단",
+    });
+    check(
+        "배치 생성자는 이체 파일 발급 불가",
+        sameAdminIssue.error?.code === "42501",
+    );
+    // 두 번째 관리자 역할을 재현하기 위해 생성자만 다른 프로필로 바꾼다.
+    await admin
+        .from("transfer_batches")
+        .update({ created_by: partnerId })
+        .eq("id", transferBatch.data?.id);
+    const issuedFile = await adminClient.rpc("admin_issue_transfer_file", {
+        p_batch_id: transferBatch.data?.id,
+        p_reason: "TEST-56 두 번째 담당자 이체 파일 발급",
+    });
+    check(
+        "두 번째 정산 담당자는 이체 파일 발급 가능",
+        !issuedFile.error &&
+            issuedFile.data?.[0]?.account_number === "123456789012",
+        issuedFile.error?.message,
+    );
+    const issuedBatch = await admin
+        .from("transfer_batches")
+        .select("status, issued_by, issued_at, last_downloaded_at")
+        .eq("id", transferBatch.data?.id)
+        .single();
+    check(
+        "파일 발급 시 배치 잠금과 발급 이력 기록",
+        issuedBatch.data?.status === "FILE_ISSUED" &&
+            issuedBatch.data?.issued_by === adminId &&
+            !!issuedBatch.data?.issued_at &&
+            !!issuedBatch.data?.last_downloaded_at,
+        issuedBatch.error?.message,
+    );
+    await admin
+        .from("transfer_batches")
+        .update({ created_by: adminId })
+        .eq("id", transferBatch.data?.id);
     const transferItems = await adminClient.rpc(
         "admin_list_transfer_batch_items",
         { p_batch_id: transferBatch.data?.id },
@@ -991,6 +1031,13 @@ async function main() {
         ["admin_list_settlements", { p_limit: 10 }],
         ["admin_list_transfer_batches", { p_limit: 10 }],
         ["admin_list_batched_settlement_ids", {}],
+        [
+            "admin_issue_transfer_file",
+            {
+                p_batch_id: seededSvc.id,
+                p_reason: "권한 없는 이체 파일 발급",
+            },
+        ],
         [
             "admin_create_transfer_batch",
             { p_ids: [seededSvc.id], p_reason: "권한 없는 이체 배치 생성" },
