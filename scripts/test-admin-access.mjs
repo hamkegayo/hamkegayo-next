@@ -536,6 +536,97 @@ async function main() {
     }
 
     // =============================================================
+    section("4-1. 정산 담당 목록·보류·일괄 승인 (#56)");
+    // =============================================================
+    const { data: previousPayout } = await admin
+        .from("partner_payouts")
+        .select("*")
+        .eq("partner_id", partnerId)
+        .maybeSingle();
+    await admin.from("partner_payouts").upsert({
+        partner_id: partnerId,
+        bank_code: "004",
+        bank_name: "국민은행",
+        account_number: "123456789012",
+        account_last4: "9012",
+        holder_name: "테스트파트너",
+    });
+    const { data: settlement, error: settlementError } = await admin
+        .from("settlements")
+        .insert({
+            service_id: seededSvc.id,
+            partner_id: partnerId,
+            amount: 40000,
+            fee: 0,
+            net: 40000,
+            reason: "SERVICE_COMPLETED",
+        })
+        .select("id")
+        .single();
+    if (settlementError) throw settlementError;
+
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "심사" })
+        .eq("profile_id", adminId);
+    const deniedSettlement = await adminClient.rpc("can_manage_settlements");
+    check("심사 담당은 정산 관리 불가", deniedSettlement.data === false);
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "정산" })
+        .eq("profile_id", adminId);
+    const settlementList = await adminClient.rpc("admin_list_settlements", {
+        p_partner: partnerId,
+        p_limit: 20,
+    });
+    check(
+        "정산 담당은 필터 목록 조회 가능",
+        !settlementList.error &&
+            settlementList.data?.some((row) => row.id === settlement.id),
+        settlementList.error?.message,
+    );
+    const approvedSettlement = await adminClient.rpc(
+        "admin_approve_settlements",
+        {
+            p_ids: [settlement.id],
+            p_reason: "TEST-56 지급 조건 확인 완료",
+        },
+    );
+    check(
+        "계좌·서비스 조건을 충족한 정산 승인",
+        approvedSettlement.data === 1,
+        approvedSettlement.error?.message,
+    );
+    const heldSettlement = await adminClient.rpc("admin_hold_settlements", {
+        p_ids: [settlement.id],
+        p_reason: "TEST-56 재검토를 위한 보류",
+    });
+    check("승인 건 보류 가능", heldSettlement.data === 1);
+    const releasedSettlement = await adminClient.rpc(
+        "admin_release_settlements",
+        {
+            p_ids: [settlement.id],
+            p_reason: "TEST-56 보류 사유 해소",
+        },
+    );
+    check("보류 건 검토 대기 복귀", releasedSettlement.data === 1);
+    await admin.from("partner_payouts").delete().eq("partner_id", partnerId);
+    const noAccountApproval = await adminClient.rpc(
+        "admin_approve_settlements",
+        {
+            p_ids: [settlement.id],
+            p_reason: "TEST-56 계좌 없는 승인 차단",
+        },
+    );
+    check(
+        "정산 계좌가 없으면 승인 불가",
+        noAccountApproval.error?.code === "23514",
+    );
+    if (previousPayout) {
+        await admin.from("partner_payouts").insert(previousPayout);
+    }
+
+    // =============================================================
     section("5. 예약 RPC — 개인정보를 반환하지 않는다");
     // =============================================================
     const list = await adminClient.rpc("admin_list_reservations", {
@@ -833,6 +924,15 @@ async function main() {
             },
         ],
         ["admin_grant_role", { p_target: userId }],
+        ["admin_list_settlements", { p_limit: 10 }],
+        [
+            "admin_approve_settlements",
+            { p_ids: [seededSvc.id], p_reason: "권한 없는 정산 승인" },
+        ],
+        [
+            "admin_hold_settlements",
+            { p_ids: [seededSvc.id], p_reason: "권한 없는 정산 보류" },
+        ],
         [
             "admin_set_account_status",
             { p_target: userId, p_status: "SUSPENDED" },
