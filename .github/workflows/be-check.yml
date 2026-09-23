@@ -252,6 +252,9 @@ jobs:
             - name: 탈퇴 시 보존·파기 (#72)
               run: npm run test:withdrawal
 
+            - name: 보유기간 만료 파기·legal hold·첨부 삭제 (#99)
+              run: npm run test:retention
+
             # 재설정은 계정을 빼앗겼을 때 되찾는 경로다. "바꿔지는가" 보다
             # **기존 세션이 죽는가** 가 핵심이고, 그건 GoTrue 의 동작이라
             # 우리 코드 변경 없이도 사라질 수 있다. 여기서 못 박는다.
