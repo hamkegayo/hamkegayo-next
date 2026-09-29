@@ -33,7 +33,7 @@ function FaqAccordion() {
     const [open, setOpen] = useState(-1);
 
     return (
-        <div className="bg-muted/50 rounded-3xl p-6 md:p-8">
+        <div className="bg-panel-muted rounded-3xl p-6 md:p-8">
             <h2 className="text-foreground text-2xl font-extrabold md:text-3xl">
                 궁금한 점이 있으신가요?
             </h2>
@@ -107,7 +107,7 @@ function FaqAccordion() {
 
 function BookingCta() {
     return (
-        <div className="bg-muted/30 flex flex-col items-center justify-center rounded-3xl px-6 py-12 text-center">
+        <div className="bg-panel-muted flex flex-col items-center justify-center rounded-3xl px-6 py-12 text-center">
             <h2 className="text-foreground text-2xl font-extrabold md:text-3xl">
                 지금 간편하게 예약하세요.
             </h2>

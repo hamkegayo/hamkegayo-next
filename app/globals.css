@@ -29,6 +29,9 @@
     --color-muted-foreground: var(--muted-foreground);
     --color-description-foreground: var(--description-foreground);
     --color-muted: var(--muted);
+    /* 메인·서비스 소개·예약의 큰 패널 배경은 여기서 함께 조정한다. */
+    --color-panel-muted: color-mix(in oklab, var(--muted) 60%, transparent);
+    --color-panel-brand: color-mix(in oklab, var(--brand) 5%, transparent);
     --color-secondary-foreground: var(--secondary-foreground);
     --color-secondary: var(--secondary);
     --color-primary-foreground: var(--primary-foreground);
