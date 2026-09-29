@@ -25,7 +25,7 @@ const SERVICES: { icon: LucideIcon; title: string; desc: string }[] = [
 export function ServiceIntro() {
     return (
         <Section>
-            <div className="bg-muted/50 rounded-3xl p-6 md:p-10">
+            <div className="bg-panel-muted rounded-3xl p-6 md:p-10">
                 <h2 className="text-foreground text-center text-2xl font-extrabold md:text-3xl">
                     병원동행 서비스란?
                 </h2>

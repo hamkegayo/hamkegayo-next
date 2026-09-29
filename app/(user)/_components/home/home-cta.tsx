@@ -8,7 +8,7 @@ import { Section } from "./section";
 export function HomeCta() {
     return (
         <Section>
-            <div className="bg-brand/5 rounded-3xl px-6 py-14 text-center">
+            <div className="bg-panel-brand rounded-3xl px-6 py-14 text-center">
                 <h2 className="text-brand text-2xl font-extrabold md:text-3xl">
                     병원 동행, 함께가요
                 </h2>

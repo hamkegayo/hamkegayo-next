@@ -6,7 +6,7 @@ import { ReviewsCarousel } from "./reviews-carousel";
 export function Reviews() {
     return (
         <Section>
-            <div className="bg-muted/50 rounded-3xl px-4 py-10 md:px-8">
+            <div className="bg-panel-muted rounded-3xl px-4 py-10 md:px-8">
                 <h2 className="text-foreground text-center text-2xl font-extrabold md:text-3xl">
                     실제 이용자 후기
                 </h2>

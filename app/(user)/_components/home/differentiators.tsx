@@ -32,7 +32,7 @@ const ITEMS: { icon: LucideIcon; title: string; desc: string; tag: string }[] =
 export function Differentiators() {
     return (
         <Section>
-            <div className="bg-brand/5 rounded-3xl p-6 md:p-10">
+            <div className="bg-panel-brand rounded-3xl p-6 md:p-10">
                 <h2 className="text-foreground text-center text-2xl font-extrabold md:text-3xl">
                     함께가요의 차별점
                 </h2>
