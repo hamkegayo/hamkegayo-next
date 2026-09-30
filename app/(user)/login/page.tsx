@@ -8,10 +8,15 @@ export const metadata: Metadata = {
     robots: { index: false, follow: false },
 };
 
-export default function LoginPage() {
+export default async function LoginPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ oauth_error?: string }>;
+}) {
+    const { oauth_error: oauthError } = await searchParams;
     return (
         <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
-            <LoginForm />
+            <LoginForm oauthError={oauthError} />
             {/* 모바일 PWA 설치 유도 (#117) — 재방문 의사가 있는 사람에게만 */}
             <InstallPrompt />
         </div>
