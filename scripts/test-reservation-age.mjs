@@ -1,3 +1,5 @@
+import { mock } from "node:test";
+
 import {
     isAtLeastAgeOnDate,
     MIN_SERVICE_AGE_MESSAGE,
@@ -42,6 +44,12 @@ check(
     !isAtLeastAgeOnDate("2007-02-29", "2026-09-16") &&
         !isAtLeastAgeOnDate("2007-09-16", "2026-02-30"),
 );
+
+// 나이 검증이 실제 실행일의 예약 시간 제한에 영향을 받지 않도록 시계를 고정한다.
+mock.timers.enable({
+    apis: ["Date"],
+    now: new Date("2026-09-30T00:00:00Z").getTime(),
+});
 
 const validReservation = {
     userName: "성인이용자",
@@ -88,6 +96,8 @@ check(
                 issue.message === MIN_SERVICE_AGE_MESSAGE,
         ),
 );
+
+mock.timers.reset();
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
