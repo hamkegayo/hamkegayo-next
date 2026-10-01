@@ -30,8 +30,8 @@ export function providerOAuthError(
     const error = params.get("error");
     const code = params.get("error_code");
     if (!error && !code) return null;
-    if (error === "access_denied" || code === "access_denied")
-        return "access_denied";
+    // Supabase는 이메일 인증 대기에도 error=access_denied를 함께 반환한다.
+    // 구체적인 error_code를 먼저 확인해야 실제 취소와 구분할 수 있다.
     if (code === "provider_email_needs_verification")
         return "email_verification_required";
     if (
@@ -41,6 +41,10 @@ export function providerOAuthError(
             ?.includes("Error getting user email from external provider")
     )
         return "email_required";
+    if (code === "user_banned") return "account_unavailable";
+    if (code && code !== "access_denied") return "provider_failed";
+    if (error === "access_denied" || code === "access_denied")
+        return "access_denied";
     return "provider_failed";
 }
 
