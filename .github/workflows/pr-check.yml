@@ -56,5 +56,8 @@ jobs:
             - name: Test partner profile validation
               run: npm run test:partner-profile
 
+            - name: Test social OAuth response handling
+              run: npm run test:social-auth
+
             - name: Build Next.js
               run: npm run build

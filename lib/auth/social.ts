@@ -5,6 +5,8 @@ export const SOCIAL_PROVIDERS = {
 
 export type SocialProvider = keyof typeof SOCIAL_PROVIDERS;
 
+export const NAVER_USERINFO_PATH = "/api/auth/naver/userinfo";
+
 export function safeInternalPath(value: string | null | undefined): string {
     if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
 

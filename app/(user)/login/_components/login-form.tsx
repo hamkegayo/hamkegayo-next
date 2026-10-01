@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm, type Resolver } from "react-hook-form";
@@ -13,6 +13,11 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SOCIAL_PROVIDERS, type SocialProvider } from "@/lib/auth/social";
+import {
+    knownOAuthError,
+    oauthErrorFromLocation,
+    OAUTH_ERRORS,
+} from "@/lib/auth/oauth-errors";
 import { createClient } from "@/utils/supabase/client";
 import {
     loginDefaultValues,
@@ -28,14 +33,18 @@ const TABS: { type: LoginType; label: string }[] = [
     { type: "partner", label: "파트너 로그인" },
 ];
 
-const OAUTH_ERRORS: Record<string, string> = {
-    missing_code: "로그인 응답이 올바르지 않습니다. 다시 시도해 주세요.",
-    exchange_failed: "소셜 로그인 확인에 실패했습니다. 다시 시도해 주세요.",
-    profile_check_failed:
-        "회원 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.",
-    account_unavailable: "이용할 수 없는 계정입니다. 고객센터에 문의해 주세요.",
-    email_required: "소셜 계정의 이메일 제공 동의가 필요합니다.",
-};
+function subscribeOAuthError(onChange: () => void) {
+    window.addEventListener("hashchange", onChange);
+    window.addEventListener("popstate", onChange);
+    return () => {
+        window.removeEventListener("hashchange", onChange);
+        window.removeEventListener("popstate", onChange);
+    };
+}
+
+function readOAuthError() {
+    return oauthErrorFromLocation(window.location.search, window.location.hash);
+}
 
 export function LoginForm({ oauthError }: { oauthError?: string }) {
     const router = useRouter();
@@ -45,14 +54,31 @@ export function LoginForm({ oauthError }: { oauthError?: string }) {
     const [submitting, setSubmitting] = useState(false);
     const [socialSubmitting, setSocialSubmitting] =
         useState<SocialProvider | null>(null);
+    const currentOAuthError = useSyncExternalStore(
+        subscribeOAuthError,
+        readOAuthError,
+        () => knownOAuthError(oauthError),
+    );
 
     useEffect(() => {
-        if (oauthError) {
-            toast.error(
-                OAUTH_ERRORS[oauthError] ?? "소셜 로그인에 실패했습니다.",
+        // 첫 hydration에서는 서버의 missing_code가 먼저 보일 수 있다.
+        // fragment를 지우기 전에 브라우저의 실제 오류를 다시 읽는다.
+        const errorCode = readOAuthError() ?? currentOAuthError;
+        if (errorCode) {
+            // Supabase 오류는 URL fragment로도 온다. 원본 오류 대신 안전한 코드만 남긴다.
+            const url = new URL(window.location.href);
+            url.hash = "";
+            url.searchParams.delete("error");
+            url.searchParams.delete("error_code");
+            url.searchParams.delete("error_description");
+            url.searchParams.set("oauth_error", errorCode);
+            window.history.replaceState(
+                window.history.state,
+                "",
+                `${url.pathname}${url.search}`,
             );
         }
-    }, [oauthError]);
+    }, [currentOAuthError]);
 
     // 활성 탭에 따라 스키마를 선택하는 커스텀 resolver
     const resolver: Resolver<LoginFormValues> = (values, context, options) => {
@@ -171,6 +197,15 @@ export function LoginForm({ oauthError }: { oauthError?: string }) {
                     서비스 이용을 위해 로그인을 해주세요.
                 </p>
             </div>
+
+            {currentOAuthError && (
+                <p
+                    role="alert"
+                    className="text-destructive mx-auto mt-6 max-w-md text-sm"
+                >
+                    {OAUTH_ERRORS[currentOAuthError]}
+                </p>
+            )}
 
             {/* 폼 */}
             <form

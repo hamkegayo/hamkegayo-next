@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { safeInternalPath } from "@/lib/auth/social";
+import { providerOAuthError } from "@/lib/auth/oauth-errors";
 import { createClient } from "@/utils/supabase/server";
 
 function loginError(request: NextRequest, code: string) {
@@ -10,6 +11,8 @@ function loginError(request: NextRequest, code: string) {
 }
 
 export async function GET(request: NextRequest) {
+    const providerError = providerOAuthError(request.nextUrl.searchParams);
+    if (providerError) return loginError(request, providerError);
     const code = request.nextUrl.searchParams.get("code");
     const next = safeInternalPath(request.nextUrl.searchParams.get("next"));
 

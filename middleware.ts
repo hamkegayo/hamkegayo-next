@@ -1,8 +1,14 @@
-import { type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+
+import { NAVER_USERINFO_PATH } from "@/lib/auth/social";
 
 import { updateSession } from "@/utils/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
+    // Supabase Auth 서버가 네이버 토큰으로 호출한다. 사이트 세션 쿠키를 요구하지 않는다.
+    if (request.nextUrl.pathname === NAVER_USERINFO_PATH) {
+        return NextResponse.next();
+    }
     return await updateSession(request);
 }
 
