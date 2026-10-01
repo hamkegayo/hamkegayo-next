@@ -180,3 +180,24 @@ test("취소·일반 오류·알 수 없는 오류는 정해진 안내 코드만
     assert.equal(knownOAuthError("exchange_failed"), "exchange_failed");
     assert.equal(oauthErrorFromLocation("", "#unrelated=1"), null);
 });
+
+test("Supabase access_denied와 함께 온 구체적인 이메일 오류를 우선한다", () => {
+    for (const [code, expected] of [
+        ["provider_email_needs_verification", "email_verification_required"],
+        ["email_address_not_provided", "email_required"],
+        ["user_banned", "account_unavailable"],
+        ["signup_disabled", "provider_failed"],
+        ["unknown_code", "provider_failed"],
+    ]) {
+        const params = `error=access_denied&error_code=${code}`;
+        assert.equal(providerOAuthError(new URLSearchParams(params)), expected);
+        assert.equal(
+            oauthErrorFromLocation("?oauth_error=missing_code", `#${params}`),
+            expected,
+        );
+    }
+    assert.equal(
+        providerOAuthError(new URLSearchParams("error=access_denied")),
+        "access_denied",
+    );
+});
