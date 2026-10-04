@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatUseDate, toHhmm } from "@/lib/format";
 import { useReservationStore, PLAN_INFO } from "../_store/reservation-store";
+import { OPENING_EVENT_TERMS } from "@/lib/opening-event";
 import { StepBand } from "./step-band";
 
 /**
@@ -30,6 +31,7 @@ type PrepareResponse = {
     amount: number;
     grossAmount: number;
     discountAmount: number;
+    campaignDiscount: number;
     goodsName: string;
     clientId: string;
     paymentDeadline: string;
@@ -70,6 +72,32 @@ export function StepPayment() {
     const { data, patch, goStep } = useReservationStore();
     const plan = PLAN_INFO[data.plan || "basic"];
 
+    const [eventOffer, setEventOffer] = useState<{
+        eligible: boolean;
+        discount: number;
+    }>({ eligible: false, discount: 0 });
+    const [useOpeningEvent, setUseOpeningEvent] = useState(false);
+    useEffect(() => {
+        let cancelled = false;
+        if (!data.reservationId) return;
+        void fetch(
+            `/api/campaigns/opening/offer?rid=${encodeURIComponent(data.reservationId)}`,
+            { cache: "no-store" },
+        )
+            .then((response) => response.json())
+            .then((offer) => {
+                if (!cancelled)
+                    setEventOffer({
+                        eligible: offer.eligible === true,
+                        discount: Number(offer.discount) || 0,
+                    });
+            })
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+        };
+    }, [data.reservationId]);
+
     const [sdkReady, setSdkReady] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [pointsInput, setPointsInput] = useState("");
@@ -83,16 +111,18 @@ export function StepPayment() {
     const balance = data.pointBalance;
 
     // 입력한 포인트는 잔액과 결제액을 넘을 수 없다. 서버가 다시 검증한다.
-    const points = Math.max(
-        0,
-        Math.min(
-            Number(pointsInput.replace(/\D/g, "")) || 0,
-            balance,
-            // 전액을 포인트로 덮으면 승인 금액이 0원이 되어 PG 가 거절한다.
-            Math.max(gross - 1, 0),
-        ),
-    );
-    const charge = gross - points;
+    const points = useOpeningEvent
+        ? 0
+        : Math.max(
+              0,
+              Math.min(
+                  Number(pointsInput.replace(/\D/g, "")) || 0,
+                  balance,
+                  // 전액을 포인트로 덮으면 승인 금액이 0원이 되어 PG 가 거절한다.
+                  Math.max(gross - 1, 0),
+              ),
+          );
+    const charge = gross - points - (useOpeningEvent ? eventOffer.discount : 0);
 
     // ---------- 카운트다운 ----------
     useEffect(() => {
@@ -131,6 +161,7 @@ export function StepPayment() {
                 body: JSON.stringify({
                     reservationId: data.reservationId,
                     pointsToUse: points,
+                    useOpeningEvent,
                 }),
             });
 
@@ -177,7 +208,15 @@ export function StepPayment() {
             );
             setSubmitting(false);
         }
-    }, [submitting, sdkReady, data.reservationId, points, patch, goStep]);
+    }, [
+        submitting,
+        sdkReady,
+        data.reservationId,
+        points,
+        useOpeningEvent,
+        patch,
+        goStep,
+    ]);
 
     const urgent = remain !== null && remain <= 5 * 60 * 1000;
 
@@ -200,6 +239,35 @@ export function StepPayment() {
             />
 
             <Section>
+                {eventOffer.eligible && (
+                    <div className="border-brand bg-brand/5 mx-auto mb-6 max-w-3xl rounded-xl border p-4 text-sm">
+                        <label className="flex items-center gap-2 font-bold">
+                            <Checkbox
+                                checked={useOpeningEvent}
+                                onCheckedChange={(checked) =>
+                                    setUseOpeningEvent(checked === true)
+                                }
+                            />
+                            첫 1시간 무료 이벤트 적용 (
+                            {eventOffer.discount.toLocaleString()}원)
+                        </label>
+                        <p className="text-muted-foreground mt-2">
+                            결제 전에 잔여 혜택을 다시 확인하며, 실제 예약 확정
+                            시 순번이 부여됩니다. 포인트와 중복 적용하지
+                            않습니다.
+                        </p>
+                        <details className="mt-2">
+                            <summary className="cursor-pointer">
+                                적용 조건
+                            </summary>
+                            <ul className="mt-2 space-y-2">
+                                {OPENING_EVENT_TERMS.map((term) => (
+                                    <li key={term}>{term}</li>
+                                ))}
+                            </ul>
+                        </details>
+                    </div>
+                )}
                 <div className="mx-auto max-w-xl">
                     {/* 남은 시간 */}
                     <div
@@ -271,6 +339,15 @@ export function StepPayment() {
                                     </span>
                                 </div>
                             )}
+                            {useOpeningEvent && (
+                                <div className="text-brand flex items-center justify-between">
+                                    <span>첫 1시간 무료 혜택</span>
+                                    <span className="font-semibold">
+                                        −{eventOffer.discount.toLocaleString()}
+                                        원
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="mt-4 flex items-center justify-between">
@@ -306,7 +383,7 @@ export function StepPayment() {
                                     onChange={(e) =>
                                         setPointsInput(e.target.value)
                                     }
-                                    disabled={submitting}
+                                    disabled={submitting || useOpeningEvent}
                                 />
                                 <button
                                     type="button"
@@ -320,7 +397,7 @@ export function StepPayment() {
                                             ),
                                         )
                                     }
-                                    disabled={submitting}
+                                    disabled={submitting || useOpeningEvent}
                                     className="border-border bg-background text-foreground hover:bg-muted shrink-0 rounded-lg border px-4 text-sm font-bold transition-colors disabled:opacity-60"
                                 >
                                     전액
