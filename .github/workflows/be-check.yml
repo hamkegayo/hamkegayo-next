@@ -46,6 +46,9 @@ jobs:
             - name: 서비스 시간 · 예약 서버 검증 (#176)
               run: node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs scripts/test-service-hours.mjs
 
+            - name: 운영키 조회 검증 스크립트 테스트 (모의 응답만 사용)
+              run: npm run test:nicepay-live-check
+
             # 알림 링크는 누가 누르기 전까지 아무도 모른다. 실제로 404 가 난 적이 있다.
             - name: 알림·리다이렉트 링크 검사
               run: npm run check:links

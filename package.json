@@ -23,6 +23,8 @@
         "test:admin": "node --env-file=.env.local scripts/test-admin-access.mjs",
         "test:partner": "node --env-file=.env.local scripts/test-partner-access.mjs",
         "test:nicepay": "node --env-file=.env.local scripts/test-nicepay.mjs",
+        "check:nicepay-live": "node --env-file=.env.local scripts/check-nicepay-live.mjs",
+        "test:nicepay-live-check": "node --test scripts/test-nicepay-live-check.mjs",
         "test:payapi": "node --env-file=.env.local scripts/test-payment-api.mjs",
         "test:withdrawal": "node --env-file=.env.local scripts/test-withdrawal.mjs",
         "test:retention": "node --env-file=.env.local scripts/test-retention-purge.mjs",

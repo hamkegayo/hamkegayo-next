@@ -54,6 +54,16 @@ export async function getTransferBatches(selectedId: string | null) {
         p_batch_id: batchId,
     });
     if (itemsResult.error) throw itemsResult.error;
+    const resultRecord = await supabase.rpc("admin_get_transfer_result", {
+        p_batch_id: batchId,
+    });
+    if (resultRecord.error) throw resultRecord.error;
+    const terminalResult = resultRecord.data as {
+        reference: string;
+        reason: string;
+        recordedAt: string;
+        recordedBy: string;
+    } | null;
     const items = ((itemsResult.data ?? []) as Record<string, unknown>[]).map(
         (row) => ({
             id: row.id as string,
@@ -66,5 +76,5 @@ export async function getTransferBatches(selectedId: string | null) {
             holderName: row.holder_name as string,
         }),
     );
-    return { allowed: true as const, batches, items, batchId };
+    return { allowed: true as const, batches, items, batchId, terminalResult };
 }
