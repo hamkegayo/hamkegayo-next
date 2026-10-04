@@ -28,10 +28,15 @@ import {
     type QualificationIcon,
 } from "../../_lib/profile";
 import type { QualificationView } from "../../_lib/qualifications.server";
+import type { PartnerBasicInfo } from "../../_lib/basic-info.server";
 import {
     addQualification,
     deleteQualification,
 } from "../_actions/qualifications";
+import {
+    changePartnerEmail,
+    updatePartnerBasicInfo,
+} from "../_actions/basic-info";
 import {
     deleteProfilePhoto,
     uploadProfilePhoto,
@@ -137,13 +142,16 @@ function CheckList({
 export function PartnerProfileView({
     initialQuals,
     initialPhotoUrl,
+    initialBasicInfo,
 }: {
     initialQuals: QualificationView[];
     initialPhotoUrl: string | null;
+    initialBasicInfo: PartnerBasicInfo;
 }) {
-    const [phone, setPhone] = useState("");
-    const [email, setEmail] = useState("");
-    const [intro, setIntro] = useState(PARTNER_PROFILE.intro);
+    const [email, setEmail] = useState(initialBasicInfo.email);
+    const [intro, setIntro] = useState(initialBasicInfo.intro);
+    const [savedIntro, setSavedIntro] = useState(initialBasicInfo.intro);
+    const [basicInfoPending, startBasicInfoTransition] = useTransition();
 
     const [regions, setRegions] = useState<CheckItem[]>(
         PARTNER_PROFILE.regions,
@@ -165,7 +173,6 @@ export function PartnerProfileView({
     const [photoPending, startPhotoTransition] = useTransition();
 
     // 모달 상태
-    const [contactOpen, setContactOpen] = useState(false);
     const [emailOpen, setEmailOpen] = useState(false);
     const [previewOpen, setPreviewOpen] = useState(false);
     const [photoOpen, setPhotoOpen] = useState(false);
@@ -250,7 +257,33 @@ export function PartnerProfileView({
         });
     };
 
+    const saveBasicInfo = () => {
+        startBasicInfoTransition(async () => {
+            const result = await updatePartnerBasicInfo(intro);
+            if (!result.ok) {
+                toast.error(result.message);
+                return;
+            }
+            setSavedIntro(intro);
+            toast.success("자기소개가 저장되었습니다.");
+        });
+    };
+
+    const cancelBasicInfo = () => {
+        setIntro(savedIntro);
+        toast.info("자기소개 변경을 취소했습니다.");
+    };
+
+    const saveVerifiedEmail = async (nextEmail: string) => {
+        const result = await changePartnerEmail(nextEmail);
+        if (result.ok) setEmail(nextEmail.trim().toLowerCase());
+        return result;
+    };
+
     const roleLine = `${PARTNER_PROFILE.role} · 병원 동행 경력 ${PARTNER_PROFILE.companionYears}년`;
+    const verificationRows = PARTNER_PROFILE.verification.map((row) =>
+        row.label === "이름" ? { ...row, value: initialBasicInfo.name } : row,
+    );
 
     return (
         <div className="pb-24">
@@ -275,12 +308,11 @@ export function PartnerProfileView({
                     </button>
                     <button
                         type="button"
-                        onClick={() =>
-                            toast.success("프로필이 저장되었습니다.")
-                        }
-                        className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-5 py-2 text-sm font-bold transition-colors"
+                        onClick={saveBasicInfo}
+                        disabled={basicInfoPending || intro === savedIntro}
+                        className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-5 py-2 text-sm font-bold transition-colors disabled:opacity-50"
                     >
-                        저장
+                        {basicInfoPending ? "저장 중…" : "저장"}
                     </button>
                 </div>
             </div>
@@ -344,20 +376,20 @@ export function PartnerProfileView({
                         <div className="mt-1.5 flex gap-2">
                             <input
                                 type="tel"
-                                value={phone}
-                                onChange={(e) => setPhone(e.target.value)}
-                                className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/40 min-w-0 flex-1 rounded-lg border px-3.5 py-2.5 text-sm outline-none focus-visible:ring-[3px]"
+                                value={initialBasicInfo.phone}
+                                readOnly
+                                className="border-input bg-muted text-muted-foreground min-w-0 flex-1 rounded-lg border px-3.5 py-2.5 text-sm outline-none"
                             />
                             <button
                                 type="button"
-                                onClick={() => setContactOpen(true)}
-                                className="border-brand bg-background text-brand hover:bg-brand/5 shrink-0 rounded-lg border px-3.5 text-sm font-bold transition-colors"
+                                disabled
+                                className="border-border bg-muted text-muted-foreground shrink-0 rounded-lg border px-3.5 text-sm font-bold"
                             >
-                                인증 변경
+                                준비 중
                             </button>
                         </div>
-                        <p className="text-brand mt-1.5 text-xs font-medium">
-                            변경 시 인증이 필요합니다.
+                        <p className="text-muted-foreground mt-1.5 text-xs font-medium">
+                            휴대폰 인증 연동 후 변경할 수 있습니다.
                         </p>
 
                         <label className="text-foreground mt-4 block text-sm font-bold">
@@ -367,8 +399,8 @@ export function PartnerProfileView({
                             <input
                                 type="email"
                                 value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/40 min-w-0 flex-1 rounded-lg border px-3.5 py-2.5 text-sm outline-none focus-visible:ring-[3px]"
+                                readOnly
+                                className="border-input bg-background min-w-0 flex-1 rounded-lg border px-3.5 py-2.5 text-sm outline-none"
                             />
                             <button
                                 type="button"
@@ -412,7 +444,7 @@ export function PartnerProfileView({
                         className="h-full"
                     >
                         <dl className="divide-border divide-y">
-                            {PARTNER_PROFILE.verification.map((row) => (
+                            {verificationRows.map((row) => (
                                 <div
                                     key={row.label}
                                     className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
@@ -631,30 +663,27 @@ export function PartnerProfileView({
             <div className="mt-8 flex gap-3">
                 <button
                     type="button"
-                    onClick={() => toast.info("변경 사항을 취소했습니다.")}
-                    className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-10 py-3.5 text-sm font-bold transition-colors"
+                    onClick={cancelBasicInfo}
+                    disabled={basicInfoPending || intro === savedIntro}
+                    className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-10 py-3.5 text-sm font-bold transition-colors disabled:opacity-50"
                 >
                     취소
                 </button>
                 <button
                     type="button"
-                    onClick={() => toast.success("프로필이 저장되었습니다.")}
-                    className="bg-brand text-brand-foreground hover:bg-brand/90 flex-1 rounded-lg px-4 py-3.5 text-sm font-bold transition-colors"
+                    onClick={saveBasicInfo}
+                    disabled={basicInfoPending || intro === savedIntro}
+                    className="bg-brand text-brand-foreground hover:bg-brand/90 flex-1 rounded-lg px-4 py-3.5 text-sm font-bold transition-colors disabled:opacity-50"
                 >
-                    저장
+                    {basicInfoPending ? "저장 중…" : "저장"}
                 </button>
             </div>
 
             {/* 모달 */}
             <VerifyChangeModal
-                open={contactOpen}
-                onClose={() => setContactOpen(false)}
-                kind="연락처"
-            />
-            <VerifyChangeModal
                 open={emailOpen}
                 onClose={() => setEmailOpen(false)}
-                kind="이메일"
+                onVerified={saveVerifiedEmail}
             />
             <SimpleAddModal
                 open={regionAddOpen}
@@ -706,7 +735,7 @@ export function PartnerProfileView({
                 open={previewOpen}
                 onClose={() => setPreviewOpen(false)}
                 photoUrl={photoUrl}
-                name={PARTNER_PROFILE.name}
+                name={initialBasicInfo.name}
                 roleLine={roleLine}
                 intro={intro}
                 regions={regions.filter((r) => r.checked).map((r) => r.label)}

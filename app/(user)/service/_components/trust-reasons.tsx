@@ -104,7 +104,7 @@ const REASONS: {
 export function TrustReasons() {
     return (
         <Section>
-            <div className="bg-brand/5 rounded-3xl p-6 md:p-10">
+            <div className="bg-panel-brand rounded-3xl p-6 md:p-10">
                 <h2 className="text-foreground text-2xl font-extrabold md:text-3xl">
                     함께가요가 더 안심되는 이유
                 </h2>
@@ -122,7 +122,7 @@ export function TrustReasons() {
                                     <h3 className="text-foreground text-lg font-bold">
                                         {title}
                                     </h3>
-                                    <p className="text-muted-foreground mt-2 leading-relaxed whitespace-pre-line">
+                                    <p className="text-description-foreground mt-2 leading-relaxed whitespace-pre-line">
                                         {desc}
                                     </p>
                                 </div>

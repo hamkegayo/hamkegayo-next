@@ -18,7 +18,7 @@ type SettlementRow = {
     amount: number;
     fee: number;
     net: number;
-    status: "PENDING" | "PAID";
+    status: "PENDING" | "HOLD" | "APPROVED" | "PAID";
     settled_at: string | null;
     created_at: string;
 };
@@ -90,7 +90,7 @@ export async function getPartnerSettlements(): Promise<{
             totalAmount: data.reduce((s, r) => s + r.net, 0),
             serviceCount: data.length,
             paidCount: data.filter((r) => r.status === "PAID").length,
-            pendingCount: data.filter((r) => r.status === "PENDING").length,
+            pendingCount: data.filter((r) => r.status !== "PAID").length,
         };
 
         return { settlements, summary };

@@ -12,6 +12,8 @@ export type NotificationType =
     | "PAYMENT_REFUND"
     | "PAYMENT_EXPIRED"
     | "REPORT_READY"
+    | "QUALIFICATION_VERIFIED"
+    | "QUALIFICATION_REVIEW_REQUIRED"
     /** 약관·방침이 개정되어 재동의가 필요하다 (#91) */
     | "AGREEMENT_REVISED";
 

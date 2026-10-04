@@ -67,7 +67,7 @@ export function ForgotPasswordForm() {
             <h1 className="text-foreground text-2xl font-extrabold">
                 비밀번호 찾기
             </h1>
-            <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+            <p className="text-description-foreground mt-2 text-sm leading-relaxed">
                 가입하신 이메일로 인증번호를 보내드립니다.
             </p>
 
@@ -109,7 +109,7 @@ export function ForgotPasswordForm() {
                       계정이 없어도 이 화면으로 넘어온다. 가입 여부가 응답으로
                       드러나면 이 화면이 가입자 이메일을 확인하는 도구가 된다.
                     */}
-                    <p className="bg-muted/40 text-muted-foreground rounded-lg px-4 py-3 text-sm leading-relaxed">
+                    <p className="bg-muted/40 text-description-foreground rounded-lg px-4 py-3 text-sm leading-relaxed">
                         <span className="text-foreground font-semibold">
                             {email}
                         </span>
@@ -210,7 +210,7 @@ export function ForgotPasswordForm() {
               파트너는 합성 이메일({login_id}@partner.hamkegayo.internal)이라
               메일이 닿지 않는다. 여기서 시도하다 막히지 않게 미리 알린다.
             */}
-            <p className="text-muted-foreground mt-6 text-center text-xs leading-relaxed">
+            <p className="text-description-foreground mt-6 text-center text-xs leading-relaxed">
                 파트너 계정은 이 화면에서 재설정할 수 없습니다.
                 <br />
                 고객센터로 문의해 주세요.

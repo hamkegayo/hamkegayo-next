@@ -27,7 +27,7 @@ export function IntroModal() {
                 <h2 className="text-foreground text-xl font-extrabold">
                     서비스 이용 전 확인해주세요.
                 </h2>
-                <p className="text-muted-foreground mt-4 text-center text-sm leading-relaxed">
+                <p className="text-description-foreground mt-4 text-center text-sm leading-relaxed">
                     함께가요는 병원 이동 및 진료 동행을 지원하는 서비스입니다.
                     <br />
                     아래와 같은 경우에는 서비스 이용이 제한될 수 있습니다.
@@ -44,7 +44,7 @@ export function IntroModal() {
                     ))}
                 </ul>
 
-                <p className="text-muted-foreground mt-6 text-center text-sm">
+                <p className="text-description-foreground mt-6 text-center text-sm">
                     이용 가능 여부가 불확실한 경우 고객센터로 문의해주세요.
                 </p>
 

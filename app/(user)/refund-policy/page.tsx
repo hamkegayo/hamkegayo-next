@@ -54,7 +54,7 @@ export default function RefundPolicyPage() {
                 시행일 {TERMS.effectiveDate}
             </p>
 
-            <p className="text-muted-foreground mt-6 leading-7">
+            <p className="text-description-foreground mt-6 leading-7">
                 예약 취소 시점에 따라 취소수수료가 달라집니다. 아래 내용은{" "}
                 <Link
                     href="/terms"
@@ -75,7 +75,7 @@ export default function RefundPolicyPage() {
             </Card>
 
             <Card title="2. 환불 방법과 소요기간">
-                <ul className="text-muted-foreground list-disc space-y-2 pl-5 leading-7">
+                <ul className="text-description-foreground list-disc space-y-2 pl-5 leading-7">
                     <li>
                         선결제하신 금액에서 취소수수료를 뺀 나머지를 환불해
                         드립니다.
@@ -95,7 +95,7 @@ export default function RefundPolicyPage() {
             </Card>
 
             <Card title="3. 취소 방법">
-                <p className="text-muted-foreground leading-7">
+                <p className="text-description-foreground leading-7">
                     마이페이지의 예약 상세에서 직접 취소하실 수 있습니다. 취소
                     전에 예상 환불 금액과 취소수수료가 화면에 표시됩니다.
                     서비스가 이미 시작된 뒤에는 고객센터로 연락해 주세요.
@@ -121,7 +121,7 @@ export default function RefundPolicyPage() {
             </Card>
 
             <Card title="5. 문의">
-                <dl className="text-muted-foreground space-y-2 leading-7">
+                <dl className="text-description-foreground space-y-2 leading-7">
                     <div className="flex gap-3">
                         <dt className="text-foreground w-20 shrink-0 font-semibold">
                             고객센터

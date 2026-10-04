@@ -28,17 +28,14 @@ export function UserHeader({ member }: { member: HeaderMember }) {
             <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
                 {/* 로고 + 크게보기 */}
                 <div className="flex items-center gap-4">
-                    <Link href="/" className="flex items-center gap-2">
+                    <Link href="/" className="flex shrink-0 items-center">
                         <Image
-                            src="/common/logo.svg"
+                            src="/common/logo-wordmark.png"
                             alt="함께가요"
-                            width={30}
-                            height={30}
+                            width={110}
+                            height={32}
                             priority
                         />
-                        <span className="text-foreground text-xl font-extrabold">
-                            함께가요
-                        </span>
                     </Link>
 
                     <button

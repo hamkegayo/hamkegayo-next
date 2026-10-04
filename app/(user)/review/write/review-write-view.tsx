@@ -115,7 +115,7 @@ export function ReviewWriteView({
                     <h1 className="text-foreground text-2xl font-extrabold md:text-3xl">
                         어떤 병원 동행 서비스에 대한 후기를 작성하시겠어요?
                     </h1>
-                    <p className="text-muted-foreground mt-3">
+                    <p className="text-description-foreground mt-3">
                         이용한 서비스를 선택해야 후기 작성이 가능합니다.
                     </p>
                 </div>
@@ -153,7 +153,7 @@ export function ReviewWriteView({
                 <h1 className="text-foreground mt-6 text-2xl font-extrabold">
                     후기가 등록되었습니다
                 </h1>
-                <p className="text-muted-foreground mt-3 leading-relaxed">
+                <p className="text-description-foreground mt-3 leading-relaxed">
                     소중한 후기를 남겨주셔서 감사합니다.
                     <br />
                     작성하신 후기는 이용 후기 목록 맨 위에서 확인하실 수 있어요.
@@ -231,7 +231,7 @@ export function ReviewWriteView({
                     내용 <span className="text-destructive">*</span>
                 </label>
                 {/* 후기는 비로그인 이용자에게도 공개되므로 건강 관련 정보 기재를 막는다. */}
-                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                <p className="text-description-foreground mt-1 text-xs leading-relaxed">
                     후기는 모든 방문자에게 공개됩니다. 질환명·수술명·병원명 등
                     건강 관련 정보는 작성하지 말아 주세요.
                 </p>

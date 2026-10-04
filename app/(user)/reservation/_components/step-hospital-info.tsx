@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
 import { formatPhoneNumber, kstToday } from "@/lib/format";
 import { maxAdvanceReservationDate } from "@/lib/reservation-window";
+import { isAtLeastAgeOnDate, MIN_SERVICE_AGE_MESSAGE } from "@/lib/service-age";
 import { Section } from "@/app/(user)/_components/home/section";
 import { useReservationStore } from "../_store/reservation-store";
 import { step2Form, type Step2Values } from "../_lib/schema";
@@ -28,6 +29,7 @@ export function StepHospitalInfo() {
         handleSubmit,
         clearErrors,
         control,
+        setError,
         setValue,
         formState: { errors },
     } = useForm<Step2Values>({
@@ -71,6 +73,14 @@ export function StepHospitalInfo() {
     const needsHandover = endMethod === "ADULT_HANDOVER";
 
     const onSubmit = (v: Step2Values) => {
+        if (!isAtLeastAgeOnDate(data.userBirth, v.useDate)) {
+            setError("useDate", {
+                type: "validate",
+                message: MIN_SERVICE_AGE_MESSAGE,
+            });
+            return;
+        }
+
         patch(v);
         next();
     };
@@ -92,7 +102,7 @@ export function StepHospitalInfo() {
                     noValidate
                     className="mx-auto max-w-3xl space-y-6"
                 >
-                    <div className="bg-muted/30 rounded-2xl p-6 md:p-8">
+                    <div className="bg-panel-muted rounded-2xl p-6 md:p-8">
                         <h2 className="text-foreground text-lg font-bold">
                             병원 및 일정 정보
                         </h2>
@@ -121,12 +131,12 @@ export function StepHospitalInfo() {
                                 <FieldError>
                                     {errors.useDate?.message}
                                 </FieldError>
-                                <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">
+                                <p className="text-description-foreground mt-1.5 text-xs leading-relaxed">
                                     PG사 기준에 따라 오늘을 1일째로 계산해 60일
                                     이내 날짜만 예약할 수 있습니다.
                                 </p>
                                 {noSlotToday && (
-                                    <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">
+                                    <p className="text-description-foreground mt-1.5 text-xs leading-relaxed">
                                         오늘은 예약 가능한 시간이 지났습니다.
                                         다른 날짜를 선택해 주세요.
                                     </p>
@@ -273,11 +283,11 @@ export function StepHospitalInfo() {
                       정한 항목이다. 이 셋이 비어 있으면 파트너는 업무를
                       시작하지 않는다.
                     */}
-                    <div className="bg-muted/30 rounded-2xl p-6 md:p-8">
+                    <div className="bg-panel-muted rounded-2xl p-6 md:p-8">
                         <h2 className="text-foreground text-lg font-bold">
                             이동 및 귀가
                         </h2>
-                        <p className="text-muted-foreground mt-1.5 text-sm">
+                        <p className="text-description-foreground mt-1.5 text-sm">
                             파트너는 개인 차량으로 이용자를 모시거나
                             이용자·보호자 차량을 대신 운전하지 않습니다.
                         </p>
@@ -361,11 +371,11 @@ export function StepHospitalInfo() {
                     </div>
 
                     {needsHandover && (
-                        <div className="bg-muted/30 rounded-2xl p-6 md:p-8">
+                        <div className="bg-panel-muted rounded-2xl p-6 md:p-8">
                             <h2 className="text-foreground text-lg font-bold">
                                 인계자 정보
                             </h2>
-                            <p className="text-muted-foreground mt-1.5 text-sm">
+                            <p className="text-description-foreground mt-1.5 text-sm">
                                 파트너가 이용자를 직접 인계할 분입니다. 현장에서
                                 성함·관계·연락처를 대조한 뒤 인계합니다.
                             </p>
@@ -463,7 +473,7 @@ export function StepHospitalInfo() {
                                         (선택)
                                     </span>
                                 </p>
-                                <p className="text-muted-foreground mt-1 text-sm">
+                                <p className="text-description-foreground mt-1 text-sm">
                                     인계자와 연락이 닿지 않을 때 다음으로
                                     연락드립니다.
                                 </p>
@@ -529,7 +539,7 @@ export function StepHospitalInfo() {
                               미도착은 약관 제15조 ③④ 가, 인계 실패는 회사 정책이
                               정한다. 고객이 알아야 하므로 표시만 한다.
                             */}
-                            <p className="text-muted-foreground mt-6 text-xs leading-relaxed">
+                            <p className="text-description-foreground mt-6 text-xs leading-relaxed">
                                 인계자가 오지 않으면 파트너는{" "}
                                 {HANDOVER_FAIL_WAIT_MIN}분간 이용자 곁에서
                                 기다린 뒤 종료합니다. 이용자가 약속 장소에

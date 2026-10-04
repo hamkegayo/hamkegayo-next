@@ -330,7 +330,7 @@ export function MemberInfo({
                     )}
 
                     {agreements.some((a) => !a.agreedLabel) && (
-                        <p className="bg-muted/40 text-muted-foreground mb-4 rounded-lg px-4 py-3 text-xs leading-relaxed">
+                        <p className="bg-muted/40 text-description-foreground mb-4 rounded-lg px-4 py-3 text-xs leading-relaxed">
                             동의 이력 저장 기능이 도입된 2026년 9월 이전에
                             가입하신 경우 &lsquo;기록 없음&rsquo; 으로
                             표시됩니다.
@@ -403,7 +403,7 @@ export function MemberInfo({
                 confirmLabel="삭제"
                 confirmDisabled={careDeleting}
             >
-                <p className="text-muted-foreground mt-3 text-left text-sm leading-relaxed">
+                <p className="text-description-foreground mt-3 text-left text-sm leading-relaxed">
                     <span className="text-foreground font-bold">
                         {deleteTarget?.name}
                     </span>{" "}

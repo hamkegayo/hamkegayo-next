@@ -30,7 +30,7 @@ export default async function MypageHome() {
             <h1 className="text-foreground text-2xl font-extrabold md:text-3xl">
                 안녕하세요, {name}님
             </h1>
-            <p className="text-muted-foreground mt-2">
+            <p className="text-description-foreground mt-2">
                 현재 예약 현황과 내 정보를 확인하세요.
             </p>
 
@@ -128,7 +128,7 @@ export default async function MypageHome() {
                     <p className="text-foreground font-bold">
                         진행 중인 예약이 없어요
                     </p>
-                    <p className="text-muted-foreground text-sm">
+                    <p className="text-description-foreground text-sm">
                         병원 동행이 필요하시면 예약을 시작해 보세요.
                     </p>
                     <Link

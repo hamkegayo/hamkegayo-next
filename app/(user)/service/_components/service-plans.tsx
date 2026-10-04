@@ -89,7 +89,7 @@ function PlanCard({ plan }: { plan: Plan }) {
                     ({plan.scope})
                 </span>
             </h3>
-            <p className="text-muted-foreground mt-4 text-sm leading-relaxed">
+            <p className="text-description-foreground mt-4 text-sm leading-relaxed">
                 {plan.desc}
             </p>
 
@@ -121,7 +121,7 @@ function PlanCard({ plan }: { plan: Plan }) {
 export function ServicePlans() {
     return (
         <Section>
-            <div className="bg-muted/50 rounded-3xl p-6 md:p-10">
+            <div className="bg-panel-muted rounded-3xl p-6 md:p-10">
                 <h2 className="text-foreground text-2xl font-extrabold md:text-3xl">
                     상황에 맞는 서비스를 고르세요.
                 </h2>

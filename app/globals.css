@@ -27,7 +27,11 @@
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
+    --color-description-foreground: var(--description-foreground);
     --color-muted: var(--muted);
+    /* 메인·서비스 소개·예약의 큰 패널 배경은 여기서 함께 조정한다. */
+    --color-panel-muted: color-mix(in oklab, var(--muted) 60%, transparent);
+    --color-panel-brand: color-mix(in oklab, var(--brand) 5%, transparent);
     --color-secondary-foreground: var(--secondary-foreground);
     --color-secondary: var(--secondary);
     --color-primary-foreground: var(--primary-foreground);
@@ -67,6 +71,7 @@
     --secondary-foreground: oklch(0.205 0 0);
     --muted: oklch(0.97 0 0);
     --muted-foreground: oklch(0.556 0 0);
+    --description-foreground: #525252;
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
     --destructive: oklch(0.577 0.245 27.325);
@@ -109,6 +114,7 @@
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.269 0 0);
     --muted-foreground: oklch(0.708 0 0);
+    --description-foreground: #d4d4d4;
     --accent: oklch(0.269 0 0);
     --accent-foreground: oklch(0.985 0 0);
     --destructive: oklch(0.704 0.191 22.216);

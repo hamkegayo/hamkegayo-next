@@ -16,6 +16,7 @@ import {
 
 type Step =
     | { name: "credentials" }
+    | { name: "password" }
     | { name: "enroll"; factorId: string; qr: string; secret: string }
     | { name: "verify" };
 
@@ -25,6 +26,8 @@ export function AdminLoginForm() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [code, setCode] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [passwordConfirm, setPasswordConfirm] = useState("");
     const [busy, setBusy] = useState(false);
 
     const submitCredentials = async (e: React.FormEvent) => {
@@ -35,6 +38,10 @@ export function AdminLoginForm() {
             const res = await loginAdmin({ email, password });
             if (!res.ok) {
                 toast.error(res.message);
+                return;
+            }
+            if (res.next === "password") {
+                setStep({ name: "password" });
                 return;
             }
             if (res.next === "verify") {
@@ -52,6 +59,36 @@ export function AdminLoginForm() {
                 qr: enrolled.qr,
                 secret: enrolled.secret,
             });
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const changeInitialPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (busy) return;
+        if (newPassword !== passwordConfirm) {
+            toast.error("비밀번호 확인이 일치하지 않습니다.");
+            return;
+        }
+        setBusy(true);
+        try {
+            const response = await fetch("/api/admin/accounts/activate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: newPassword }),
+            });
+            const result = (await response.json()) as { message?: string };
+            if (!response.ok) {
+                toast.error(result.message ?? "비밀번호 변경에 실패했습니다.");
+                return;
+            }
+            await cancelAdminLogin();
+            setStep({ name: "credentials" });
+            setPassword("");
+            setNewPassword("");
+            setPasswordConfirm("");
+            toast.success("변경한 비밀번호로 다시 로그인해 주세요.");
         } finally {
             setBusy(false);
         }
@@ -126,6 +163,62 @@ export function AdminLoginForm() {
                     >
                         {busy && <Loader2 className="size-4 animate-spin" />}
                         다음
+                    </button>
+                </form>
+            )}
+
+            {step.name === "password" && (
+                <form
+                    onSubmit={changeInitialPassword}
+                    className="mt-7 space-y-5"
+                >
+                    <p className="text-muted-foreground text-sm">
+                        임시 비밀번호를 새 비밀번호로 변경해야 2단계 인증을
+                        등록할 수 있습니다.
+                    </p>
+                    <div className="space-y-2">
+                        <Label htmlFor="admin-new-password">새 비밀번호</Label>
+                        <Input
+                            id="admin-new-password"
+                            type="password"
+                            autoComplete="new-password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            minLength={8}
+                            required
+                        />
+                        <p className="text-muted-foreground text-xs">
+                            8자 이상, 특수문자를 포함해 주세요.
+                        </p>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="admin-password-confirm">
+                            새 비밀번호 확인
+                        </Label>
+                        <Input
+                            id="admin-password-confirm"
+                            type="password"
+                            autoComplete="new-password"
+                            value={passwordConfirm}
+                            onChange={(e) => setPasswordConfirm(e.target.value)}
+                            minLength={8}
+                            required
+                        />
+                    </div>
+                    <button
+                        type="submit"
+                        disabled={busy}
+                        className="bg-foreground text-background flex h-11 w-full items-center justify-center gap-2 rounded-lg font-bold disabled:opacity-60"
+                    >
+                        {busy && <Loader2 className="size-4 animate-spin" />}
+                        비밀번호 변경
+                    </button>
+                    <button
+                        type="button"
+                        onClick={cancel}
+                        className="text-muted-foreground hover:text-foreground w-full text-sm"
+                    >
+                        처음으로
                     </button>
                 </form>
             )}

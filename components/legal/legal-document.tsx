@@ -30,7 +30,10 @@ export function ArticleBody({ article }: { article: LegalArticle }) {
             {article.blocks.map((block, i) => {
                 if (block.type === "p") {
                     return (
-                        <p key={i} className="text-muted-foreground leading-7">
+                        <p
+                            key={i}
+                            className="text-description-foreground leading-7"
+                        >
                             {block.text}
                         </p>
                     );
@@ -51,7 +54,7 @@ export function ArticleBody({ article }: { article: LegalArticle }) {
                     return (
                         <ol
                             key={i}
-                            className="text-muted-foreground list-decimal space-y-2 pl-5 leading-7"
+                            className="text-description-foreground list-decimal space-y-2 pl-5 leading-7"
                         >
                             {block.items.map((item, j) => (
                                 <li key={j}>{item}</li>
@@ -89,7 +92,7 @@ export function ArticleBody({ article }: { article: LegalArticle }) {
                                         {row.map((cell, k) => (
                                             <td
                                                 key={k}
-                                                className="text-muted-foreground px-3 py-2 align-top leading-6"
+                                                className="text-description-foreground px-3 py-2 align-top leading-6"
                                             >
                                                 {cell}
                                             </td>

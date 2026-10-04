@@ -115,7 +115,7 @@ export function ServicePrinciples() {
                         <h2 className="text-foreground text-lg font-bold">
                             서비스 이용 전 꼭 확인해주세요
                         </h2>
-                        <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
+                        <p className="text-description-foreground mt-1 text-sm leading-relaxed">
                             함께가요는 의료행위가 아닌 비의료 지원 서비스입니다.
                             보다 안전하고 신뢰할 수 있는 서비스를 제공하기 위해
                             명확한 운영 원칙을 지키고 있습니다.
@@ -158,7 +158,7 @@ export function ServicePrinciples() {
                                         {items.map((item) => (
                                             <li
                                                 key={item}
-                                                className="text-muted-foreground text-sm leading-relaxed"
+                                                className="text-description-foreground text-sm leading-relaxed"
                                             >
                                                 {item}
                                             </li>

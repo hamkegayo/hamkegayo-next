@@ -105,7 +105,7 @@ export function StepComplete() {
                         <h2 className="text-foreground mt-4 text-2xl font-extrabold">
                             예약이 확정되었습니다!
                         </h2>
-                        <p className="text-muted-foreground mt-2">
+                        <p className="text-description-foreground mt-2">
                             이용해주셔서 감사합니다.
                         </p>
                     </div>
@@ -118,7 +118,7 @@ export function StepComplete() {
                         <p className="text-foreground mt-1 text-2xl font-extrabold">
                             {reservationNo}
                         </p>
-                        <p className="text-muted-foreground mt-1 text-xs">
+                        <p className="text-description-foreground mt-1 text-xs">
                             예약 번호는 예약 조회 및 문의시 필요합니다
                         </p>
                     </div>
@@ -190,7 +190,7 @@ export function StepComplete() {
                                         <p className="text-foreground font-bold">
                                             {title}
                                         </p>
-                                        <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
+                                        <p className="text-description-foreground mt-1 text-sm leading-relaxed">
                                             {desc}
                                         </p>
                                     </div>

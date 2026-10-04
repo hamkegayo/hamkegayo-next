@@ -19,7 +19,7 @@ export function ConsentBanner() {
             className="fixed inset-x-0 bottom-0 z-[60] px-4 pb-4"
         >
             <div className="border-border bg-popover text-popover-foreground mx-auto flex max-w-3xl flex-col gap-4 rounded-2xl border p-5 shadow-lg sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-muted-foreground text-sm leading-relaxed">
+                <p className="text-description-foreground text-sm leading-relaxed">
                     함께가요는 서비스 개선과 마케팅을 위해 GA4·Meta Pixel 쿠키를
                     사용합니다. 동의하시면 방문·전환 통계 수집에 활용됩니다.
                     거부하셔도 서비스 이용에는 영향이 없습니다.

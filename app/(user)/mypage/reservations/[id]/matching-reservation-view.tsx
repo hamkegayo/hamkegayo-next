@@ -146,7 +146,7 @@ export function MatchingReservationView({
                                 {applicants.length}
                             </span>
                         </h3>
-                        <p className="text-muted-foreground mt-1 text-sm">
+                        <p className="text-description-foreground mt-1 text-sm">
                             지원한 파트너 중 한 분을 선택하면 예약이 확정됩니다.
                         </p>
 
@@ -158,7 +158,7 @@ export function MatchingReservationView({
                                 <p className="text-foreground font-bold">
                                     아직 지원한 파트너가 없어요
                                 </p>
-                                <p className="text-muted-foreground text-sm">
+                                <p className="text-description-foreground text-sm">
                                     파트너가 요청을 수락하면 여기에서 선택할 수
                                     있어요.
                                 </p>
@@ -232,7 +232,7 @@ export function MatchingReservationView({
                 confirmLabel="파트너 확정"
                 confirmDisabled={pending}
             >
-                <p className="text-muted-foreground mt-3 text-left text-sm leading-relaxed">
+                <p className="text-description-foreground mt-3 text-left text-sm leading-relaxed">
                     <span className="text-foreground font-bold">
                         {selected?.name}
                     </span>{" "}
@@ -250,7 +250,7 @@ export function MatchingReservationView({
                 confirmLabel="예약 취소"
                 confirmDisabled={pending}
             >
-                <p className="text-muted-foreground mt-3 text-left text-sm leading-relaxed">
+                <p className="text-description-foreground mt-3 text-left text-sm leading-relaxed">
                     취소하면 파트너에게 전달된 매칭 요청이 종료되며, 되돌릴 수
                     없습니다. 다시 이용하시려면 새로 예약해 주세요.
                 </p>

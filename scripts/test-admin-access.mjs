@@ -54,6 +54,8 @@ const ADMIN_EMAIL = process.env.TEST_ADMIN_EMAIL ?? "admin-test-50@example.com";
 const ADMIN_PASSWORD = "adminTest50!";
 /** 승격 대상으로 쓸 전용(이용 이력 없는) 계정 — #56 의 계정 발급이 만들 형태 */
 const DEDICATED_EMAIL = "admin-new-50@example.com";
+const ISSUED_PARTNER_EMAIL = "issued-partner-56@partner.hamkegayo.internal";
+const ISSUED_PARTNER_LOGIN = "issued-partner-56";
 const CODE_PREFIX = "TEST-50";
 
 const admin = createClient(url, serviceKey, {
@@ -131,6 +133,13 @@ async function findUserByEmail(email) {
 }
 
 async function cleanup(adminId) {
+    if (adminId) {
+        await admin.from("transfer_batches").delete().eq("created_by", adminId);
+    }
+    await admin
+        .from("payment_incidents")
+        .delete()
+        .like("order_id", `${CODE_PREFIX}%`);
     await admin.from("reservations").delete().like("code", `${CODE_PREFIX}%`);
     if (adminId) {
         await admin.from("access_logs").delete().eq("actor_id", adminId);
@@ -140,6 +149,8 @@ async function cleanup(adminId) {
     // 승격 테스트용 전용 계정 — profiles/admin_* 는 cascade 로 함께 지워진다
     const dedicated = await findUserByEmail(DEDICATED_EMAIL);
     if (dedicated) await admin.auth.admin.deleteUser(dedicated.id);
+    const issuedPartner = await findUserByEmail(ISSUED_PARTNER_EMAIL);
+    if (issuedPartner) await admin.auth.admin.deleteUser(issuedPartner.id);
 }
 
 /** 테스트용 관리자 계정을 만들고 2단계 인증까지 마친 클라이언트를 돌려준다 */
@@ -308,7 +319,17 @@ async function main() {
 
     const aal1Rpc = await adminClient.rpc("admin_list_reservations", {});
     check("aal1 관리자는 예약 목록 RPC 거절됨", !!aal1Rpc.error);
+    const aal1Transfer = await adminClient.rpc("admin_record_transfer_result", {p_batch_id: adminId, p_status: "COMPLETED", p_reference: "TEST-177 MFA 검증", p_reason: "TEST-177 MFA 미인증 차단"});
+    check("MFA 전에는 이체 결과 기록 차단", aal1Transfer.error?.code === "42501");
 
+    await admin
+        .from("admin_accounts")
+        .upsert({ profile_id: adminId, duty: "심사" });
+    const aal1Review = await adminClient.rpc("can_review_qualifications");
+    check(
+        "심사 담당이어도 2단계 인증 전에는 심사 불가",
+        aal1Review.data === false,
+    );
     await upgradeToAal2(adminClient);
 
     const aal2IsAdmin = await adminClient.rpc("is_admin");
@@ -316,6 +337,70 @@ async function main() {
 
     const aal2Live = await adminClient.rpc("is_admin_live");
     check("2단계 인증 후 is_admin_live() = true", aal2Live.data === true);
+
+    const issuedPartner = await admin.auth.admin.createUser({
+        email: ISSUED_PARTNER_EMAIL,
+        password: "issuedPartner56!",
+        email_confirm: true,
+    });
+    if (issuedPartner.error) throw issuedPartner.error;
+    const issuedPartnerId = issuedPartner.data.user.id;
+    const deniedIssue = await adminClient.rpc(
+        "admin_register_partner_account",
+        {
+            p_target: issuedPartnerId,
+            p_login_id: ISSUED_PARTNER_LOGIN,
+            p_reason: "TEST-56 파트너 전용 계정 발급",
+        },
+    );
+    check("심사 담당은 계정 발급 불가", deniedIssue.error?.code === "42501");
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "계정" })
+        .eq("profile_id", adminId);
+    const issueAllowed = await adminClient.rpc("can_issue_accounts");
+    check("계정 담당은 MFA 후 계정 발급 가능", issueAllowed.data === true);
+    const issued = await adminClient.rpc("admin_register_partner_account", {
+        p_target: issuedPartnerId,
+        p_login_id: ISSUED_PARTNER_LOGIN.toUpperCase(),
+        p_reason: "TEST-56 파트너 전용 계정 발급",
+    });
+    check(
+        "파트너 가입 대기 계정 발급 성공",
+        !issued.error,
+        issued.error?.message,
+    );
+    const [issuedProfile, issuedAccount, issuedLog] = await Promise.all([
+        admin
+            .from("profiles")
+            .select("role, status")
+            .eq("id", issuedPartnerId)
+            .single(),
+        admin
+            .from("partner_accounts")
+            .select("login_id")
+            .eq("profile_id", issuedPartnerId)
+            .single(),
+        admin
+            .from("access_logs")
+            .select("action, actor_id")
+            .eq("target_id", issuedPartnerId)
+            .maybeSingle(),
+    ]);
+    check(
+        "발급 계정은 PARTNER/PENDING 상태",
+        issuedProfile.data?.role === "PARTNER" &&
+            issuedProfile.data?.status === "PENDING",
+    );
+    check(
+        "대문자 입력도 소문자로 정규화해 발급 아이디 저장",
+        issuedAccount.data?.login_id === ISSUED_PARTNER_LOGIN,
+    );
+    check(
+        "계정 발급자 접속기록 저장",
+        issuedLog.data?.action === "PARTNER_ACCOUNT_ISSUE" &&
+            issuedLog.data?.actor_id === adminId,
+    );
 
     // =============================================================
     section("3. 관리자가 볼 수 없어야 하는 것 (처리방침 제10조 3)");
@@ -328,7 +413,9 @@ async function main() {
         .limit(1)
         .maybeSingle();
     if (!partnerRow) {
-        console.error("❌ 파트너 계정이 없습니다. npm run seed:dev 를 먼저 실행하세요.");
+        console.error(
+            "❌ 파트너 계정이 없습니다. npm run seed:dev 를 먼저 실행하세요.",
+        );
         process.exit(1);
     }
     const partnerId = partnerRow.profile_id;
@@ -420,7 +507,8 @@ async function main() {
         svcList.error?.message,
     );
 
-    const svcRow = (svcList.data ?? []).find((s) => s.id === seededSvc.id) ?? {};
+    const svcRow =
+        (svcList.data ?? []).find((s) => s.id === seededSvc.id) ?? {};
     check(
         "시각 3종(도착·시작·종료)이 모두 반환됨",
         !!svcRow.arrived_at && !!svcRow.started_at && !!svcRow.ended_at,
@@ -453,6 +541,299 @@ async function main() {
     }
 
     // =============================================================
+    section("4-1. 정산 담당 목록·보류·일괄 승인 (#56)");
+    // =============================================================
+    const { data: previousPayout } = await admin
+        .from("partner_payouts")
+        .select("*")
+        .eq("partner_id", partnerId)
+        .maybeSingle();
+    await admin.from("partner_payouts").upsert({
+        partner_id: partnerId,
+        bank_code: "004",
+        bank_name: "국민은행",
+        account_number: "123456789012",
+        account_last4: "9012",
+        holder_name: "테스트파트너",
+    });
+    const { data: settlement, error: settlementError } = await admin
+        .from("settlements")
+        .insert({
+            service_id: seededSvc.id,
+            partner_id: partnerId,
+            amount: 40000,
+            fee: 0,
+            net: 40000,
+            reason: "SERVICE_COMPLETED",
+        })
+        .select("id")
+        .single();
+    if (settlementError) throw settlementError;
+
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "심사" })
+        .eq("profile_id", adminId);
+    const deniedSettlement = await adminClient.rpc("can_manage_settlements");
+    check("심사 담당은 정산 관리 불가", deniedSettlement.data === false);
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "정산" })
+        .eq("profile_id", adminId);
+    const settlementList = await adminClient.rpc("admin_list_settlements", {
+        p_partner: partnerId,
+        p_limit: 20,
+    });
+    check(
+        "정산 담당은 필터 목록 조회 가능",
+        !settlementList.error &&
+            settlementList.data?.some((row) => row.id === settlement.id),
+        settlementList.error?.message,
+    );
+    const noPaymentApproval = await adminClient.rpc("admin_approve_settlements", {
+        p_ids: [settlement.id], p_reason: "TEST-177 결제 없는 정산 차단",
+    });
+    check("결제 연결 없는 정산 승인 차단", noPaymentApproval.error?.code === "23514");
+    const legacyConfirm = await adminClient.rpc("confirm_reservation_partner", {
+        p_reservation_id: seededRes.id, p_partner_id: partnerId,
+    });
+    check("레거시 미결제 예약 확정 RPC 실행 권한 회수", legacyConfirm.error?.code === "42501");
+    const paymentFixture = await admin.from("payments").insert({
+        reservation_id: seededRes.id, type: "BASE", status: "PENDING",
+        order_id: `TEST-177-${Date.now()}`, gross_amount: 40000,
+        discount_amount: 0, commission_amount: 0, payout_amount: 40000,
+    }).select("id").single();
+    if (paymentFixture.error) throw paymentFixture.error;
+    const paidFixtureId = paymentFixture.data.id;
+    await admin.from("settlements").update({payment_id: paidFixtureId}).eq("id", settlement.id);
+    const pendingPaymentApproval = await adminClient.rpc("admin_approve_settlements", {
+        p_ids: [settlement.id], p_reason: "TEST-177 미승인 결제 정산 차단",
+    });
+    check("PENDING 결제는 정산 승인 불가", pendingPaymentApproval.error?.code === "23514");
+    await admin.from("payments").update({status: "PAID", paid_at: new Date().toISOString()}).eq("id", paidFixtureId);
+    const approvedSettlement = await adminClient.rpc(
+        "admin_approve_settlements",
+        {
+            p_ids: [settlement.id],
+            p_reason: "TEST-56 지급 조건 확인 완료",
+        },
+    );
+    check(
+        "계좌·서비스 조건을 충족한 정산 승인",
+        approvedSettlement.data === 1,
+        approvedSettlement.error?.message,
+    );
+    const heldSettlement = await adminClient.rpc("admin_hold_settlements", {
+        p_ids: [settlement.id],
+        p_reason: "TEST-56 재검토를 위한 보류",
+    });
+    check("승인 건 보류 가능", heldSettlement.data === 1);
+    const releasedSettlement = await adminClient.rpc(
+        "admin_release_settlements",
+        {
+            p_ids: [settlement.id],
+            p_reason: "TEST-56 보류 사유 해소",
+        },
+    );
+    check("보류 건 검토 대기 복귀", releasedSettlement.data === 1);
+    await admin.from("partner_payouts").delete().eq("partner_id", partnerId);
+    const noAccountApproval = await adminClient.rpc(
+        "admin_approve_settlements",
+        {
+            p_ids: [settlement.id],
+            p_reason: "TEST-56 계좌 없는 승인 차단",
+        },
+    );
+    check(
+        "정산 계좌가 없으면 승인 불가",
+        noAccountApproval.error?.code === "23514",
+    );
+    if (previousPayout) {
+        await admin.from("partner_payouts").insert(previousPayout);
+    } else {
+        await admin.from("partner_payouts").insert({
+            partner_id: partnerId,
+            bank_code: "004",
+            bank_name: "국민은행",
+            account_number: "123456789012",
+            account_last4: "9012",
+            holder_name: "테스트파트너",
+        });
+    }
+
+    const reapprovedSettlement = await adminClient.rpc(
+        "admin_approve_settlements",
+        {
+            p_ids: [settlement.id],
+            p_reason: "TEST-56 이체 배치 생성 전 재승인",
+        },
+    );
+    check("계좌 복구 후 정산 재승인", reapprovedSettlement.data === 1);
+    await admin.from("payments").update({status: "FAILED"}).eq("id", paidFixtureId);
+    const unpaidBatch = await adminClient.rpc("admin_create_transfer_batch", {
+        p_ids: [settlement.id], p_reason: "TEST-177 승인 후 결제 상태 재검증",
+    });
+    check("승인된 정산도 결제가 PAID가 아니면 이체 배치 생성 차단", unpaidBatch.error?.code === "23514");
+    await admin.from("payments").update({status: "PAID"}).eq("id", paidFixtureId);
+    const transferBatch = await adminClient.rpc("admin_create_transfer_batch", {
+        p_ids: [settlement.id],
+        p_reason: "TEST-56 승인 정산 이체 배치 생성",
+    });
+    check(
+        "승인 정산을 파트너별 이체 배치로 생성",
+        !transferBatch.error &&
+            transferBatch.data?.settlementCount === 1 &&
+            transferBatch.data?.partnerCount === 1 &&
+            transferBatch.data?.totalNet === 40000,
+        transferBatch.error?.message,
+    );
+    const duplicateBatch = await adminClient.rpc(
+        "admin_create_transfer_batch",
+        {
+            p_ids: [settlement.id],
+            p_reason: "TEST-56 동일 정산 중복 편입 차단",
+        },
+    );
+    check(
+        "동일 정산의 중복 배치 편입 차단",
+        duplicateBatch.error?.code === "23514",
+    );
+    const batchedHold = await adminClient.rpc("admin_hold_settlements", {
+        p_ids: [settlement.id],
+        p_reason: "TEST-56 배치 편입 뒤 보류 차단",
+    });
+    check(
+        "활성 배치에 편입된 정산의 보류 차단",
+        batchedHold.error?.code === "23514",
+    );
+    const sameAdminIssue = await adminClient.rpc("admin_issue_transfer_file", {
+        p_batch_id: transferBatch.data?.id,
+        p_reason: "TEST-56 생성자 파일 발급 차단",
+    });
+    check(
+        "배치 생성자는 이체 파일 발급 불가",
+        sameAdminIssue.error?.code === "42501",
+    );
+    // 두 번째 관리자 역할을 재현하기 위해 생성자만 다른 프로필로 바꾼다.
+    await admin
+        .from("transfer_batches")
+        .update({ created_by: partnerId })
+        .eq("id", transferBatch.data?.id);
+    await admin.from("payments").update({status: "FAILED"}).eq("id", paidFixtureId);
+    const unpaidFile = await adminClient.rpc("admin_issue_transfer_file", {
+        p_batch_id: transferBatch.data?.id, p_reason: "TEST-177 파일 반출 전 결제 검증",
+    });
+    check("배치 편입 뒤 결제 상태가 바뀌면 파일 반출 차단", unpaidFile.error?.code === "23514");
+    await admin.from("payments").update({status: "PAID"}).eq("id", paidFixtureId);
+    // service_role? ??/?? ?? ??? ????. ??? RPC??? ???? ???.
+    await admin.from("settlements").update({ status: "HOLD" }).eq("id", settlement.id);
+    const heldFile = await adminClient.rpc("admin_issue_transfer_file", {
+        p_batch_id: transferBatch.data.id, p_reason: "TEST-177 ?? ?? CSV ??",
+    });
+    check("?? ??? ?? ??? ?? ?? ?? ??", heldFile.error?.code === "23514");
+    const heldRelease = await adminClient.rpc("admin_release_settlements", {
+        p_ids: [settlement.id], p_reason: "TEST-177 ?? ?? ?? ?? ??",
+    });
+    check("?? ??? ??? ??? ?? ?? ??", heldRelease.error?.code === "23514");
+    const heldState = await admin.from("settlements").select("status").eq("id", settlement.id).single();
+    const unissuedState = await admin.from("transfer_batches").select("status,issued_at,last_downloaded_at").eq("id",transferBatch.data.id).single();
+    check("??? ?????? ??? ??? ?? ??", heldState.data?.status === "HOLD" && unissuedState.data?.status === "DRAFT" && unissuedState.data?.issued_at === null && unissuedState.data?.last_downloaded_at === null);
+    await admin.from("settlements").update({ status: "APPROVED" }).eq("id", settlement.id);
+    const issuedFile = await adminClient.rpc("admin_issue_transfer_file", {
+        p_batch_id: transferBatch.data?.id,
+        p_reason: "TEST-56 두 번째 담당자 이체 파일 발급",
+    });
+    check(
+        "두 번째 정산 담당자는 이체 파일 발급 가능",
+        !issuedFile.error &&
+            issuedFile.data?.[0]?.account_number === "123456789012",
+        issuedFile.error?.message,
+    );
+    const issuedBatch = await admin
+        .from("transfer_batches")
+        .select("status, issued_by, issued_at, last_downloaded_at")
+        .eq("id", transferBatch.data?.id)
+        .single();
+    check(
+        "파일 발급 시 배치 잠금과 발급 이력 기록",
+        issuedBatch.data?.status === "FILE_ISSUED" &&
+            issuedBatch.data?.issued_by === adminId &&
+            !!issuedBatch.data?.issued_at &&
+            !!issuedBatch.data?.last_downloaded_at,
+        issuedBatch.error?.message,
+    );
+    await admin.from("settlements").update({ status: "HOLD" }).eq("id", settlement.id);
+    const heldReissue = await adminClient.rpc("admin_issue_transfer_file", {
+        p_batch_id: transferBatch.data.id, p_reason: "TEST-177 ?? ?? ????? ??",
+    });
+    const unchangedDownload = await admin.from("transfer_batches").select("last_downloaded_at").eq("id",transferBatch.data.id).single();
+    check("?? ?? ? ??? ??? CSV ????? ??", heldReissue.error?.code === "23514" && unchangedDownload.data?.last_downloaded_at === issuedBatch.data?.last_downloaded_at);
+    await admin.from("settlements").update({ status: "APPROVED" }).eq("id", settlement.id);
+    await admin
+        .from("transfer_batches")
+        .update({ created_by: adminId })
+        .eq("id", transferBatch.data?.id);
+    const transferItems = await adminClient.rpc(
+        "admin_list_transfer_batch_items",
+        { p_batch_id: transferBatch.data?.id },
+    );
+    const transferItem = transferItems.data?.[0] ?? {};
+    check(
+        "이체 배치 목록은 계좌 끝 4자리만 반환",
+        !transferItems.error &&
+            transferItem.account_last4 === "9012" &&
+            !("account_number" in transferItem),
+        transferItems.error?.message,
+    );
+
+    const resultArgs = { p_batch_id: transferBatch.data.id, p_status: "COMPLETED", p_reference: "TEST-177 은행 결과 대조", p_reason: "TEST-177 전건 지급 성공 확인" };
+    await admin.from("admin_accounts").update({ duty: "계정" }).eq("profile_id", adminId);
+    const wrongTransferDuty = await adminClient.rpc("admin_record_transfer_result", resultArgs);
+    check("계정 담당은 이체 결과 기록 차단", wrongTransferDuty.error?.code === "42501");
+    await admin.from("admin_accounts").update({ duty: "정산" }).eq("profile_id", adminId);
+    const badResult = await adminClient.rpc("admin_record_transfer_result", { ...resultArgs, p_reason: "짧음" });
+    check("이체 결과 기록 사유 검증", badResult.error?.code === "22023");
+    await admin.from("payments").update({ status: "FAILED" }).eq("id", paidFixtureId);
+    const unpaidResult = await adminClient.rpc("admin_record_transfer_result", resultArgs);
+    check("결제 근거가 사라진 배치 지급 완료 기록 차단", unpaidResult.error?.code === "23514");
+    const unchangedResult = await admin.from("transfer_batch_results").select("batch_id").eq("batch_id", transferBatch.data.id);
+    check("실패한 결과 기록은 이력도 남기지 않음", unchangedResult.data?.length === 0);
+    await admin.from("payments").update({ status: "PAID" }).eq("id", paidFixtureId);
+    const completedBatch = await adminClient.rpc("admin_record_transfer_result", resultArgs);
+    const resultRecord = await adminClient.rpc("admin_get_transfer_result", { p_batch_id: transferBatch.data.id });
+    check("지급 결과 근거·담당자·시각 조회", !resultRecord.error && resultRecord.data?.reference === resultArgs.p_reference && !!resultRecord.data?.recordedAt);
+    const paidSettlement = await admin.from("settlements").select("status,paid_at").eq("id", settlement.id).single();
+    check("지급 완료와 정산 PAID 동기화", paidSettlement.data?.status === "PAID" && !!paidSettlement.data?.paid_at);
+    const duplicateResult = await adminClient.rpc("admin_record_transfer_result", resultArgs);
+    check("지급 결과 중복 기록 차단", duplicateResult.error?.code === "23514");
+    const tamperedResult = await adminClient.from("transfer_batch_results").update({reason:"TEST-177 이력 위조"}).eq("batch_id",transferBatch.data.id).select("batch_id");
+    check("인증된 관리자도 결과 이력 직접 수정 차단", !!tamperedResult.error || tamperedResult.data?.length === 0);
+    const purgedItems = await admin.from("transfer_batch_items").select("account_number,account_last4").eq("batch_id",transferBatch.data.id);
+    check("이체 완료 후 계좌번호 원문 파기 및 끝4자리 유지", !completedBatch.error && purgedItems.data?.every(x=>x.account_number === null && x.account_last4 === "9012"));
+    const reopenBatch = await admin.from("transfer_batches").update({status:"DRAFT"}).eq("id",transferBatch.data.id);
+    check("완료 배치는 계좌 재반출을 위해 재개할 수 없음", reopenBatch.error?.code === "23514");
+
+    // 전건 미지급 취소는 별도 배치로 테스트한다. 원래 배치 이력은 보존하고 재편입 연결만 해제한다.
+    await admin.from("settlements").update({status:"APPROVED",paid_at:null,settled_at:null}).eq("id", settlement.id);
+    const cancelId = crypto.randomUUID();
+    await admin.from("transfer_batches").insert({id:cancelId,code:`TEST-50-CANCEL-${cancelId}`,reason:"TEST-177 취소 배치",settlement_count:1,partner_count:1,total_net:40000,created_by:adminId});
+    const cancelItemId = crypto.randomUUID();
+    await admin.from("transfer_batch_items").insert({id:cancelItemId,batch_id:cancelId,partner_id:partnerId,amount:40000,settlement_count:1,bank_code:"004",bank_name:"테스트은행",account_number:"123456789012",account_last4:"9012",holder_name:"테스트"});
+    // 테스트용 기존 연결을 옮긴다. 운영 완료 배치의 연결을 변경하는 RPC는 없다.
+    await admin.from("transfer_batch_settlements").delete().eq("batch_id", transferBatch.data.id);
+    await admin.from("transfer_batch_settlements").insert({batch_id:cancelId,item_id:cancelItemId,settlement_id:settlement.id});
+    const draftComplete = await adminClient.rpc("admin_record_transfer_result", {...resultArgs,p_batch_id:cancelId});
+    check("파일 미발급 배치는 지급 완료 기록 차단", draftComplete.error?.code === "23514");
+    const cancelled = await adminClient.rpc("admin_record_transfer_result", {...resultArgs,p_batch_id:cancelId,p_status:"CANCELLED",p_reason:"TEST-177 은행 대기 이체 없고 전건 미지급 확인"});
+    const cancelItems = await admin.from("transfer_batch_items").select("account_number").eq("batch_id",cancelId);
+    const cancelLinks = await admin.from("transfer_batch_settlements").select("settlement_id").eq("batch_id",cancelId);
+    const cancelHistory = await admin.from("transfer_batch_results").select("settlement_ids").eq("batch_id",cancelId).single();
+    check("취소 결과 기록과 계좌 파기", !cancelled.error && cancelItems.data?.[0]?.account_number === null, cancelled.error?.message);
+    check("취소 연결 해제와 원래 정산 이력 보존", cancelLinks.data?.length === 0 && cancelHistory.data?.settlement_ids?.includes(settlement.id));
+    await admin.from("transfer_batch_items").delete().eq("batch_id",cancelId);
+    await admin.from("transfer_batches").delete().eq("id",cancelId);
+
+    // =============================================================
     section("5. 예약 RPC — 개인정보를 반환하지 않는다");
     // =============================================================
     const list = await adminClient.rpc("admin_list_reservations", {
@@ -482,11 +863,160 @@ async function main() {
         `노출된 컬럼: ${leaked.join(", ")}`,
     );
 
+    // =============================================================
+    section("5-1. 결제 사고 추적 — 목록·상태·고객 안내 (#80)");
+    // =============================================================
+    const { data: incident, error: incidentSeedError } = await admin
+        .from("payment_incidents")
+        .insert({
+            reservation_id: seededRes.id,
+            order_id: `${CODE_PREFIX}-PAYMENT`,
+            kind: "CANCEL_FAILED",
+            severity: "CRITICAL",
+            amount: 20000,
+            detail: { gatewayCode: "TEST", gatewayMessage: "테스트 오류" },
+        })
+        .select("id")
+        .single();
+    if (incidentSeedError) throw incidentSeedError;
+
+    const directIncident = await adminClient
+        .from("payment_incidents")
+        .select("id")
+        .eq("id", incident.id);
+    check(
+        "관리자도 payment_incidents를 직접 조회하지 못함",
+        !directIncident.error && (directIncident.data ?? []).length === 0,
+        directIncident.error?.message,
+    );
+    const directIncidentActions = await adminClient
+        .from("payment_incident_actions")
+        .select("id")
+        .eq("incident_id", incident.id);
+    check(
+        "관리자도 payment_incident_actions를 직접 조회하지 못함",
+        !!directIncidentActions.error ||
+            (directIncidentActions.data ?? []).length === 0,
+        directIncidentActions.error?.message,
+    );
+
+    const incidentSummary = await adminClient.rpc(
+        "admin_payment_incident_summary",
+    );
+    check(
+        "대시보드 요약에 미처리 최상 사고가 집계됨",
+        !incidentSummary.error &&
+            Number(incidentSummary.data?.[0]?.open_count ?? 0) >= 1 &&
+            Number(incidentSummary.data?.[0]?.critical_count ?? 0) >= 1,
+        incidentSummary.error?.message,
+    );
+
+    const incidentList = await adminClient.rpc("admin_list_payment_incidents", {
+        p_status: null,
+    });
+    check(
+        "관리자 RPC로 PG 응답과 관련 예약을 조회할 수 있음",
+        !incidentList.error &&
+            (incidentList.data ?? []).some(
+                (row) =>
+                    row.id === incident.id &&
+                    row.reservation_id === seededRes.id &&
+                    row.detail?.gatewayCode === "TEST",
+            ),
+        incidentList.error?.message,
+    );
+
+    const skippedState = await adminClient.rpc(
+        "admin_update_payment_incident",
+        {
+            p_id: incident.id,
+            p_status: "RESOLVED",
+            p_memo: "중간 단계 생략 시도",
+        },
+    );
+    check("OPEN에서 RESOLVED로 바로 변경할 수 없음", !!skippedState.error);
+
+    const acknowledged = await adminClient.rpc(
+        "admin_update_payment_incident",
+        {
+            p_id: incident.id,
+            p_status: "ACKNOWLEDGED",
+            p_memo: "PG 관리자 콘솔 확인 시작",
+        },
+    );
+    check(
+        "OPEN 사고를 ACKNOWLEDGED로 변경할 수 있음",
+        !acknowledged.error,
+        acknowledged.error?.message,
+    );
+
+    const nullContactMethod = await adminClient.rpc(
+        "admin_record_payment_incident_contact",
+        {
+            p_id: incident.id,
+            p_method: null,
+            p_note: "안내 수단 누락",
+        },
+    );
+    check("고객 안내 수단이 NULL이면 거절됨", !!nullContactMethod.error);
+
+    const contacted = await adminClient.rpc(
+        "admin_record_payment_incident_contact",
+        {
+            p_id: incident.id,
+            p_method: "PHONE",
+            p_note: "TEST_PAYMENT_CONTACT_NOTE",
+        },
+    );
+    check(
+        "고객 안내 방법·내용을 기록할 수 있음",
+        !contacted.error,
+        contacted.error?.message,
+    );
+
+    const incidentResolved = await adminClient.rpc(
+        "admin_update_payment_incident",
+        {
+            p_id: incident.id,
+            p_status: "RESOLVED",
+            p_memo: "PG 콘솔 확인 및 고객 안내 완료",
+        },
+    );
+    check(
+        "ACKNOWLEDGED 사고를 RESOLVED로 변경할 수 있음",
+        !incidentResolved.error,
+        incidentResolved.error?.message,
+    );
+
+    const resolvedList = await adminClient.rpc("admin_list_payment_incidents", {
+        p_status: "RESOLVED",
+    });
+    const resolvedIncident = (resolvedList.data ?? []).find(
+        (row) => row.id === incident.id,
+    );
+    check(
+        "상태 변경 2건과 고객 안내 1건이 불변 이력으로 조회됨",
+        !resolvedList.error && resolvedIncident?.history?.length === 3,
+        resolvedList.error?.message ??
+            `history=${resolvedIncident?.history?.length ?? 0}`,
+    );
+
     const noReason = await adminClient.rpc("admin_get_reservation", {
         p_id: seededRes.id,
         p_reason: "   ",
     });
     check("사유 없는 상세 열람은 거절됨", !!noReason.error);
+
+    const incidentReservation = await adminClient.rpc(
+        "admin_get_payment_incident_reservation",
+        { p_incident_id: incident.id },
+    );
+    check(
+        "결제 사고와 실제 연결된 예약만 상세 열람 가능",
+        !incidentReservation.error &&
+            incidentReservation.data?.id === seededRes.id,
+        incidentReservation.error?.message,
+    );
 
     const detail = await adminClient.rpc("admin_get_reservation", {
         p_id: seededRes.id,
@@ -513,14 +1043,31 @@ async function main() {
         "접속기록에 처리한 정보주체가 기록됨",
         readLog?.subject_id === userId,
     );
-    check("접속기록에 열람 사유가 기록됨", readLog?.reason === "TEST-50 민원 확인");
     check(
-        "접속기록에 취급자 역할이 기록됨",
-        readLog?.actor_role === "ADMIN",
+        "접속기록에 열람 사유가 기록됨",
+        readLog?.reason === "TEST-50 민원 확인",
     );
+    check("접속기록에 취급자 역할이 기록됨", readLog?.actor_role === "ADMIN");
     check(
         "목록 조회도 접속기록에 남음",
         (logs ?? []).some((l) => l.action === "RESERVATION_LIST"),
+    );
+    check(
+        "결제 사고 조회·상태 변경·고객 안내도 접속기록에 남음",
+        [
+            "PAYMENT_INCIDENT_LIST",
+            "PAYMENT_INCIDENT_STATUS",
+            "PAYMENT_INCIDENT_CONTACT",
+        ].every((action) => (logs ?? []).some((l) => l.action === action)),
+    );
+    const contactLog = (logs ?? []).find(
+        (l) => l.action === "PAYMENT_INCIDENT_CONTACT",
+    );
+    check(
+        "고객 안내 내용은 접속기록에 중복 저장하지 않음",
+        contactLog?.reason === "PHONE" &&
+            !String(contactLog.reason).includes("TEST_PAYMENT_CONTACT_NOTE"),
+        contactLog?.reason,
     );
 
     const ownLogs = await adminClient
@@ -561,8 +1108,57 @@ async function main() {
         ["admin_list_reservations", {}],
         ["admin_list_services", {}],
         ["admin_get_reservation", { p_id: seededRes.id, p_reason: "x" }],
+        [
+            "admin_get_payment_incident_reservation",
+            { p_incident_id: incident.id },
+        ],
+        ["admin_payment_incident_summary", {}],
+        ["admin_list_payment_incidents", { p_status: null }],
+        [
+            "admin_update_payment_incident",
+            {
+                p_id: seededRes.id,
+                p_status: "ACKNOWLEDGED",
+                p_memo: "권한 없는 상태 변경",
+            },
+        ],
+        [
+            "admin_record_payment_incident_contact",
+            {
+                p_id: seededRes.id,
+                p_method: "PHONE",
+                p_note: "권한 없는 고객 안내",
+            },
+        ],
         ["admin_grant_role", { p_target: userId }],
-        ["admin_set_account_status", { p_target: userId, p_status: "SUSPENDED" }],
+        ["admin_list_settlements", { p_limit: 10 }],
+        ["admin_list_transfer_batches", { p_limit: 10 }],
+        ["admin_get_transfer_result", { p_batch_id: seededSvc.id }],
+        ["admin_record_transfer_result", {p_batch_id:seededSvc.id,p_status:"COMPLETED",p_reference:"TEST-177 은행 결과",p_reason:"TEST-177 미인증 거절"}],
+        ["admin_list_batched_settlement_ids", {}],
+        [
+            "admin_issue_transfer_file",
+            {
+                p_batch_id: seededSvc.id,
+                p_reason: "권한 없는 이체 파일 발급",
+            },
+        ],
+        [
+            "admin_create_transfer_batch",
+            { p_ids: [seededSvc.id], p_reason: "권한 없는 이체 배치 생성" },
+        ],
+        [
+            "admin_approve_settlements",
+            { p_ids: [seededSvc.id], p_reason: "권한 없는 정산 승인" },
+        ],
+        [
+            "admin_hold_settlements",
+            { p_ids: [seededSvc.id], p_reason: "권한 없는 정산 보류" },
+        ],
+        [
+            "admin_set_account_status",
+            { p_target: userId, p_status: "SUSPENDED" },
+        ],
         ["admin_list_service_notices", {}],
         [
             "admin_correct_service_time",
@@ -623,6 +1219,7 @@ async function main() {
         email: DEDICATED_EMAIL,
         password: "dedicated50!",
         email_confirm: true,
+        app_metadata: { must_change_password: true },
     });
     if (dedicated.error) throw dedicated.error;
     const dedicatedId = dedicated.data.user.id;
@@ -634,6 +1231,56 @@ async function main() {
         status: "ACTIVE",
     });
 
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "심사" })
+        .eq("profile_id", adminId);
+    const wrongDutyGrant = await adminClient.rpc("admin_grant_role", {
+        p_target: dedicatedId,
+        p_duty: "정산",
+        p_reason: "TEST-56 계정 담당 외 발급 차단",
+    });
+    check(
+        "계정 담당이 아닌 관리자는 관리자 계정 발급 불가",
+        wrongDutyGrant.error?.code === "42501",
+    );
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "계정" })
+        .eq("profile_id", adminId);
+    const [
+        accountCanReview,
+        accountCanSettle,
+        accountCanAccount,
+        accountCanAll,
+    ] = await Promise.all([
+        adminClient.rpc("can_issue_admin_duty", { p_duty: "심사" }),
+        adminClient.rpc("can_issue_admin_duty", { p_duty: "정산" }),
+        adminClient.rpc("can_issue_admin_duty", { p_duty: "계정" }),
+        adminClient.rpc("can_issue_admin_duty", { p_duty: "전체" }),
+    ]);
+    check("계정 담당은 심사 duty 발급 가능", accountCanReview.data === true);
+    check("계정 담당은 정산 duty 발급 가능", accountCanSettle.data === true);
+    check("계정 담당은 계정 duty 발급 불가", accountCanAccount.data === false);
+    check("계정 담당은 전체 duty 발급 불가", accountCanAll.data === false);
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "전체" })
+        .eq("profile_id", adminId);
+    const [allCanAccount, allCanAll] = await Promise.all([
+        adminClient.rpc("can_issue_admin_duty", { p_duty: "계정" }),
+        adminClient.rpc("can_issue_admin_duty", { p_duty: "전체" }),
+    ]);
+    check("전체 담당은 계정 duty 발급 가능", allCanAccount.data === true);
+    check("전체 duty는 UI/RPC 발급 불가", allCanAll.data === false);
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "계정" })
+        .eq("profile_id", adminId);
+    const selfGrant = await adminClient.rpc("admin_grant_role", {
+        p_target: adminId, p_duty: "정산", p_reason: "TEST-177 자기 정산 권한 상승 차단",
+    });
+    check("계정 담당자의 자기 직무 변경 차단", selfGrant.error?.code === "42501");
     const grant = await adminClient.rpc("admin_grant_role", {
         p_target: dedicatedId,
         p_duty: "정산",
@@ -645,12 +1292,60 @@ async function main() {
         grant.error?.message,
     );
 
+    const changeExistingAdmin = await adminClient.rpc("admin_grant_role", {
+        p_target: dedicatedId, p_duty: "심사", p_reason: "TEST-177 기존 관리자 직무 변경 차단",
+    });
+    check("계정 담당자는 다른 기존 관리자 직무도 변경 불가", changeExistingAdmin.error?.code === "42501");
+    await admin.from("admin_accounts").update({duty:"전체"}).eq("profile_id",adminId);
+    const fullAdminChange = await adminClient.rpc("admin_grant_role", {
+        p_target: dedicatedId, p_duty: "정산", p_reason: "TEST-177 전체 관리자 기존 직무 변경",
+    });
+    check("전체 관리자만 다른 기존 관리자 직무 변경 가능", !fullAdminChange.error);
+    await admin.from("admin_accounts").update({duty:"계정"}).eq("profile_id",adminId);
+
     const { data: granted } = await admin
         .from("profiles")
         .select("role")
         .eq("id", dedicatedId)
         .single();
     check("부여 후 role 이 ADMIN", granted.role === "ADMIN");
+
+    const { data: dedicatedAuth } =
+        await admin.auth.admin.getUserById(dedicatedId);
+    check(
+        "관리자 권한 부여 후에도 최초 비밀번호 변경 표식 유지",
+        dedicatedAuth.user?.app_metadata.must_change_password === true,
+    );
+
+    const reissueApproval = await adminClient.rpc(
+        "admin_authorize_password_reissue",
+        {
+            p_target: dedicatedId,
+            p_reason: "TEST-56 전달 실패로 임시 비밀번호 재발급",
+        },
+    );
+    check(
+        "최초 비밀번호 변경 전에는 권한 범위 내 재발급 승인",
+        !reissueApproval.error,
+        reissueApproval.error?.message,
+    );
+    await admin.auth.admin.updateUserById(dedicatedId, {
+        app_metadata: {
+            ...dedicatedAuth.user?.app_metadata,
+            must_change_password: false,
+        },
+    });
+    const reissueAfterChange = await adminClient.rpc(
+        "admin_authorize_password_reissue",
+        {
+            p_target: dedicatedId,
+            p_reason: "TEST-56 변경 완료 계정 재발급 차단",
+        },
+    );
+    check(
+        "최초 비밀번호 변경 완료 후에는 재발급 불가",
+        reissueAfterChange.error?.code === "23514",
+    );
 
     const { data: grantRows } = await admin
         .from("admin_role_grants")
@@ -762,8 +1457,7 @@ async function main() {
     });
     check(
         "관리자는 처리 대기 신고를 볼 수 있다",
-        !listed.error &&
-            (listed.data ?? []).some((n) => n.id === noticeId.id),
+        !listed.error && (listed.data ?? []).some((n) => n.id === noticeId.id),
         listed.error?.message,
     );
 
@@ -781,7 +1475,11 @@ async function main() {
         p_id: noticeId.id,
         p_memo: "실제 시각으로 시작시각을 정정했습니다.",
     });
-    check("안내를 남기면 닫힌다", resolved.data === true, resolved.error?.message);
+    check(
+        "안내를 남기면 닫힌다",
+        resolved.data === true,
+        resolved.error?.message,
+    );
 
     // ---------- 시각 정정 ----------
     const shortReason = await adminClient.rpc("admin_correct_service_time", {
@@ -850,11 +1548,197 @@ async function main() {
     );
 
     // =============================================================
-    section("10. 정지된 관리자는 즉시 차단된다");
+    section("10. 자격 심사 담당 권한·사유·중복 처리 (#56)");
+    const qualification = await admin
+        .from("partner_qualifications")
+        .insert({
+            partner_id: partnerId,
+            type: "TEST-56",
+            path: `${partnerId}/test-56.pdf`,
+            filename: "test-56.pdf",
+            size: 1,
+        })
+        .select("id")
+        .single();
+    if (qualification.error) throw qualification.error;
+    const qualificationId = qualification.data.id;
+    const proofPath = `${partnerId}/test-56.pdf`;
+    const proofUpload = await admin.storage
+        .from("partner-qualifications")
+        .upload(proofPath, Buffer.from("%PDF-1.4\nTEST-56\n%%EOF"), {
+            contentType: "application/pdf",
+            upsert: true,
+        });
+    if (proofUpload.error) throw proofUpload.error;
+    const reviewArgs = {
+        p_id: qualificationId,
+        p_expected: "PENDING",
+        p_status: "VERIFIED",
+        p_reason: "TEST-56 증빙 확인 완료",
+    };
+    await admin
+        .from("admin_accounts")
+        .upsert({ profile_id: adminId, duty: "정산" });
+    const wrongDuty = await adminClient.rpc(
+        "admin_review_qualification",
+        reviewArgs,
+    );
+    check("정산 담당은 자격 심사 불가", wrongDuty.error?.code === "42501");
+    const oldBypass = await adminClient.rpc("admin_verify_qualification", {
+        p_id: qualificationId,
+        p_status: "VERIFIED",
+        p_reason: reviewArgs.p_reason,
+    });
+    check(
+        "구 심사 RPC도 담당업무 우회 불가",
+        oldBypass.error?.code === "42501",
+    );
+    const userReview = await userClient.rpc(
+        "admin_review_qualification",
+        reviewArgs,
+    );
+    check("일반 사용자는 자격 심사 불가", userReview.error?.code === "42501");
+    await admin
+        .from("admin_accounts")
+        .update({ duty: "심사" })
+        .eq("profile_id", adminId);
+    const noFileLog = await adminClient.rpc("can_read_qualification_file", {
+        p_path: proofPath,
+    });
+    const unsignedProof = await adminClient.storage
+        .from("partner-qualifications")
+        .createSignedUrl(proofPath, 300);
+    check("열람 기록 없이 서명 URL 발급 불가", Boolean(unsignedProof.error));
+    check("열람 기록 없이 증빙 접근 불가", noFileLog.data === false);
+    const shortFileReason = await adminClient.rpc(
+        "admin_get_qualification_file",
+        { p_id: qualificationId, p_reason: " " },
+    );
+    check("증빙 사유 필수", shortFileReason.error?.code === "22023");
+    const fileRead = await adminClient.rpc("admin_get_qualification_file", {
+        p_id: qualificationId,
+        p_reason: "TEST-56 증빙 원문 확인",
+    });
+    check(
+        "심사 담당이 사유를 남기면 파일 경로 반환",
+        fileRead.data === `${partnerId}/test-56.pdf`,
+        fileRead.error?.message,
+    );
+    const loggedFile = await adminClient.rpc("can_read_qualification_file", {
+        p_path: proofPath,
+    });
+    const signedProof = await adminClient.storage
+        .from("partner-qualifications")
+        .createSignedUrl(proofPath, 300);
+    check(
+        "열람 기록 직후 서명 URL 발급 성공",
+        Boolean(signedProof.data?.signedUrl) && !signedProof.error,
+        signedProof.error?.message,
+    );
+    check("열람 기록이 있는 파일만 접근 가능", loggedFile.data === true);
+    const otherFile = await adminClient.rpc("can_read_qualification_file", {
+        p_path: `${partnerId}/other.pdf`,
+    });
+    check("다른 파일에는 열람 허가가 전파되지 않음", otherFile.data === false);
+    const badReason = await adminClient.rpc("admin_review_qualification", {
+        ...reviewArgs,
+        p_reason: " ",
+    });
+    check("심사 사유 필수", badReason.error?.code === "22023");
+    const accepted = await adminClient.rpc(
+        "admin_review_qualification",
+        reviewArgs,
+    );
+    check("심사 담당 인증 완료 성공", !accepted.error, accepted.error?.message);
+    const duplicateReview = await adminClient.rpc(
+        "admin_review_qualification",
+        reviewArgs,
+    );
+    check(
+        "중복·오래된 상태로 심사 시 거부",
+        duplicateReview.error?.code === "P0002",
+    );
+    const verified = await admin
+        .from("partner_qualifications")
+        .select("status")
+        .eq("id", qualificationId)
+        .single();
+    check("심사 결과 실제 저장", verified.data?.status === "VERIFIED");
+    const verifiedNotice = await admin
+        .from("notifications")
+        .select("type, title, body, link")
+        .eq("recipient_id", partnerId)
+        .eq("type", "QUALIFICATION_VERIFIED")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    check(
+        "인증 완료 사유를 파트너에게 알림",
+        verifiedNotice.data?.body?.includes(reviewArgs.p_reason) &&
+            verifiedNotice.data?.link === "/partner/profile",
+        verifiedNotice.error?.message,
+    );
+    const revisionReason = "TEST-56 증빙 보완 후 다시 제출해 주세요";
+    const revision = await adminClient.rpc("admin_review_qualification", {
+        p_id: qualificationId,
+        p_expected: "VERIFIED",
+        p_status: "PENDING",
+        p_reason: revisionReason,
+    });
+    check("심사 대기 전환 성공", !revision.error, revision.error?.message);
+    const revisionNotice = await admin
+        .from("notifications")
+        .select("body, link")
+        .eq("recipient_id", partnerId)
+        .eq("type", "QUALIFICATION_REVIEW_REQUIRED")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    check(
+        "수정 요청 사유를 파트너에게 알림",
+        revisionNotice.data?.body?.includes(revisionReason) &&
+            revisionNotice.data?.link === "/partner/profile",
+        revisionNotice.error?.message,
+    );
+    const reviewLogs = await admin
+        .from("access_logs")
+        .select("action, subject_id")
+        .eq("target_id", qualificationId);
+    check(
+        "증빙 열람과 심사 기록에 파트너 식별자 포함",
+        ["QUALIFICATION_FILE_READ", "QUALIFICATION_REVIEW"].every((action) =>
+            reviewLogs.data?.some(
+                (log) => log.action === action && log.subject_id === partnerId,
+            ),
+        ),
+    );
+    await admin
+        .from("partner_qualifications")
+        .delete()
+        .eq("id", qualificationId);
+    const proofRemoval = await admin.storage
+        .from("partner-qualifications")
+        .remove([proofPath]);
+    if (proofRemoval.error) throw proofRemoval.error;
+    await admin
+        .from("notifications")
+        .delete()
+        .eq("recipient_id", partnerId)
+        .in("type", [
+            "QUALIFICATION_VERIFIED",
+            "QUALIFICATION_REVIEW_REQUIRED",
+        ]);
+
+    section("11. 정지된 관리자는 즉시 차단된다");
     // =============================================================
-    await admin.from("profiles").update({ status: "SUSPENDED" }).eq("id", adminId);
+    await admin
+        .from("profiles")
+        .update({ status: "SUSPENDED" })
+        .eq("id", adminId);
 
     const suspendedLive = await adminClient.rpc("is_admin_live");
+    const suspendedReview = await adminClient.rpc("can_review_qualifications");
+    check("정지된 심사 담당 권한 즉시 해제", suspendedReview.data === false);
     check(
         "정지 즉시 is_admin_live() = false (JWT 갱신 전에도)",
         suspendedLive.data === false,
@@ -883,9 +1767,7 @@ async function main() {
         .like("code", `${CODE_PREFIX}%`);
     console.log(`\n정리 — TEST 예약 잔여 | ${(leftovers ?? []).length}`);
 
-    console.log(
-        `\n\x1b[1m${passed}건 통과 / ${failed}건 실패\x1b[0m`,
-    );
+    console.log(`\n\x1b[1m${passed}건 통과 / ${failed}건 실패\x1b[0m`);
     process.exit(failed === 0 ? 0 : 1);
 }
 

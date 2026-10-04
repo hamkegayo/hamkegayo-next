@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm, type Resolver } from "react-hook-form";
@@ -12,6 +12,17 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+    NAVER_LOGIN_ENABLED,
+    SOCIAL_PROVIDERS,
+    type SocialProvider,
+} from "@/lib/auth/social";
+import {
+    knownOAuthError,
+    oauthErrorFromLocation,
+    OAUTH_ERRORS,
+} from "@/lib/auth/oauth-errors";
+import { createClient } from "@/utils/supabase/client";
 import {
     loginDefaultValues,
     partnerLoginSchema,
@@ -26,14 +37,52 @@ const TABS: { type: LoginType; label: string }[] = [
     { type: "partner", label: "파트너 로그인" },
 ];
 
-const READY_MESSAGE = "준비 중인 기능입니다.";
+function subscribeOAuthError(onChange: () => void) {
+    window.addEventListener("hashchange", onChange);
+    window.addEventListener("popstate", onChange);
+    return () => {
+        window.removeEventListener("hashchange", onChange);
+        window.removeEventListener("popstate", onChange);
+    };
+}
 
-export function LoginForm() {
+function readOAuthError() {
+    return oauthErrorFromLocation(window.location.search, window.location.hash);
+}
+
+export function LoginForm({ oauthError }: { oauthError?: string }) {
     const router = useRouter();
     const [type, setType] = useState<LoginType>("user");
     const typeRef = useRef<LoginType>("user");
     const [showPassword, setShowPassword] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [socialSubmitting, setSocialSubmitting] =
+        useState<SocialProvider | null>(null);
+    const currentOAuthError = useSyncExternalStore(
+        subscribeOAuthError,
+        readOAuthError,
+        () => knownOAuthError(oauthError),
+    );
+
+    useEffect(() => {
+        // 첫 hydration에서는 서버의 missing_code가 먼저 보일 수 있다.
+        // fragment를 지우기 전에 브라우저의 실제 오류를 다시 읽는다.
+        const errorCode = readOAuthError() ?? currentOAuthError;
+        if (errorCode) {
+            // Supabase 오류는 URL fragment로도 온다. 원본 오류 대신 안전한 코드만 남긴다.
+            const url = new URL(window.location.href);
+            url.hash = "";
+            url.searchParams.delete("error");
+            url.searchParams.delete("error_code");
+            url.searchParams.delete("error_description");
+            url.searchParams.set("oauth_error", errorCode);
+            window.history.replaceState(
+                window.history.state,
+                "",
+                `${url.pathname}${url.search}`,
+            );
+        }
+    }, [currentOAuthError]);
 
     // 활성 탭에 따라 스키마를 선택하는 커스텀 resolver
     const resolver: Resolver<LoginFormValues> = (values, context, options) => {
@@ -98,7 +147,24 @@ export function LoginForm() {
         }
     };
 
-    const notReady = () => toast.info(READY_MESSAGE);
+    const socialLogin = async (provider: SocialProvider) => {
+        if (provider === "naver" && !NAVER_LOGIN_ENABLED) return;
+        if (socialSubmitting) return;
+        setSocialSubmitting(provider);
+        const supabase = createClient();
+        const callback = new URL("/auth/callback", window.location.origin);
+        callback.searchParams.set("next", "/");
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: SOCIAL_PROVIDERS[provider],
+            options: { redirectTo: callback.toString() },
+        });
+        if (error) {
+            toast.error(
+                `${provider === "kakao" ? "카카오" : "네이버"} 로그인을 시작하지 못했습니다.`,
+            );
+            setSocialSubmitting(null);
+        }
+    };
 
     const title = type === "user" ? "일반 로그인" : "파트너 로그인";
 
@@ -132,10 +198,19 @@ export function LoginForm() {
                 <h1 className="text-foreground text-3xl font-extrabold">
                     {title}
                 </h1>
-                <p className="text-muted-foreground mt-3">
+                <p className="text-description-foreground mt-3">
                     서비스 이용을 위해 로그인을 해주세요.
                 </p>
             </div>
+
+            {currentOAuthError && (
+                <p
+                    role="alert"
+                    className="text-destructive mx-auto mt-6 max-w-md text-sm"
+                >
+                    {OAUTH_ERRORS[currentOAuthError]}
+                </p>
+            )}
 
             {/* 폼 */}
             <form
@@ -256,29 +331,57 @@ export function LoginForm() {
                     {submitting ? "로그인 중…" : "로그인"}
                 </button>
 
-                {/* 소셜 로그인 (준비 중) */}
-                <button
-                    type="button"
-                    onClick={notReady}
-                    className="bg-kakao text-kakao-foreground mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-lg text-base font-bold transition-colors hover:brightness-95"
-                >
-                    <Image
-                        src="/common/kakao-logo.svg"
-                        alt=""
-                        width={20}
-                        height={20}
-                        aria-hidden
-                    />
-                    카카오톡 로그인
-                </button>
-                <button
-                    type="button"
-                    onClick={notReady}
-                    className="bg-naver text-naver-foreground mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-lg text-base font-bold transition-colors hover:brightness-95"
-                >
-                    <span className="text-lg leading-none font-black">N</span>
-                    네이버 로그인
-                </button>
+                {/* 소셜 로그인 — 일반 사용자 탭에서만 제공한다. */}
+                {type === "user" && (
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => socialLogin("kakao")}
+                            disabled={socialSubmitting !== null}
+                            aria-busy={socialSubmitting === "kakao"}
+                            className="bg-kakao text-kakao-foreground mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-lg text-base font-bold transition-colors hover:brightness-95 disabled:opacity-60"
+                        >
+                            <Image
+                                src="/common/kakao-logo.svg"
+                                alt=""
+                                width={20}
+                                height={20}
+                                aria-hidden
+                            />
+                            {socialSubmitting === "kakao" && (
+                                <Loader2
+                                    aria-hidden
+                                    className="size-5 animate-spin"
+                                />
+                            )}
+                            카카오 로그인
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => socialLogin("naver")}
+                            disabled={
+                                !NAVER_LOGIN_ENABLED ||
+                                socialSubmitting !== null
+                            }
+                            aria-busy={socialSubmitting === "naver"}
+                            className="bg-naver text-naver-foreground mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-lg text-base font-bold transition-colors hover:brightness-95 disabled:opacity-60"
+                        >
+                            {socialSubmitting === "naver" ? (
+                                <Loader2
+                                    aria-hidden
+                                    className="size-5 animate-spin"
+                                />
+                            ) : (
+                                <span className="text-lg leading-none font-black">
+                                    N
+                                </span>
+                            )}
+                            {NAVER_LOGIN_ENABLED
+                                ? "네이버 로그인"
+                                : "네이버 로그인 (점검 중)"}
+                        </button>
+                    </>
+                )}
 
                 {/* 하단 링크 */}
                 <div className="text-foreground mt-6 flex items-center justify-center gap-4 text-sm font-semibold">

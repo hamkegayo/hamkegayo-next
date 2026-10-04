@@ -12,7 +12,7 @@ export function FaqHero() {
                     <p className="text-foreground mt-4 text-lg font-bold">
                         자주 묻는 질문을 확인해보세요.
                     </p>
-                    <p className="text-muted-foreground mt-1">
+                    <p className="text-description-foreground mt-1">
                         궁금한 내용을 검색하거나 아래 목록에서 찾아보실 수
                         있습니다.
                     </p>

@@ -26,7 +26,7 @@ export function LoginRequiredModal() {
                 <h3 className="text-foreground mt-4 text-lg font-extrabold">
                     로그인이 필요해요
                 </h3>
-                <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+                <p className="text-description-foreground mt-2 text-sm leading-relaxed">
                     이 기능은 로그인 후 이용할 수 있어요.
                     <br />
                     로그인하고 계속 진행해 주세요.

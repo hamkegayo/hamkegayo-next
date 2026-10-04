@@ -231,7 +231,7 @@ function Header({
             <h3 className="text-foreground mt-3 text-xl font-extrabold break-keep">
                 {title}
             </h3>
-            <div className="text-muted-foreground mt-2 text-base leading-relaxed break-keep">
+            <div className="text-description-foreground mt-2 text-base leading-relaxed break-keep">
                 {children}
             </div>
         </div>

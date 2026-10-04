@@ -33,11 +33,11 @@ function FaqAccordion() {
     const [open, setOpen] = useState(-1);
 
     return (
-        <div className="bg-muted/50 rounded-3xl p-6 md:p-8">
+        <div className="bg-panel-muted rounded-3xl p-6 md:p-8">
             <h2 className="text-foreground text-2xl font-extrabold md:text-3xl">
                 궁금한 점이 있으신가요?
             </h2>
-            <p className="text-muted-foreground mt-2 text-sm">
+            <p className="text-description-foreground mt-2 text-sm">
                 자주 묻는 질문을 통해 확인하세요.
             </p>
 
@@ -78,7 +78,7 @@ function FaqAccordion() {
                                 <div className="overflow-hidden">
                                     <p
                                         className={cn(
-                                            "text-muted-foreground px-4 pb-4 text-sm leading-relaxed transition-opacity duration-200",
+                                            "text-description-foreground px-4 pb-4 text-sm leading-relaxed transition-opacity duration-200",
                                             isOpen
                                                 ? "opacity-100"
                                                 : "opacity-0",
@@ -107,11 +107,11 @@ function FaqAccordion() {
 
 function BookingCta() {
     return (
-        <div className="bg-muted/30 flex flex-col items-center justify-center rounded-3xl px-6 py-12 text-center">
+        <div className="bg-panel-muted flex flex-col items-center justify-center rounded-3xl px-6 py-12 text-center">
             <h2 className="text-foreground text-2xl font-extrabold md:text-3xl">
                 지금 간편하게 예약하세요.
             </h2>
-            <p className="text-muted-foreground mt-3">
+            <p className="text-description-foreground mt-3">
                 언제든 24시간, 필요한 순간에 함께가요가 곁에 있습니다.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">

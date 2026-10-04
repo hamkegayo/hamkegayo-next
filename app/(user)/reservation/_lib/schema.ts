@@ -5,6 +5,8 @@ import {
     isBeyondAdvanceReservationWindow,
     isCalendarDate,
 } from "@/lib/reservation-window";
+import { isAtLeastAgeOnDate, MIN_SERVICE_AGE_MESSAGE } from "@/lib/service-age";
+import { kstToday } from "@/lib/format";
 import { isPastSlot, MIN_LEAD_MINUTES, reservationStartAt } from "./options";
 
 const required = "필수 입력 항목입니다.";
@@ -12,7 +14,14 @@ const required = "필수 입력 항목입니다.";
 /** STEP1 · 이용자 / 진료 정보 */
 export const step1Schema = z.object({
     userName: z.string().min(1, required),
-    userBirth: z.string().min(1, required),
+    userBirth: z
+        .string()
+        .min(1, required)
+        .refine(isCalendarDate, "올바른 생년월일을 입력해 주세요.")
+        .refine(
+            (birthDate) => birthDate <= kstToday(),
+            "생년월일은 오늘 이후일 수 없습니다.",
+        ),
     userGender: z.string().min(1, "성별을 선택해 주세요."),
     userPhone: z.string().min(1, required),
     guardianName: z.string().min(1, required),
@@ -169,6 +178,22 @@ function checkSchedule(
     }
 }
 
+/** 약관 제5조 ⑤ — 실제 서비스 이용일을 기준으로 만 19세 이상이어야 한다. */
+function checkPatientAge(
+    v: { userBirth: string; useDate: string },
+    ctx: z.RefinementCtx,
+) {
+    if (!isCalendarDate(v.userBirth) || !isCalendarDate(v.useDate)) return;
+
+    if (!isAtLeastAgeOnDate(v.userBirth, v.useDate)) {
+        ctx.addIssue({
+            code: "custom",
+            path: ["userBirth"],
+            message: MIN_SERVICE_AGE_MESSAGE,
+        });
+    }
+}
+
 export const step2Form = step2Schema
     .superRefine(requireHandover)
     .superRefine(checkSchedule);
@@ -185,6 +210,8 @@ export const reservationServerSchema = step1Schema
     })
     // 화면을 우회해 직접 호출해도 인계자 없는 성인 인계는 막는다.
     .superRefine(requireHandover)
-    .superRefine(checkSchedule);
+    .superRefine(checkSchedule)
+    // 화면을 우회한 직접 요청도 미성년 이용자 예약을 만들 수 없다.
+    .superRefine(checkPatientAge);
 
 export type ReservationInput = z.infer<typeof reservationServerSchema>;
