@@ -100,3 +100,32 @@ export async function createTransferBatch(
     revalidatePath("/admin/settlements/batches");
     return { ok: true, ...result };
 }
+
+export async function recordTransferResult(
+    batchId: string,
+    status: "COMPLETED" | "CANCELLED",
+    reference: string,
+    reason: string,
+): Promise<{ ok: boolean; message: string }> {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("admin_record_transfer_result", {
+        p_batch_id: batchId,
+        p_status: status,
+        p_reference: reference.trim(),
+        p_reason: reason.trim(),
+    });
+    if (error)
+        return {
+            ok: false,
+            message:
+                "결과를 기록하지 못했습니다. 권한·배치 상태·정산 금액과 입력 내용을 확인해 주세요.",
+        };
+    revalidatePath("/admin");
+    revalidatePath("/admin/settlements");
+    revalidatePath("/admin/settlements/batches");
+    return {
+        ok: true,
+        message:
+            "결과를 기록하고 배치의 계좌번호 원문을 파기했습니다. 다운로드한 CSV도 파기해 주세요.",
+    };
+}

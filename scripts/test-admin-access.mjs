@@ -319,6 +319,8 @@ async function main() {
 
     const aal1Rpc = await adminClient.rpc("admin_list_reservations", {});
     check("aal1 관리자는 예약 목록 RPC 거절됨", !!aal1Rpc.error);
+    const aal1Transfer = await adminClient.rpc("admin_record_transfer_result", {p_batch_id: adminId, p_status: "COMPLETED", p_reference: "TEST-177 MFA 검증", p_reason: "TEST-177 MFA 미인증 차단"});
+    check("MFA 전에는 이체 결과 기록 차단", aal1Transfer.error?.code === "42501");
 
     await admin
         .from("admin_accounts")
@@ -763,11 +765,52 @@ async function main() {
         transferItems.error?.message,
     );
 
-    const completedBatch = await admin.from("transfer_batches").update({status:"COMPLETED"}).eq("id",transferBatch.data.id);
+    const resultArgs = { p_batch_id: transferBatch.data.id, p_status: "COMPLETED", p_reference: "TEST-177 은행 결과 대조", p_reason: "TEST-177 전건 지급 성공 확인" };
+    await admin.from("admin_accounts").update({ duty: "계정" }).eq("profile_id", adminId);
+    const wrongTransferDuty = await adminClient.rpc("admin_record_transfer_result", resultArgs);
+    check("계정 담당은 이체 결과 기록 차단", wrongTransferDuty.error?.code === "42501");
+    await admin.from("admin_accounts").update({ duty: "정산" }).eq("profile_id", adminId);
+    const badResult = await adminClient.rpc("admin_record_transfer_result", { ...resultArgs, p_reason: "짧음" });
+    check("이체 결과 기록 사유 검증", badResult.error?.code === "22023");
+    await admin.from("payments").update({ status: "FAILED" }).eq("id", paidFixtureId);
+    const unpaidResult = await adminClient.rpc("admin_record_transfer_result", resultArgs);
+    check("결제 근거가 사라진 배치 지급 완료 기록 차단", unpaidResult.error?.code === "23514");
+    const unchangedResult = await admin.from("transfer_batch_results").select("batch_id").eq("batch_id", transferBatch.data.id);
+    check("실패한 결과 기록은 이력도 남기지 않음", unchangedResult.data?.length === 0);
+    await admin.from("payments").update({ status: "PAID" }).eq("id", paidFixtureId);
+    const completedBatch = await adminClient.rpc("admin_record_transfer_result", resultArgs);
+    const resultRecord = await adminClient.rpc("admin_get_transfer_result", { p_batch_id: transferBatch.data.id });
+    check("지급 결과 근거·담당자·시각 조회", !resultRecord.error && resultRecord.data?.reference === resultArgs.p_reference && !!resultRecord.data?.recordedAt);
+    const paidSettlement = await admin.from("settlements").select("status,paid_at").eq("id", settlement.id).single();
+    check("지급 완료와 정산 PAID 동기화", paidSettlement.data?.status === "PAID" && !!paidSettlement.data?.paid_at);
+    const duplicateResult = await adminClient.rpc("admin_record_transfer_result", resultArgs);
+    check("지급 결과 중복 기록 차단", duplicateResult.error?.code === "23514");
+    const tamperedResult = await adminClient.from("transfer_batch_results").update({reason:"TEST-177 이력 위조"}).eq("batch_id",transferBatch.data.id).select("batch_id");
+    check("인증된 관리자도 결과 이력 직접 수정 차단", !!tamperedResult.error || tamperedResult.data?.length === 0);
     const purgedItems = await admin.from("transfer_batch_items").select("account_number,account_last4").eq("batch_id",transferBatch.data.id);
     check("이체 완료 후 계좌번호 원문 파기 및 끝4자리 유지", !completedBatch.error && purgedItems.data?.every(x=>x.account_number === null && x.account_last4 === "9012"));
     const reopenBatch = await admin.from("transfer_batches").update({status:"DRAFT"}).eq("id",transferBatch.data.id);
     check("완료 배치는 계좌 재반출을 위해 재개할 수 없음", reopenBatch.error?.code === "23514");
+
+    // 전건 미지급 취소는 별도 배치로 테스트한다. 원래 배치 이력은 보존하고 재편입 연결만 해제한다.
+    await admin.from("settlements").update({status:"APPROVED",paid_at:null,settled_at:null}).eq("id", settlement.id);
+    const cancelId = crypto.randomUUID();
+    await admin.from("transfer_batches").insert({id:cancelId,code:`TEST-50-CANCEL-${cancelId}`,reason:"TEST-177 취소 배치",settlement_count:1,partner_count:1,total_net:40000,created_by:adminId});
+    const cancelItemId = crypto.randomUUID();
+    await admin.from("transfer_batch_items").insert({id:cancelItemId,batch_id:cancelId,partner_id:partnerId,amount:40000,settlement_count:1,bank_code:"004",bank_name:"테스트은행",account_number:"123456789012",account_last4:"9012",holder_name:"테스트"});
+    // 테스트용 기존 연결을 옮긴다. 운영 완료 배치의 연결을 변경하는 RPC는 없다.
+    await admin.from("transfer_batch_settlements").delete().eq("batch_id", transferBatch.data.id);
+    await admin.from("transfer_batch_settlements").insert({batch_id:cancelId,item_id:cancelItemId,settlement_id:settlement.id});
+    const draftComplete = await adminClient.rpc("admin_record_transfer_result", {...resultArgs,p_batch_id:cancelId});
+    check("파일 미발급 배치는 지급 완료 기록 차단", draftComplete.error?.code === "23514");
+    const cancelled = await adminClient.rpc("admin_record_transfer_result", {...resultArgs,p_batch_id:cancelId,p_status:"CANCELLED",p_reason:"TEST-177 은행 대기 이체 없고 전건 미지급 확인"});
+    const cancelItems = await admin.from("transfer_batch_items").select("account_number").eq("batch_id",cancelId);
+    const cancelLinks = await admin.from("transfer_batch_settlements").select("settlement_id").eq("batch_id",cancelId);
+    const cancelHistory = await admin.from("transfer_batch_results").select("settlement_ids").eq("batch_id",cancelId).single();
+    check("취소 결과 기록과 계좌 파기", !cancelled.error && cancelItems.data?.[0]?.account_number === null, cancelled.error?.message);
+    check("취소 연결 해제와 원래 정산 이력 보존", cancelLinks.data?.length === 0 && cancelHistory.data?.settlement_ids?.includes(settlement.id));
+    await admin.from("transfer_batch_items").delete().eq("batch_id",cancelId);
+    await admin.from("transfer_batches").delete().eq("id",cancelId);
 
     // =============================================================
     section("5. 예약 RPC — 개인정보를 반환하지 않는다");
@@ -1069,6 +1112,8 @@ async function main() {
         ["admin_grant_role", { p_target: userId }],
         ["admin_list_settlements", { p_limit: 10 }],
         ["admin_list_transfer_batches", { p_limit: 10 }],
+        ["admin_get_transfer_result", { p_batch_id: seededSvc.id }],
+        ["admin_record_transfer_result", {p_batch_id:seededSvc.id,p_status:"COMPLETED",p_reference:"TEST-177 은행 결과",p_reason:"TEST-177 미인증 거절"}],
         ["admin_list_batched_settlement_ids", {}],
         [
             "admin_issue_transfer_file",

@@ -29,6 +29,8 @@ const ACTION_LABEL: Record<string, string> = {
     SETTLEMENT_APPROVE: "정산 승인",
     SETTLEMENT_HOLD: "정산 보류",
     SETTLEMENT_RELEASE: "정산 보류 해제",
+    TRANSFER_RESULT_RECORD: "은행 지급 결과 기록",
+    TRANSFER_RESULT_VIEW: "은행 지급 결과 조회",
     PAYMENT_INCIDENT_LIST: "결제 사고 목록 조회",
     PAYMENT_INCIDENT_STATUS: "결제 사고 상태 변경",
     PAYMENT_INCIDENT_CONTACT: "결제 사고 고객 안내 기록",
