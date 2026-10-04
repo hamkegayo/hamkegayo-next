@@ -29,6 +29,8 @@ const ACTION_LABEL: Record<string, string> = {
     SETTLEMENT_APPROVE: "정산 승인",
     SETTLEMENT_HOLD: "정산 보류",
     SETTLEMENT_RELEASE: "정산 보류 해제",
+    CAMPAIGN_LIST: "이벤트 현황 조회",
+    CAMPAIGN_STATUS: "이벤트 상태 변경",
     PAYMENT_INCIDENT_LIST: "결제 사고 목록 조회",
     PAYMENT_INCIDENT_STATUS: "결제 사고 상태 변경",
     PAYMENT_INCIDENT_CONTACT: "결제 사고 고객 안내 기록",
@@ -79,6 +81,13 @@ export default async function AdminHome() {
                 {overview.name} 님으로 로그인했습니다. 2단계 인증 완료
                 상태입니다.
             </p>
+
+            <Link
+                href="/admin/campaigns/opening"
+                className="text-brand mt-4 inline-block font-bold"
+            >
+                오픈 이벤트 관리
+            </Link>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {cards.map(

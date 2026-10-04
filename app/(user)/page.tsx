@@ -7,6 +7,7 @@ import { Differentiators } from "./_components/home/differentiators";
 import { HowToUse } from "./_components/home/how-to-use";
 import { Reviews } from "./_components/home/reviews";
 import { HomeCta } from "./_components/home/home-cta";
+import { OpeningEvent } from "./_components/home/opening-event";
 
 export const metadata: Metadata = {
     title: { absolute: HOME_TITLE },
@@ -43,6 +44,7 @@ export default function HomePage() {
                 }}
             />
             <HomeHero />
+            <OpeningEvent />
             <ServiceIntro />
             <Differentiators />
             <HowToUse />
