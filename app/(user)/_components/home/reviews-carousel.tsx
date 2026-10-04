@@ -5,51 +5,8 @@ import { ChevronLeft, ChevronRight, Star } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-type Review = {
-    rating: number;
-    text: string;
-    name: string;
-    meta: string;
-};
-
-const REVIEWS: Review[] = [
-    {
-        rating: 5,
-        text: "어머니 병원 방문에 동행해 주셨는데, 진행 상황을 따로 정리해 알려주셔서 정말 안심이 됐어요.",
-        name: "김O연",
-        meta: "50대 보호자",
-    },
-    {
-        rating: 5,
-        text: "혼자 사시는 아버지 병원 가시는 날, 접수부터 귀가까지 함께해 주셔서 회사에 있는 저도 마음이 놓였습니다.",
-        name: "이O준",
-        meta: "40대 보호자",
-    },
-    {
-        rating: 4,
-        text: "실시간으로 위치와 진행 상황을 보내주셔서, 멀리 있어도 어머니가 어디서 무엇을 하시는지 다 알 수 있었어요.",
-        name: "박O희",
-        meta: "60대 이용자",
-    },
-    {
-        rating: 5,
-        text: "거동이 불편하신 아버지를 정성껏 부축해 주시고, 방문 내내 곁을 지켜주셔서 감사했습니다.",
-        name: "정O아",
-        meta: "50대 보호자",
-    },
-    {
-        rating: 5,
-        text: "예약부터 리포트까지 과정이 투명해서 믿고 맡길 수 있었어요. 다음에도 이용할 생각입니다.",
-        name: "최O훈",
-        meta: "40대 보호자",
-    },
-    {
-        rating: 4,
-        text: "약국까지 함께 가주셔서 번거로운 일이 줄었어요. 리포트도 꼼꼼해서 다음 방문 준비에 큰 도움이 됐습니다.",
-        name: "한O서",
-        meta: "50대 보호자",
-    },
-];
+import Link from "next/link";
+import type { ReviewView } from "@/app/(user)/review/_lib/reviews.server";
 
 const AUTO_MS = 5000;
 
@@ -81,36 +38,39 @@ function Stars({ rating }: { rating: number }) {
     );
 }
 
-function ReviewCard({ review }: { review: Review }) {
+function ReviewCard({ review }: { review: ReviewView }) {
     return (
-        <article className="border-border bg-background flex h-full flex-col rounded-2xl border p-6">
+        <Link
+            href={`/review/${review.id}`}
+            className="border-border bg-background flex h-full flex-col rounded-2xl border p-6"
+        >
             <Stars rating={review.rating} />
-            <p className="text-foreground mt-3 flex-1 text-sm leading-relaxed">
-                “{review.text}”
+            <p className="text-foreground mt-3 line-clamp-5 flex-1 text-sm leading-relaxed">
+                “{review.content}”
             </p>
             <div className="mt-4 flex items-center gap-3">
                 <span className="bg-brand/10 text-brand flex size-9 items-center justify-center rounded-full text-sm font-bold">
-                    {review.name.charAt(0)}
+                    {review.author.charAt(0)}
                 </span>
                 <div>
                     <p className="text-foreground text-sm font-bold">
-                        {review.name}
+                        {review.author}
                     </p>
                     <p className="text-muted-foreground text-xs">
-                        {review.meta}
+                        {review.plan} · {review.date}
                     </p>
                 </div>
             </div>
-        </article>
+        </Link>
     );
 }
 
-export function ReviewsCarousel() {
+export function ReviewsCarousel({ reviews }: { reviews: ReviewView[] }) {
     // SSR 안전한 perView 구독 (setState-in-effect 회피)
     const perView = useSyncExternalStore(subscribe, getPerView, () => 3);
     const [index, setIndex] = useState(0);
 
-    const maxIndex = Math.max(0, REVIEWS.length - perView);
+    const maxIndex = Math.max(0, reviews.length - perView);
     const current = Math.min(index, maxIndex);
 
     const go = (next: number) => {
@@ -141,16 +101,16 @@ export function ReviewsCarousel() {
                 </button>
 
                 {/* 뷰포트 */}
-                <div className="overflow-hidden">
+                <div className="min-w-0 flex-1 overflow-hidden">
                     <div
                         className="flex transition-transform duration-500 ease-out"
                         style={{
                             transform: `translateX(-${current * (100 / perView)}%)`,
                         }}
                     >
-                        {REVIEWS.map((review, i) => (
+                        {reviews.map((review) => (
                             <div
-                                key={i}
+                                key={review.id}
                                 className="shrink-0 px-2"
                                 style={{ width: `${100 / perView}%` }}
                             >

@@ -14,6 +14,7 @@ export type ReviewView = {
     date: string;
     content: string;
     reply: string | null;
+    source: "site" | "provided";
 };
 
 /** 작성 가능한(완료·미작성) 서비스 */
@@ -36,90 +37,63 @@ function formatServiceDate(useDate: string): string {
 
 type ReviewRow = {
     id: string;
+    plan: string;
     rating: number;
     title: string;
     content: string;
     author_masked: string;
     reply: string | null;
-    created_at: string;
-    services: { reservations: { plan: string } | null } | null;
+    published_at: string;
+    source: "site" | "provided";
 };
 
 function toView(r: ReviewRow): ReviewView {
-    const planCode: PlanCode =
-        r.services?.reservations?.plan === "plus" ? "plus" : "basic";
     return {
         id: r.id,
-        plan: planDisplay(planCode),
+        plan: planDisplay(r.plan === "plus" ? "plus" : "basic"),
         title: r.title,
         author: r.author_masked,
         rating: r.rating,
-        date: formatDate(r.created_at),
+        date: formatDate(r.published_at),
         content: r.content,
         reply: r.reply,
+        source: r.source,
     };
 }
 
-const SELECT =
-    "id, rating, title, content, author_masked, reply, created_at, services!inner(reservations!inner(plan))";
-
-/** 전체 공개 후기 (최신순) */
-export async function getReviews(): Promise<ReviewView[]> {
+/** 공개 필드만 반환하는 RPC: 기존 서비스 후기와 제공 후기를 최신순으로 결합. */
+export async function getReviews(limit = 10000): Promise<ReviewView[]> {
     try {
         const supabase = await createClient();
-        const { data, error } = await supabase
-            .from("reviews")
-            .select(SELECT)
-            .order("created_at", { ascending: false })
-            .returns<ReviewRow[]>();
-        if (error || !data) return [];
-        return data.map(toView);
+        const { data, error } = await supabase.rpc("get_public_reviews", {
+            p_limit: limit,
+        });
+        if (error) {
+            console.error("공개 후기 조회 실패", error.code);
+            return [];
+        }
+        return ((data ?? []) as unknown as ReviewRow[]).map(toView);
     } catch {
         return [];
     }
 }
 
-/** 후기 단건 + 이전(더 최신)/다음(더 과거) */
+/** 날짜가 같은 후기까지 ID 순서로 안정적으로 탐색한다. */
 export async function getReviewWithAdjacent(id: string): Promise<{
     review: ReviewView | null;
     prev: { id: string; title: string } | null;
     next: { id: string; title: string } | null;
 }> {
-    try {
-        const supabase = await createClient();
-        const { data, error } = await supabase
-            .from("reviews")
-            .select(SELECT)
-            .eq("id", id)
-            .maybeSingle<ReviewRow>();
-        if (error || !data) return { review: null, prev: null, next: null };
-
-        const [{ data: prevRows }, { data: nextRows }] = await Promise.all([
-            supabase
-                .from("reviews")
-                .select("id, title, created_at")
-                .gt("created_at", data.created_at)
-                .order("created_at", { ascending: true })
-                .limit(1),
-            supabase
-                .from("reviews")
-                .select("id, title, created_at")
-                .lt("created_at", data.created_at)
-                .order("created_at", { ascending: false })
-                .limit(1),
-        ]);
-
-        const prev = prevRows?.[0]
-            ? { id: prevRows[0].id, title: prevRows[0].title }
-            : null;
-        const next = nextRows?.[0]
-            ? { id: nextRows[0].id, title: nextRows[0].title }
-            : null;
-
-        return { review: toView(data), prev, next };
-    } catch {
-        return { review: null, prev: null, next: null };
-    }
+    const reviews = await getReviews();
+    const index = reviews.findIndex((r) => r.id === id);
+    if (index < 0) return { review: null, prev: null, next: null };
+    const adjacent = (r: ReviewView | undefined) =>
+        r ? { id: r.id, title: r.title } : null;
+    return {
+        review: reviews[index],
+        prev: adjacent(reviews[index - 1]),
+        next: adjacent(reviews[index + 1]),
+    };
 }
 
 type ReviewableRow = {
