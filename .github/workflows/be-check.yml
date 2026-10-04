@@ -243,6 +243,11 @@ jobs:
             - name: 파트너 개인정보 3단계 경계 (#66 · #67)
               run: npm run test:partner
 
+            - name: 제공 후기 공개 범위·중복 등록 (#175)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-imported-reviews.sql
+
             - name: 관리자 권한·접근통제·접속기록 (#50)
               run: npm run test:admin
 
