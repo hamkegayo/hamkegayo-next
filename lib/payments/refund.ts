@@ -51,6 +51,7 @@ type PaymentRow = {
     transaction_id: string | null;
     gross_amount: number;
     discount_amount: number;
+    campaign_discount_amount: number;
     reservations: {
         code: string;
         plan: string;
@@ -92,7 +93,7 @@ async function loadBasePayment(
     const { data } = await admin
         .from("payments")
         .select(
-            "id, order_id, transaction_id, gross_amount, discount_amount, " +
+            "id, order_id, transaction_id, gross_amount, discount_amount, campaign_discount_amount, " +
                 "reservations!inner(code, plan, use_date, arrive_time, surcharge_rate)",
         )
         .eq("reservation_id", reservationId)
@@ -120,7 +121,10 @@ export async function previewCancelRefund(
 
     return {
         paidCash,
-        usedPoints: payment.discount_amount,
+        usedPoints: Math.max(
+            0,
+            payment.discount_amount - payment.campaign_discount_amount,
+        ),
         cancelFee: fee.amount,
         refundCash: Math.max(0, paidCash - fee.amount),
         bracket: fee.bracket,

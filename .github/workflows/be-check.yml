@@ -43,6 +43,9 @@ jobs:
             - name: 요금 계산 단위 테스트 (#46 · #76)
               run: npm run test:pricing
 
+            - name: 서비스 시간 · 예약 서버 검증 (#176)
+              run: node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs scripts/test-service-hours.mjs
+
             - name: 운영키 조회 검증 스크립트 테스트 (모의 응답만 사용)
               run: npm run test:nicepay-live-check
 
@@ -52,6 +55,9 @@ jobs:
 
             # 본문이 바뀌었는데 version 을 안 올리면 동의 이력이 본문을 식별하지
             # 못한다. 실제로 2026-09-06 개정에서 그 일이 일어났다 (#105).
+            - name: FAQ 문답·공통 참조·검색 (#178)
+              run: node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs scripts/test-faq-content.mjs
+
             - name: 약관·방침 버전 무결성 (#105)
               run: npm run test:legal
 
@@ -175,7 +181,9 @@ jobs:
 
                   if [[ "$MIGRATION_COUNT" -gt 0 ]]; then
                     eval "$(supabase status -o env)"
-                    supabase migration up --db-url "$DB_URL"
+                    # main의 운영 보안 이력(67·68) 뒤에 기능 PR의 63~66을
+                    # 추가하는 릴리즈도 기준 데이터 위에서 빠짐없이 검사한다.
+                    supabase migration up --include-all --db-url "$DB_URL"
                   else
                     echo "적용할 신규 마이그레이션이 없습니다."
                   fi
@@ -243,11 +251,38 @@ jobs:
             - name: 서비스 수행 시각 무결성 (#55)
               run: npm run test:service
 
+            - name: 서비스 시간 · KST 자동 마감 경계 (#176)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-service-hours.sql
+
             - name: 파트너 개인정보 3단계 경계 (#66 · #67)
               run: npm run test:partner
 
+            - name: 오픈 이벤트 정원·결제·권한 경계 (#159)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-opening-event.sql
+                  node --env-file=.env.local scripts/test-opening-event-concurrency.mjs
+                  node --experimental-strip-types --no-warnings scripts/test-opening-event-email.mjs
+
+            - name: 제공 후기 공개 범위·중복 등록 (#175)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-imported-reviews.sql
+
+            - name: 실제 이용자 후기 공개 동의·3년 만료·철회
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-review-publication-consent.sql
+
             - name: 관리자 권한·접근통제·접속기록 (#50)
               run: npm run test:admin
+
+            - name: 예약 파트너 상세 · 공개 동의 · 경력 심사 (#173)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-partner-details.sql
 
             - name: 정산 계좌 열람 통제 (#51)
               run: npm run test:payout

@@ -156,7 +156,7 @@ export function ReviewWriteView({
                 <p className="text-description-foreground mt-3 leading-relaxed">
                     소중한 후기를 남겨주셔서 감사합니다.
                     <br />
-                    작성하신 후기는 이용 후기 목록 맨 위에서 확인하실 수 있어요.
+                    작성하신 후기는 공개 동의와 공개본 검토 후 게시됩니다.
                 </p>
                 <div className="mt-8 flex justify-center gap-3">
                     <Link
@@ -169,7 +169,7 @@ export function ReviewWriteView({
                         href="/review"
                         className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-6 py-3 text-sm font-bold transition-colors"
                     >
-                        후기 목록에서 확인하기
+                        후기 목록으로
                     </Link>
                 </div>
             </div>
@@ -230,10 +230,17 @@ export function ReviewWriteView({
                 <label className="text-foreground mt-2 block text-sm font-bold">
                     내용 <span className="text-destructive">*</span>
                 </label>
-                {/* 후기는 비로그인 이용자에게도 공개되므로 건강 관련 정보 기재를 막는다. */}
+                {/* 별도 공개 동의·증빙 확인 전 원문은 공개하지 않는다. */}
                 <p className="text-description-foreground mt-1 text-xs leading-relaxed">
-                    후기는 모든 방문자에게 공개됩니다. 질환명·수술명·병원명 등
-                    건강 관련 정보는 작성하지 말아 주세요.
+                    후기는 등록 즉시 공개되지 않습니다. 실제 이용자의 별도 공개
+                    동의와 증빙 확인 절차가 준비되기 전에는 구체적인 진료·검사
+                    정보나 질환명·수술명·병원명을 작성하지 말아 주세요.{" "}
+                    <Link
+                        href="/review/publication-consent"
+                        className="underline"
+                    >
+                        공개 동의 안내
+                    </Link>
                 </p>
                 <textarea
                     value={content}

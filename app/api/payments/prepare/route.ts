@@ -10,6 +10,7 @@ import {
 } from "@/lib/reservation-window";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
+import { ensureOpeningEventEmail } from "@/lib/opening-event-email.server";
 
 /**
  * 선결제 준비 — 결제창을 열기 직전에 호출한다 (#53).
@@ -29,6 +30,7 @@ export const dynamic = "force-dynamic";
 type Body = {
     reservationId?: unknown;
     pointsToUse?: unknown;
+    useOpeningEvent?: unknown;
 };
 
 export async function POST(request: NextRequest) {
@@ -69,6 +71,13 @@ export async function POST(request: NextRequest) {
         );
     }
 
+    const useOpeningEvent = body.useOpeningEvent === true;
+    if (useOpeningEvent && pointsToUse > 0)
+        return NextResponse.json(
+            { error: "이벤트 혜택은 포인트와 중복 적용할 수 없습니다." },
+            { status: 400 },
+        );
+
     const admin = createAdminClient();
 
     // ---------- 1. 예약 확인 ----------
@@ -98,6 +107,13 @@ export async function POST(request: NextRequest) {
     if (reservation.status !== "MATCHING") {
         return NextResponse.json(
             { error: "결제할 수 있는 상태가 아닙니다.", code: "NOT_MATCHING" },
+            { status: 409 },
+        );
+    }
+
+    if (useOpeningEvent && !(await ensureOpeningEventEmail(user))) {
+        return NextResponse.json(
+            { error: "이메일 인증과 이벤트 참여 조건을 확인해 주세요." },
             { status: 409 },
         );
     }
@@ -219,6 +235,28 @@ export async function POST(request: NextRequest) {
         );
     }
 
+    let campaignDiscount = 0;
+    if (useOpeningEvent) {
+        const { data: discount, error: campaignError } = await admin.rpc(
+            "reserve_opening_event",
+            { p_payment_id: payment.id },
+        );
+        if (campaignError) {
+            await admin
+                .from("payments")
+                .update({ status: "FAILED" })
+                .eq("id", payment.id);
+            return NextResponse.json(
+                {
+                    error: "이벤트 혜택을 확보하지 못했습니다. 자격·잔여 수량을 다시 확인해 주세요.",
+                    code: "CAMPAIGN_UNAVAILABLE",
+                },
+                { status: 409 },
+            );
+        }
+        campaignDiscount = Number(discount);
+    }
+
     // ---------- 5. 포인트 선점 ----------
     if (amounts.discount > 0) {
         const { error: pointError } = await admin.rpc("spend_points", {
@@ -264,9 +302,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
         orderId,
         /** 결제창에 넘길 실제 승인 요청 금액 (총액 − 포인트) */
-        amount: amounts.charge,
+        amount: amounts.charge - campaignDiscount,
         grossAmount: amounts.gross,
-        discountAmount: amounts.discount,
+        discountAmount: amounts.discount + campaignDiscount,
+        campaignDiscount,
         goodsName: `병원동행 서비스 ${reservation.code}`,
         clientId: process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY ?? "",
         paymentDeadline: (current && current > extended

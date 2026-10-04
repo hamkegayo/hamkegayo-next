@@ -304,7 +304,7 @@ export async function endService(
     const final = await finalizeServiceCharge(serviceId);
     if (final) {
         const { charge, diff, customerId } = final;
-        const usage = `이용시간 ${formatMinutes(charge.billedMinutes)} · 최종 요금 ${charge.total.toLocaleString()}원`;
+        const usage = `이용시간 ${formatMinutes(charge.billedMinutes)} · 최종 요금 ${final.customerAmount.toLocaleString()}원`;
 
         if (diff.additional > 0) {
             // 링크 발급과 안내는 모듈이 함께 처리한다(#75). 소프트 상한을

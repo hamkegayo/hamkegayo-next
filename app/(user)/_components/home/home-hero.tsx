@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { NonMedicalNotice } from "@/components/non-medical-notice";
 import { COMPANY } from "@/lib/legal/company";
+import { SERVICE_HOURS_LABEL } from "@/lib/service-hours";
 import { ContactLink } from "./contact-link";
 import { Section } from "./section";
 
@@ -42,18 +43,21 @@ export function HomeHero() {
                             전화 상담하기
                         </ContactLink>
                     </div>
+                    <p className="text-description-foreground mt-5 text-sm leading-relaxed">
+                        서비스 제공시간: {SERVICE_HOURS_LABEL}
+                    </p>
                     <NonMedicalNotice className="mt-6 max-w-md" />
                 </div>
 
                 {/* 이미지 */}
-                <div className="overflow-hidden rounded-3xl">
+                <div className="relative aspect-[535/415] overflow-hidden rounded-3xl">
                     <Image
                         src="/user/main-hero.png"
-                        alt="병원 동행 파트너와 함께 걷는 어르신"
-                        width={640}
-                        height={480}
+                        alt="병원 대기실에서 동행 파트너와 대화하는 어르신"
+                        fill
+                        sizes="(min-width: 768px) 58vw, 100vw"
                         priority
-                        className="h-full w-full object-cover"
+                        className="object-cover object-right"
                     />
                 </div>
             </div>

@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { formatPhoneNumber, kstToday } from "@/lib/format";
 import { maxAdvanceReservationDate } from "@/lib/reservation-window";
 import { isAtLeastAgeOnDate, MIN_SERVICE_AGE_MESSAGE } from "@/lib/service-age";
+import { SERVICE_HOURS_LABEL, isServiceBooking } from "@/lib/service-hours";
+import { parseDurationMinutes } from "@/lib/pricing";
 import { Section } from "@/app/(user)/_components/home/section";
 import { useReservationStore } from "../_store/reservation-store";
 import { step2Form, type Step2Values } from "../_lib/schema";
@@ -68,8 +70,14 @@ export function StepHospitalInfo() {
      *  순간에도 만료 정리가 돌아서 파트너에게는 아무것도 보이지 않는다.
      */
     const useDate = useWatch({ control, name: "useDate" });
+    const arriveTime = useWatch({ control, name: "arriveTime" });
+    const duration = useWatch({ control, name: "duration" });
     const timeOptions = timeOptionsFor(useDate ?? "");
-    const noSlotToday = Boolean(useDate) && timeOptions.length === 0;
+    const noSlotToday =
+        Boolean(useDate) &&
+        !timeOptions.some((time) =>
+            isServiceBooking(time, parseDurationMinutes(duration ?? "") ?? 120),
+        );
     const needsHandover = endMethod === "ADULT_HANDOVER";
 
     const onSubmit = (v: Step2Values) => {
@@ -106,6 +114,12 @@ export function StepHospitalInfo() {
                         <h2 className="text-foreground text-lg font-bold">
                             병원 및 일정 정보
                         </h2>
+                        <p className="text-description-foreground mt-2 text-sm leading-relaxed">
+                            서비스 제공시간: {SERVICE_HOURS_LABEL}
+                            <br />
+                            예상 종료는 19시 이내여야 합니다. 2시간 예약의
+                            마지막 도착 시간은 17시입니다.
+                        </p>
 
                         <div className="mt-5 space-y-5">
                             <div>
@@ -158,7 +172,18 @@ export function StepHospitalInfo() {
                                 >
                                     <option value="">시간을 선택하세요</option>
                                     {timeOptions.map((t) => (
-                                        <option key={t} value={t}>
+                                        <option
+                                            key={t}
+                                            value={t}
+                                            disabled={
+                                                !isServiceBooking(
+                                                    t,
+                                                    parseDurationMinutes(
+                                                        duration ?? "",
+                                                    ) ?? 120,
+                                                )
+                                            }
+                                        >
                                             {t}
                                         </option>
                                     ))}
@@ -208,7 +233,18 @@ export function StepHospitalInfo() {
                                 >
                                     <option value="">시간을 선택하세요</option>
                                     {DURATION_OPTIONS.map((d) => (
-                                        <option key={d} value={d}>
+                                        <option
+                                            key={d}
+                                            value={d}
+                                            disabled={
+                                                Boolean(arriveTime) &&
+                                                !isServiceBooking(
+                                                    arriveTime ?? "",
+                                                    parseDurationMinutes(d) ??
+                                                        0,
+                                                )
+                                            }
+                                        >
                                             {d}
                                         </option>
                                     ))}

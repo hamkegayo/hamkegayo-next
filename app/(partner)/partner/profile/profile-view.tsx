@@ -280,7 +280,7 @@ export function PartnerProfileView({
         return result;
     };
 
-    const roleLine = `${PARTNER_PROFILE.role} · 병원 동행 경력 ${PARTNER_PROFILE.companionYears}년`;
+    const roleLine = "병원 동행 파트너";
     const verificationRows = PARTNER_PROFILE.verification.map((row) =>
         row.label === "이름" ? { ...row, value: initialBasicInfo.name } : row,
     );
@@ -557,52 +557,6 @@ export function PartnerProfileView({
 
             <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
                 {/* 근무했던 병원 리스트 */}
-                <Card title="근무했던 병원 리스트" hint="(인증 정보)">
-                    <ul className="space-y-3">
-                        {PARTNER_PROFILE.workHistory.map((w) => (
-                            <li
-                                key={w.hospital}
-                                className="border-border rounded-xl border p-4"
-                            >
-                                <div className="flex items-start justify-between gap-2">
-                                    <p className="text-foreground font-bold">
-                                        {w.hospital}
-                                    </p>
-                                    <Lock className="text-muted-foreground mt-0.5 size-3.5 shrink-0" />
-                                </div>
-                                <dl className="mt-2 space-y-1 text-xs">
-                                    <div className="flex justify-between gap-3">
-                                        <dt className="text-muted-foreground shrink-0">
-                                            근무 기간
-                                        </dt>
-                                        <dd className="text-foreground text-right font-semibold">
-                                            {w.period} ({w.duration})
-                                        </dd>
-                                    </div>
-                                    <div className="flex justify-between gap-3">
-                                        <dt className="text-muted-foreground shrink-0">
-                                            부서
-                                        </dt>
-                                        <dd className="text-foreground text-right">
-                                            {w.dept}
-                                        </dd>
-                                    </div>
-                                    <div className="flex justify-between gap-3">
-                                        <dt className="text-muted-foreground shrink-0">
-                                            담당 업무
-                                        </dt>
-                                        <dd className="text-foreground text-right">
-                                            {w.role}
-                                        </dd>
-                                    </div>
-                                </dl>
-                            </li>
-                        ))}
-                    </ul>
-                    <p className="text-muted-foreground mt-3 text-xs">
-                        * 인증된 정보는 수정이 불가합니다.
-                    </p>
-                </Card>
 
                 {/* 자격 및 보유 사항 */}
                 <Card
@@ -738,9 +692,9 @@ export function PartnerProfileView({
                 name={initialBasicInfo.name}
                 roleLine={roleLine}
                 intro={intro}
-                regions={regions.filter((r) => r.checked).map((r) => r.label)}
-                times={times.filter((t) => t.checked).map((t) => t.label)}
-                preferredHospitals={hospitals}
+                regions={[]}
+                times={[]}
+                preferredHospitals={[]}
             />
         </div>
     );

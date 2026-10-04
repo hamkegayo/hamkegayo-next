@@ -2,6 +2,7 @@ import Image from "next/image";
 
 import { Section } from "@/app/(user)/_components/home/section";
 import { NonMedicalNotice } from "@/components/non-medical-notice";
+import { SERVICE_HOURS_LABEL } from "@/lib/service-hours";
 
 /** 서비스 소개 히어로 — 배지 + 헤드라인 + 이미지 */
 export function ServiceHero() {
@@ -30,18 +31,21 @@ export function ServiceHero() {
                       박스로 띄워 두면 페이지에서 떨어져 나온 경고문처럼 보인다.
                       메인 히어로도 같은 처리다.
                     */}
+                    <p className="text-description-foreground mt-5 text-sm leading-relaxed">
+                        서비스 제공시간: {SERVICE_HOURS_LABEL}
+                    </p>
                     <NonMedicalNotice className="mt-6 max-w-md" />
                 </div>
 
                 {/* 이미지 (교체용 파일: public/user/service-hero.png) */}
-                <div className="overflow-hidden rounded-3xl">
+                <div className="relative aspect-[277/163] overflow-hidden rounded-3xl">
                     <Image
                         src="/user/service-hero.png"
-                        alt="병원 로비에서 어르신과 함께한 동행 파트너"
-                        width={720}
-                        height={460}
+                        alt="동행 파트너의 도움을 받아 병원 접수를 진행하는 어르신"
+                        fill
+                        sizes="(min-width: 768px) 55vw, 100vw"
                         priority
-                        className="h-full w-full object-cover"
+                        className="object-cover object-right"
                     />
                 </div>
             </div>

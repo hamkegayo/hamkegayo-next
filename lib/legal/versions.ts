@@ -42,6 +42,8 @@ export const LEGAL_BODY_HASHES: Record<LegalDocKey, Record<string, string>> = {
         // 초판. 2026-09-06 커밋(01def53)은 termsArticle() 헬퍼만 추가했고
         // 조문은 건드리지 않았다 — 그래서 개정이 아니다.
         "2026-09-03": "f68c948cd62004b3",
+        // #176 서비스 제공시간을 매일 07:00~19:00으로 변경.
+        "2026-10-04": "a5f8bd4d2b1ae3a4",
     },
     PRIVACY: {
         // 2026-09-06 개정 — 파트너 정산정보, 제11조 조문 번호 (#104)

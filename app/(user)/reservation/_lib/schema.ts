@@ -7,6 +7,12 @@ import {
 } from "@/lib/reservation-window";
 import { isAtLeastAgeOnDate, MIN_SERVICE_AGE_MESSAGE } from "@/lib/service-age";
 import { kstToday } from "@/lib/format";
+import {
+    isServiceTime,
+    isServiceBooking,
+    SERVICE_HOURS,
+} from "@/lib/service-hours";
+import { parseDurationMinutes } from "@/lib/pricing";
 import { isPastSlot, MIN_LEAD_MINUTES, reservationStartAt } from "./options";
 
 const required = "필수 입력 항목입니다.";
@@ -51,8 +57,20 @@ export const step1Schema = z.object({
 /** STEP2 · 병원 및 일정 정보 */
 export const step2Schema = z.object({
     useDate: z.string().min(1, required),
-    arriveTime: z.string().min(1, "시간을 선택해 주세요."),
-    reserveTime: z.string().min(1, "시간을 선택해 주세요."),
+    arriveTime: z
+        .string()
+        .min(1, "시간을 선택해 주세요.")
+        .refine(
+            isServiceTime,
+            `서비스 제공시간 ${SERVICE_HOURS} 내에서 30분 단위로 선택해 주세요.`,
+        ),
+    reserveTime: z
+        .string()
+        .min(1, "시간을 선택해 주세요.")
+        .refine(
+            isServiceTime,
+            `서비스 제공시간 ${SERVICE_HOURS} 내에서 30분 단위로 선택해 주세요.`,
+        ),
     duration: z.string().min(1, "시간을 선택해 주세요."),
     departAddress: z.string().min(1, required),
     // 병원명은 매칭 전 파트너에게 제공되는 단계 1 항목이다 (처리방침 제5조 ②).
@@ -132,7 +150,12 @@ function requireHandover(
  *  아무것도 보이지 않는다. 폼과 서버 양쪽에서 막는다.
  */
 function checkSchedule(
-    v: { useDate: string; arriveTime: string; reserveTime: string },
+    v: {
+        useDate: string;
+        arriveTime: string;
+        reserveTime: string;
+        duration: string;
+    },
     ctx: z.RefinementCtx,
 ) {
     if (!v.useDate) return;
@@ -156,6 +179,17 @@ function checkSchedule(
     }
 
     if (!v.arriveTime || !v.reserveTime) return;
+
+    if (
+        !isServiceBooking(v.arriveTime, parseDurationMinutes(v.duration) ?? 0)
+    ) {
+        ctx.addIssue({
+            code: "custom",
+            path: ["duration"],
+            message:
+                "예상 종료가 19시 이내가 되도록 도착 시간과 소요 시간을 선택해 주세요. 최소 예약은 2시간입니다.",
+        });
+    }
 
     if (isPastSlot(v.useDate, v.arriveTime)) {
         ctx.addIssue({
