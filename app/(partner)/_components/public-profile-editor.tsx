@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import type { PartnerPublicProfile } from "@/lib/partner-details";
+import { COMPANY } from "@/lib/legal/company";
 import {
     deletePartnerWorkHistory,
     getPartnerPublicProfile,
@@ -122,9 +123,17 @@ export function PublicProfileEditor({
                     </div>
                     <h3 className="mt-6 font-bold">근무 병원·경력</h3>
                     <p className="text-muted-foreground mt-2 text-sm">
-                        실제 근무 이력을 등록해 주세요. 관리자에게 증빙을 별도로
-                        제출하고 검증이 완료된 경력만 공개합니다. 수정이
-                        필요하면 삭제 후 새로 등록하여 심사를 받아 주세요.
+                        실제 근무 이력을 등록하고 증빙을{" "}
+                        <a
+                            className="underline"
+                            href={`mailto:${COMPANY.email}`}
+                        >
+                            {COMPANY.email}
+                        </a>
+                        로 제출해 주세요. 담당자 김서현이 검증한 경력만
+                        공개합니다. 환자 정보 등 불필요한 개인정보는 제외해
+                        주세요. 수정이 필요하면 삭제 후 새로 등록하여 심사를
+                        받아 주세요.
                     </p>
                     {profile.histories.length === 0 && (
                         <p className="text-muted-foreground mt-4 text-sm">
