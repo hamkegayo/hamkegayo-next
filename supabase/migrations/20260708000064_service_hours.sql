@@ -22,6 +22,19 @@ begin
   ) then
     raise exception 'service_hours_out_of_range' using errcode = '23514';
   end if;
+  -- 사용자 확정: 신규 예약의 예상 종료까지 19시 이내. 라벨/분 불일치도 거절한다.
+  if auth.role() = 'authenticated' and (
+    new.duration_minutes is null or new.duration_minutes not between 120 and 240
+    or new.duration_minutes % 30 <> 0
+    or new.duration is distinct from case when new.duration_minutes % 60 = 0
+      then (new.duration_minutes / 60)::text || '시간'
+      else (new.duration_minutes / 60)::text || '시간 30분' end
+    or public.reservation_start_at(new.use_date, new.arrive_time)
+      + make_interval(mins => new.duration_minutes)
+      > (new.use_date::date + time '19:00') at time zone 'Asia/Seoul'
+  ) then
+    raise exception 'planned_end_out_of_range' using errcode = '23514';
+  end if;
   return new;
 end;
 $$;

@@ -37,4 +37,21 @@ begin
 end;
 $$;
 reset role;
+select set_config('request.jwt.claims','{"sub":"00000176-0000-4000-8000-000000000001","role":"authenticated"}',true);
+set local role authenticated;
+do $$
+declare v_start text; v_minutes integer; v_rejected boolean;
+begin
+  for v_start, v_minutes in select * from (values ('17:00',120),('17:30',120),('16:30',150),('16:30',120),('17:00',null::integer)) as cases(start_time,minutes) loop
+    v_rejected := false;
+    begin
+      insert into public.reservations(code, customer_id, plan, patient_name, patient_birth, patient_gender, patient_phone, guardian_name, guardian_phone, relation, treatment, purpose, use_date, arrive_time, reserve_time, duration, duration_minutes, depart_address, hospital_address)
+      values ('TEST-HOURS-END-'||replace(v_start,':','')||coalesce(v_minutes::text,'NULL'),'00000176-0000-4000-8000-000000000001','basic','Test','1960-01-01','female','01000000000','Test','01000000000','self','Test','Test','2099-01-01',v_start,v_start,case when v_minutes=150 then '2시간 30분' else '2시간' end,v_minutes,'Test','Test');
+    exception when check_violation then v_rejected := true;
+    end;
+    perform pg_temp.assert(v_rejected = (v_minutes is null or (v_start='17:30' and v_minutes=120)), 'planned end boundary '||v_start||'/'||coalesce(v_minutes::text,'NULL'));
+  end loop;
+end;
+$$;
+reset role;
 rollback;

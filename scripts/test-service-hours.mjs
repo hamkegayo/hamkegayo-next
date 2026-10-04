@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { mock } from "node:test";
-import { isServiceTime, SERVICE_HOURS_LABEL } from "@/lib/service-hours";
+import {
+    isServiceTime,
+    isServiceBooking,
+    SERVICE_HOURS_LABEL,
+} from "@/lib/service-hours";
 import {
     TIME_OPTIONS,
     timeOptionsFor,
@@ -126,4 +130,42 @@ check(
     timeOptionsFor("2026-10-10").length === 25,
 );
 mock.timers.reset();
+for (const [time, duration, valid] of [
+    ["17:00", 120, true],
+    ["17:30", 120, false],
+    ["16:30", 150, true],
+    ["15:00", 240, true],
+    ["15:30", 240, false],
+    ["19:00", 120, false],
+    ["07:00", 90, false],
+]) {
+    check(
+        `planned end ${time}/${duration}`,
+        isServiceBooking(time, duration) === valid,
+    );
+}
+check(
+    "server allows ending at 19",
+    reservationServerSchema.safeParse({
+        ...input,
+        arriveTime: "17:00",
+        reserveTime: "17:30",
+    }).success,
+);
+check(
+    "server rejects ending after 19",
+    !reservationServerSchema.safeParse({
+        ...input,
+        arriveTime: "17:30",
+        reserveTime: "18:00",
+    }).success,
+);
+check(
+    "form rejects ending after 19",
+    !step2Form.safeParse({
+        ...input,
+        arriveTime: "17:30",
+        reserveTime: "18:00",
+    }).success,
+);
 console.log(`${passed} checks passed`);
