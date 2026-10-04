@@ -23,14 +23,16 @@ import {
 export function OpeningEventPopup({
     enabled,
     preview = false,
+    previewAutoOpen = false,
     reservationHref = "/reservation",
 }: {
     enabled: boolean;
     preview?: boolean;
+    previewAutoOpen?: boolean;
     reservationHref?: string;
 }) {
     const dismissedDate = useRef<string | null>(null);
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(preview && previewAutoOpen);
     useEffect(() => {
         if (preview || !enabled) return;
         const refresh = async () => {
@@ -70,7 +72,7 @@ export function OpeningEventPopup({
     };
     return (
         <Dialog open={open} onOpenChange={changeOpen}>
-            {preview && (
+            {preview && !previewAutoOpen && (
                 <DialogTrigger className="border-border bg-background rounded-lg border px-4 py-2 font-bold">
                     팝업 시안 미리보기
                 </DialogTrigger>
@@ -90,7 +92,7 @@ export function OpeningEventPopup({
                         <X className="size-6" />
                     </DialogClose>
                 </div>
-                <DialogTitle className="mt-6 text-3xl leading-tight font-extrabold sm:text-4xl">
+                <DialogTitle className="mt-6 text-3xl leading-tight font-extrabold break-keep sm:text-4xl">
                     첫 병원동행,
                     <br />
                     <span className="text-brand">1시간 무료</span>로 시작하세요
@@ -98,14 +100,33 @@ export function OpeningEventPopup({
                 <DialogDescription className="mt-3 text-base">
                     병원동행을 부담 없이 시작해 보세요.
                 </DialogDescription>
-                <div className="bg-brand text-brand-foreground mt-6 rounded-2xl px-4 py-6 text-center">
-                    <p className="text-lg font-bold">선착순 20명</p>
-                    <p className="mt-2 text-3xl font-extrabold sm:text-4xl">
+                {previewAutoOpen && (
+                    <p
+                        role="status"
+                        className="mt-3 rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-900"
+                    >
+                        스테이징 시안 미리보기 · 실제 할인은 적용되지 않습니다.
+                    </p>
+                )}
+                <div
+                    className="relative mt-6 rounded-2xl bg-linear-to-br from-[#00b5ff] to-[#0089ee] px-7 pt-7 pb-5 text-center text-white sm:px-9 sm:pt-8 sm:pb-6"
+                    style={{
+                        maskImage:
+                            "radial-gradient(circle at left center, transparent 0 16px, black 16.5px), radial-gradient(circle at right center, transparent 0 16px, black 16.5px)",
+                        maskComposite: "intersect",
+                    }}
+                >
+                    <p className="text-lg font-bold sm:text-xl">선착순 20명</p>
+                    <p className="mt-3 text-3xl leading-tight font-extrabold tracking-tight sm:text-4xl">
                         첫 1시간 이용 무료
                     </p>
                     <p className="mt-2 text-lg font-bold">
                         (Plus 25,000원 · Basic 20,000원 상당)
                     </p>
+                    <div
+                        aria-hidden="true"
+                        className="mt-6 border-t-2 border-dashed border-white/80"
+                    />
                 </div>
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                     {preview ? (
@@ -163,9 +184,9 @@ export function OpeningEventPopup({
                 </details>
                 {preview && (
                     <p className="mt-3 text-xs text-amber-700">
-                        시안 검토 화면입니다. 두 버튼은 이동하지 않습니다.
-                        이메일 인증·운영 조건 확인 전 실제 할인과 고객 팝업은
-                        비활성입니다.
+                        시안 검토 화면입니다. 두 버튼은 이동하지 않습니다. 이
+                        시안에서는 예약·상담 요청이나 실제 할인 적용을 실행하지
+                        않습니다.
                     </p>
                 )}
             </DialogContent>
