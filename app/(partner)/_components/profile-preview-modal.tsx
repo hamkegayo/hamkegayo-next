@@ -76,15 +76,21 @@ export function ProfilePreviewModal({
                         {intro}
                     </p>
                 </Section>
-                <Section title="활동 지역">
-                    <Chips items={regions} />
-                </Section>
-                <Section title="활동 가능 시간">
-                    <Chips items={times} />
-                </Section>
-                <Section title="선호 병원">
-                    <Chips items={preferredHospitals} />
-                </Section>
+                {regions.length > 0 && (
+                    <Section title="활동 지역">
+                        <Chips items={regions} />
+                    </Section>
+                )}
+                {times.length > 0 && (
+                    <Section title="활동 가능 시간">
+                        <Chips items={times} />
+                    </Section>
+                )}
+                {preferredHospitals.length > 0 && (
+                    <Section title="선호 병원">
+                        <Chips items={preferredHospitals} />
+                    </Section>
+                )}
             </div>
 
             <div className="p-6 pt-0">

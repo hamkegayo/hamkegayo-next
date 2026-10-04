@@ -12,6 +12,7 @@ import { resumeReservation } from "../_actions/payment";
 import { useReservationStore } from "../_store/reservation-store";
 import { getMatchingState, type DetailedApplicant } from "../_actions/matching";
 import { StepBand } from "./step-band";
+import { PartnerDetailModal } from "./partner-detail-modal";
 
 const POLL_MS = 5000;
 
@@ -21,6 +22,7 @@ export function StepPartnerSelect() {
 
     const [applicants, setApplicants] = useState<DetailedApplicant[]>([]);
     const [selected, setSelected] = useState<DetailedApplicant | null>(null);
+    const [detailPartnerId, setDetailPartnerId] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     /** 매칭이 끝난 예약이면 고를 수 없다 (취소·확정 등) */
     const [closed, setClosed] = useState(false);
@@ -184,14 +186,27 @@ export function StepPartnerSelect() {
                                             {a.appliedAtLabel} 수락
                                         </p>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setSelected(a)}
-                                        disabled={pending}
-                                        className="bg-brand text-brand-foreground hover:bg-brand/90 shrink-0 rounded-lg px-5 py-2.5 text-sm font-bold transition-colors disabled:opacity-60"
-                                    >
-                                        이 파트너로 선택
-                                    </button>
+                                    <div className="flex shrink-0 flex-wrap gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setDetailPartnerId(a.partnerId)
+                                            }
+                                            disabled={pending || closed}
+                                            className="border-border hover:bg-muted rounded-lg border px-4 py-2.5 text-sm font-bold disabled:opacity-60"
+                                            aria-label={`${a.name} 파트너 상세 정보`}
+                                        >
+                                            상세 정보
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelected(a)}
+                                            disabled={pending || closed}
+                                            className="bg-brand text-brand-foreground hover:bg-brand/90 shrink-0 rounded-lg px-5 py-2.5 text-sm font-bold transition-colors disabled:opacity-60"
+                                        >
+                                            이 파트너로 선택
+                                        </button>
+                                    </div>
                                 </li>
                             ))}
                         </ul>
@@ -209,6 +224,14 @@ export function StepPartnerSelect() {
                 </div>
             </Section>
 
+            {detailPartnerId && reservationId && (
+                <PartnerDetailModal
+                    key={`${reservationId}-${detailPartnerId}`}
+                    reservationId={reservationId}
+                    partnerId={detailPartnerId}
+                    onClose={() => setDetailPartnerId(null)}
+                />
+            )}
             <ConfirmModal
                 open={selected !== null}
                 onClose={() => setSelected(null)}

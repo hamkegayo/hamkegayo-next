@@ -5,6 +5,32 @@ import { createClient } from "@/utils/supabase/server";
 
 const QUALIFICATION_FILE_URL_TTL_SECONDS = 5 * 60;
 
+export async function reviewWorkHistory(input: {
+    id: string;
+    expected: "PENDING" | "VERIFIED";
+    status: "PENDING" | "VERIFIED";
+    reason: string;
+}) {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("admin_review_work_history", {
+        p_id: input.id,
+        p_expected: input.expected,
+        p_status: input.status,
+        p_reason: input.reason,
+    });
+    if (error)
+        return {
+            ok: false,
+            message:
+                error.code === "P0002"
+                    ? "다른 담당자가 처리했거나 삭제된 항목입니다. 새로고침해 주세요."
+                    : "심사 권한과 사유(5~500자)를 확인해 주세요.",
+        };
+    revalidatePath("/admin/qualifications");
+    revalidatePath("/partner/profile");
+    return { ok: true };
+}
+
 export async function reviewQualification(input: {
     id: string;
     expected: "PENDING" | "VERIFIED";
