@@ -46,6 +46,21 @@ select pg_temp.denied($q$select public.get_reservation_partner_detail('00000173-
 reset role;
 select set_config('request.jwt.claims', '{"sub":"00000173-0000-4000-8000-000000000002","role":"authenticated","aal":"aal1"}', true);
 set local role authenticated;
+select pg_temp.assert(not public.partner_public_details_enabled(),'public details default disabled');
+select pg_temp.denied($q$select public.get_reservation_partner_detail('00000173-0000-4000-8000-000000000005','00000173-0000-4000-8000-000000000003')$q$,'details blocked before notice release');
+select pg_temp.denied('update public.partner_public_release set enabled=true','customer cannot enable release');
+reset role;
+select set_config('request.jwt.claims', '{"sub":"00000173-0000-4000-8000-000000000003","role":"authenticated","aal":"aal1"}', true);
+set local role authenticated;
+select pg_temp.denied('select public.set_partner_public_consent(true)','partner cannot consent before notice release');
+select public.set_partner_public_consent(false);
+select pg_temp.denied('select public.get_reservation_partner_detail_unreleased(null,null)','private detail cannot bypass release');
+select pg_temp.denied('select public.set_partner_public_consent_unreleased(true)','private consent cannot bypass release');
+reset role;
+-- Transaction-local release only: verify the original ownership/consent controls too.
+update public.partner_public_release set enabled=true;
+select set_config('request.jwt.claims', '{"sub":"00000173-0000-4000-8000-000000000002","role":"authenticated","aal":"aal1"}', true);
+set local role authenticated;
 select pg_temp.denied($q$select public.get_reservation_partner_detail('00000173-0000-4000-8000-000000000005','00000173-0000-4000-8000-000000000003')$q$, 'foreign reservation denied');
 select pg_temp.assert((select count(*) = 0 from public.partner_work_histories), 'foreign history RLS');
 select pg_temp.denied('select public.set_partner_public_consent(true)', 'ordinary user cannot consent as partner');

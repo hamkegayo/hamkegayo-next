@@ -18,13 +18,13 @@ begin
     plan_code:=case when i%2=0 then 'basic' else 'plus' end;
     hour_amount:=case plan_code when 'plus' then 25000 else 20000 end;
     surcharge:=case when i%3=0 then 0.3 else 0 end;
-    gross:=round(hour_amount*2*(1+surcharge));
+    gross:=round(hour_amount*(case when i in (4,6) then 4 else 2 end)*(1+surcharge));
     insert into auth.users(id,email,email_confirmed_at) values(uid,'event-'||i||'@example.invalid',now());
     insert into public.profiles(id,name,role) values(uid,'Event Test','USER');
     insert into public.opening_event_identities(customer_id,identity_hash,verification_source,verified_at)
       values(uid,md5(uid::text)||md5(uid::text),'SUPABASE_EMAIL',now());
     insert into public.reservations(id,code,customer_id,plan,patient_name,patient_birth,patient_gender,patient_phone,guardian_name,guardian_phone,relation,treatment,purpose,use_date,arrive_time,reserve_time,duration,duration_minutes,depart_address,hospital_address,status,confirmed_partner_id,payment_deadline,surcharge_rate,prepaid_amount)
-    values(rid,'TEST-EVENT-'||i,uid,plan_code,'Test','1960-01-01','female','01000000000','Test','01000000000','self','Test','Test',((now() at time zone 'Asia/Seoul')::date+i),'10:00','10:30','2시간',120,'Test','Test','MATCHING','00000159-0000-4000-8000-000000000999',now()+interval '30 minutes',surcharge,gross);
+    values(rid,'TEST-EVENT-'||i,uid,plan_code,'Test','1960-01-01','female','01000000000','Test','01000000000','self','Test','Test',((now() at time zone 'Asia/Seoul')::date+i),'10:00','10:30',case when i in (4,6) then '4시간' else '2시간' end,case when i in (4,6) then 240 else 120 end,'Test','Test','MATCHING','00000159-0000-4000-8000-000000000999',now()+interval '30 minutes',surcharge,gross);
     insert into public.payments(id,reservation_id,type,status,order_id,gross_amount,discount_amount,commission_amount,payout_amount,commission_rate)
     values(pid,rid,'BASE','PENDING','TEST-EVENT-'||i,gross,0,round(gross*0.2),gross-round(gross*0.2),0.2);
   end loop;
@@ -173,8 +173,22 @@ select public.record_settlement_refund((select id from public.refund_requests wh
 select pg_temp.assert((select sum(net)=16000 from public.settlements st join public.services s on s.id=st.service_id where s.reservation_id='00000159-0001-4000-8000-000000000002'),'early completion refund keeps one-hour partner payout');
 update public.reservations set final_amount=20000,billed_minutes=60 where id='00000159-0001-4000-8000-000000000004';
 update public.services set status='COMPLETED',no_show=true where reservation_id='00000159-0001-4000-8000-000000000004';
-select pg_temp.assert((select net=16000 and amount=20000 from public.settlements where payment_id='00000159-0002-4000-8000-000000000004'),'no-show has no free-hour subsidy');
-select pg_temp.assert((select payout_amount=16000 and commission_amount=4000 from public.payments where id='00000159-0002-4000-8000-000000000004'),'no-show payment and settlement payout agree');
+select pg_temp.assert((select net=48000 and amount=60000 from public.settlements where payment_id='00000159-0002-4000-8000-000000000004'),'4-hour no-show primary ledger preserves cash received');
+select pg_temp.assert((select gross_amount=80000 and discount_amount=20000 and commission_amount=12000 and payout_amount=48000 and gross_amount-discount_amount-commission_amount=payout_amount from public.payments where id='00000159-0002-4000-8000-000000000004'),'4-hour no-show payment split remains valid');
+insert into public.refund_requests(reservation_id,payment_id,amount,status,reason)
+  values('00000159-0001-4000-8000-000000000004','00000159-0002-4000-8000-000000000004',40000,'APPROVED','TEST 4H NO SHOW');
+select public.record_settlement_refund((select id from public.refund_requests where reservation_id='00000159-0001-4000-8000-000000000004'));
+select public.record_settlement_refund((select id from public.refund_requests where reservation_id='00000159-0001-4000-8000-000000000004'));
+select pg_temp.assert((select sum(st.net)=16000 and sum(st.amount)=20000 from public.settlements st join public.services s on s.id=st.service_id where s.reservation_id='00000159-0001-4000-8000-000000000004'),'4-hour no-show refund deducted once; one-hour partner net positive');
+select pg_temp.assert((select sum(gross_amount-discount_amount)=20000 and sum(payout_amount)=16000 from public.payments where reservation_id='00000159-0001-4000-8000-000000000004' and status='PAID'),'4-hour no-show payment totals equal settlement');
+update public.reservations set final_amount=26000,billed_minutes=60 where id='00000159-0001-4000-8000-000000000006';
+update public.services set status='COMPLETED',no_show=true where reservation_id='00000159-0001-4000-8000-000000000006';
+select pg_temp.assert((select gross_amount=104000 and discount_amount=20000 and commission_amount=16800 and payout_amount=67200 and gross_amount-discount_amount-commission_amount=payout_amount from public.payments where id='00000159-0002-4000-8000-000000000006'),'4-hour weekend/holiday no-show split remains valid');
+insert into public.refund_requests(reservation_id,payment_id,amount,status,reason)
+  values('00000159-0001-4000-8000-000000000006','00000159-0002-4000-8000-000000000006',58000,'APPROVED','TEST SURCHARGE NO SHOW');
+select public.record_settlement_refund((select id from public.refund_requests where reservation_id='00000159-0001-4000-8000-000000000006'));
+select pg_temp.assert((select sum(st.net)=20800 and sum(st.amount)=26000 from public.settlements st join public.services s on s.id=st.service_id where s.reservation_id='00000159-0001-4000-8000-000000000006'),'weekend/holiday no-show refund leaves one-hour surcharge net');
+select pg_temp.assert((select sum(gross_amount-discount_amount)=26000 and sum(payout_amount)=20800 from public.payments where reservation_id='00000159-0001-4000-8000-000000000006' and status='PAID'),'weekend/holiday no-show payment totals equal settlement');
 
 -- 회사/파트너 귀책 복원은 MFA 정산 담당자의 명시 확인과 실제 전액 환불 기록이 필요하다.
 select set_config('test.restore_claim_id',(select id::text from public.opening_event_claims where payment_id='00000159-0002-4000-8000-000000000101'),true);

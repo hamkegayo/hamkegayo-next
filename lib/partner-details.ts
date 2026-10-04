@@ -28,5 +28,6 @@ export type PartnerDetail = {
 
 export type PartnerPublicProfile = {
     consent: boolean;
+    publicEnabled: boolean;
     histories: (WorkHistory & { status: "PENDING" | "VERIFIED" })[];
 };
