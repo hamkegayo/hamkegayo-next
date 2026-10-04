@@ -29,6 +29,7 @@ import {
 import { signUpUser, activatePartner } from "../_lib/actions";
 import { trackSignUp } from "@/lib/analytics";
 import { EmailVerificationField } from "./email-verification-field";
+import { authPageWithNext } from "@/lib/auth/navigation";
 
 const TABS: { type: SignupType; label: string }[] = [
     { type: "user", label: "일반 회원가입" },
@@ -57,7 +58,7 @@ const AGREEMENTS = [
     },
 ] as const;
 
-export function SignupForm() {
+export function SignupForm({ next = "/" }: { next?: string }) {
     const router = useRouter();
     const [type, setType] = useState<SignupType>("user");
     const typeRef = useRef<SignupType>("user");
@@ -65,6 +66,8 @@ export function SignupForm() {
     const [showPwc, setShowPwc] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [successOpen, setSuccessOpen] = useState(false);
+    const loginHref =
+        type === "user" ? authPageWithNext("/login", next) : "/login";
 
     // 활성 탭에 따라 스키마를 선택하는 커스텀 resolver
     const resolver: Resolver<SignupFormValues> = (values, context, options) => {
@@ -420,7 +423,7 @@ export function SignupForm() {
                 <p className="text-foreground text-center text-sm">
                     이미 회원이신가요?{" "}
                     <Link
-                        href="/login"
+                        href={loginHref}
                         className="text-brand font-bold hover:underline"
                     >
                         로그인
@@ -440,7 +443,7 @@ export function SignupForm() {
                     </DialogDescription>
                     <button
                         type="button"
-                        onClick={() => router.push("/login")}
+                        onClick={() => router.push(loginHref)}
                         className="bg-brand text-brand-foreground hover:bg-brand/90 mt-5 h-11 w-full rounded-lg text-base font-bold transition-colors"
                     >
                         확인

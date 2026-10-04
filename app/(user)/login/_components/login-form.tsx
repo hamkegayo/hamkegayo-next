@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import {
     NAVER_LOGIN_ENABLED,
     SOCIAL_PROVIDERS,
+    safeInternalPath,
     type SocialProvider,
 } from "@/lib/auth/social";
 import {
@@ -23,6 +24,7 @@ import {
     OAUTH_ERRORS,
 } from "@/lib/auth/oauth-errors";
 import { createClient } from "@/utils/supabase/client";
+import { authPageWithNext } from "@/lib/auth/navigation";
 import {
     loginDefaultValues,
     partnerLoginSchema,
@@ -50,7 +52,13 @@ function readOAuthError() {
     return oauthErrorFromLocation(window.location.search, window.location.hash);
 }
 
-export function LoginForm({ oauthError }: { oauthError?: string }) {
+export function LoginForm({
+    oauthError,
+    next = "/",
+}: {
+    oauthError?: string;
+    next?: string;
+}) {
     const router = useRouter();
     const [type, setType] = useState<LoginType>("user");
     const typeRef = useRef<LoginType>("user");
@@ -137,7 +145,9 @@ export function LoginForm({ oauthError }: { oauthError?: string }) {
             // 성공: 이동이 끝나 이 컴포넌트가 언마운트될 때까지 로딩 상태를 유지한다.
             // (finally 에서 즉시 해제하면 네비게이션 지연(RSC 로드) 동안 스피너가 사라지고
             //  버튼이 다시 활성화됐다가 뒤늦게 이동하는 깜빡임이 생긴다.)
-            router.push(res.redirectTo);
+            router.push(
+                type === "user" ? safeInternalPath(next) : res.redirectTo,
+            );
             router.refresh();
         } catch {
             toast.error(
@@ -153,7 +163,7 @@ export function LoginForm({ oauthError }: { oauthError?: string }) {
         setSocialSubmitting(provider);
         const supabase = createClient();
         const callback = new URL("/auth/callback", window.location.origin);
-        callback.searchParams.set("next", "/");
+        callback.searchParams.set("next", safeInternalPath(next));
         const { error } = await supabase.auth.signInWithOAuth({
             provider: SOCIAL_PROVIDERS[provider],
             options: { redirectTo: callback.toString() },
@@ -386,7 +396,7 @@ export function LoginForm({ oauthError }: { oauthError?: string }) {
                 {/* 하단 링크 */}
                 <div className="text-foreground mt-6 flex items-center justify-center gap-4 text-sm font-semibold">
                     <Link
-                        href="/signup"
+                        href={authPageWithNext("/signup", next)}
                         className="hover:text-brand transition-colors"
                     >
                         회원가입
