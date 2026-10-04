@@ -7,6 +7,8 @@ export const OAUTH_ERRORS = {
     email_required: "소셜 계정의 이메일 제공 동의가 필요합니다.",
     email_verification_required:
         "이메일 주소 확인이 필요합니다. 받은 편지함의 인증 메일을 확인한 뒤 다시 로그인해 주세요.",
+    email_rate_limited:
+        "인증 메일 발송 한도에 도달했습니다. 이미 받은 인증 메일이 있다면 먼저 확인해 주세요. 메일이 없다면 잠시 후 다시 시도해 주세요.",
     access_denied: "소셜 로그인이 취소되었습니다. 다시 시도해 주세요.",
     provider_failed:
         "소셜 로그인 정보를 확인하지 못했습니다. 다시 시도해 주세요. 계속 실패하면 고객센터에 문의해 주세요.",
@@ -34,6 +36,7 @@ export function providerOAuthError(
     // 구체적인 error_code를 먼저 확인해야 실제 취소와 구분할 수 있다.
     if (code === "provider_email_needs_verification")
         return "email_verification_required";
+    if (code === "over_email_send_rate_limit") return "email_rate_limited";
     if (
         code === "email_address_not_provided" ||
         params

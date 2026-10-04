@@ -184,6 +184,7 @@ test("취소·일반 오류·알 수 없는 오류는 정해진 안내 코드만
 test("Supabase access_denied와 함께 온 구체적인 이메일 오류를 우선한다", () => {
     for (const [code, expected] of [
         ["provider_email_needs_verification", "email_verification_required"],
+        ["over_email_send_rate_limit", "email_rate_limited"],
         ["email_address_not_provided", "email_required"],
         ["user_banned", "account_unavailable"],
         ["signup_disabled", "provider_failed"],
@@ -191,6 +192,8 @@ test("Supabase access_denied와 함께 온 구체적인 이메일 오류를 우�
     ]) {
         const params = `error=access_denied&error_code=${code}`;
         assert.equal(providerOAuthError(new URLSearchParams(params)), expected);
+        assert.equal(oauthErrorFromLocation(`?${params}`, ""), expected);
+        assert.equal(knownOAuthError(expected), expected);
         assert.equal(
             oauthErrorFromLocation("?oauth_error=missing_code", `#${params}`),
             expected,
