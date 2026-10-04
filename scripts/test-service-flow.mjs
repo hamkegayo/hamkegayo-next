@@ -461,7 +461,7 @@ async function main() {
         freshRow?.status,
     );
 
-    // 18시 상한이 예정 종료보다 이르면 예정 종료가 이긴다.
+    // 19시 상한이 예정 종료보다 이르면 예정 종료가 이긴다.
     // 상한을 그대로 쓰면 아직 끝나지 않은 서비스가 시작하자마자 마감된다.
     const late = await makeService(
         customerId,
@@ -470,7 +470,7 @@ async function main() {
         todayKst(),
         "00:00",
     );
-    // 이틀 전 20:00(KST) 시작 → 예정 종료 22:00, 당일 상한 18:00 (이미 지남)
+    // 이틀 전 20:00(KST) 시작 → 예정 종료 22:00, 당일 상한 19:00 (이미 지남)
     const lateStart = new Date(Date.now() - 2 * 86_400_000);
     lateStart.setUTCHours(11, 0, 0, 0); // 20:00 KST
     await admin
@@ -494,7 +494,7 @@ async function main() {
           ) / 60_000
         : 999;
     check(
-        "예정 종료가 18시를 넘으면 상한이 아니라 예정 종료로 마감된다",
+        "예정 종료가 19시를 넘으면 상한이 아니라 예정 종료로 마감된다",
         lateRow?.status === "ENDED" && lateDiffMin < 1,
         `${lateRow?.status} · 차이 ${lateDiffMin.toFixed(1)}분`,
     );

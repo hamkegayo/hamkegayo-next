@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { formatPhoneNumber, kstToday } from "@/lib/format";
 import { maxAdvanceReservationDate } from "@/lib/reservation-window";
 import { isAtLeastAgeOnDate, MIN_SERVICE_AGE_MESSAGE } from "@/lib/service-age";
+import { SERVICE_HOURS_LABEL } from "@/lib/service-hours";
 import { Section } from "@/app/(user)/_components/home/section";
 import { useReservationStore } from "../_store/reservation-store";
 import { step2Form, type Step2Values } from "../_lib/schema";
@@ -106,6 +107,9 @@ export function StepHospitalInfo() {
                         <h2 className="text-foreground text-lg font-bold">
                             병원 및 일정 정보
                         </h2>
+                        <p className="text-description-foreground mt-2 text-sm leading-relaxed">
+                            서비스 제공시간: {SERVICE_HOURS_LABEL}
+                        </p>
 
                         <div className="mt-5 space-y-5">
                             <div>

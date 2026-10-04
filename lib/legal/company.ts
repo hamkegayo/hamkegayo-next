@@ -22,7 +22,7 @@ export type CompanyInfo = {
     mailOrderNumber: string | null;
     address: string;
     tel: string;
-    /** 약관 제13조 ③ — 서비스 운영시간과 같은 값이어야 한다 */
+    /** 고객센터 상담 시간. 서비스 제공시간은 lib/service-hours.ts에서 관리한다. */
     hours: string;
     email: string;
     /**

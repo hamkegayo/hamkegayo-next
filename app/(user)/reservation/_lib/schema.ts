@@ -7,6 +7,7 @@ import {
 } from "@/lib/reservation-window";
 import { isAtLeastAgeOnDate, MIN_SERVICE_AGE_MESSAGE } from "@/lib/service-age";
 import { kstToday } from "@/lib/format";
+import { isServiceTime, SERVICE_HOURS } from "@/lib/service-hours";
 import { isPastSlot, MIN_LEAD_MINUTES, reservationStartAt } from "./options";
 
 const required = "필수 입력 항목입니다.";
@@ -51,8 +52,20 @@ export const step1Schema = z.object({
 /** STEP2 · 병원 및 일정 정보 */
 export const step2Schema = z.object({
     useDate: z.string().min(1, required),
-    arriveTime: z.string().min(1, "시간을 선택해 주세요."),
-    reserveTime: z.string().min(1, "시간을 선택해 주세요."),
+    arriveTime: z
+        .string()
+        .min(1, "시간을 선택해 주세요.")
+        .refine(
+            isServiceTime,
+            `서비스 제공시간 ${SERVICE_HOURS} 내에서 30분 단위로 선택해 주세요.`,
+        ),
+    reserveTime: z
+        .string()
+        .min(1, "시간을 선택해 주세요.")
+        .refine(
+            isServiceTime,
+            `서비스 제공시간 ${SERVICE_HOURS} 내에서 30분 단위로 선택해 주세요.`,
+        ),
     duration: z.string().min(1, "시간을 선택해 주세요."),
     departAddress: z.string().min(1, required),
     // 병원명은 매칭 전 파트너에게 제공되는 단계 1 항목이다 (처리방침 제5조 ②).

@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { NonMedicalNotice } from "@/components/non-medical-notice";
 import { COMPANY } from "@/lib/legal/company";
+import { SERVICE_HOURS_LABEL } from "@/lib/service-hours";
 import { ContactLink } from "./contact-link";
 import { Section } from "./section";
 
@@ -42,6 +43,9 @@ export function HomeHero() {
                             전화 상담하기
                         </ContactLink>
                     </div>
+                    <p className="text-description-foreground mt-5 text-sm leading-relaxed">
+                        서비스 제공시간: {SERVICE_HOURS_LABEL}
+                    </p>
                     <NonMedicalNotice className="mt-6 max-w-md" />
                 </div>
 

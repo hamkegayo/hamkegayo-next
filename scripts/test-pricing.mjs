@@ -207,7 +207,7 @@ check(
 
 check(
     "오늘 남은 옵션만 남긴다",
-    timeOptionsFor("2026-09-07", SLOT_NOW).length === 4 &&
+    timeOptionsFor("2026-09-07", SLOT_NOW).length === 6 &&
         timeOptionsFor("2026-09-07", SLOT_NOW)[0] === "16시 30분",
     timeOptionsFor("2026-09-07", SLOT_NOW).join(","),
 );
