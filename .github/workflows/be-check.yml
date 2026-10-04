@@ -43,6 +43,9 @@ jobs:
             - name: 요금 계산 단위 테스트 (#46 · #76)
               run: npm run test:pricing
 
+            - name: 운영키 조회 검증 스크립트 테스트 (모의 응답만 사용)
+              run: npm run test:nicepay-live-check
+
             # 알림 링크는 누가 누르기 전까지 아무도 모른다. 실제로 404 가 난 적이 있다.
             - name: 알림·리다이렉트 링크 검사
               run: npm run check:links
