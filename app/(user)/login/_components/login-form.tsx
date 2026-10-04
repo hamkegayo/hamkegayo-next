@@ -12,7 +12,11 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SOCIAL_PROVIDERS, type SocialProvider } from "@/lib/auth/social";
+import {
+    NAVER_LOGIN_ENABLED,
+    SOCIAL_PROVIDERS,
+    type SocialProvider,
+} from "@/lib/auth/social";
 import {
     knownOAuthError,
     oauthErrorFromLocation,
@@ -144,6 +148,7 @@ export function LoginForm({ oauthError }: { oauthError?: string }) {
     };
 
     const socialLogin = async (provider: SocialProvider) => {
+        if (provider === "naver" && !NAVER_LOGIN_ENABLED) return;
         if (socialSubmitting) return;
         setSocialSubmitting(provider);
         const supabase = createClient();
@@ -354,7 +359,10 @@ export function LoginForm({ oauthError }: { oauthError?: string }) {
                         <button
                             type="button"
                             onClick={() => socialLogin("naver")}
-                            disabled={socialSubmitting !== null}
+                            disabled={
+                                !NAVER_LOGIN_ENABLED ||
+                                socialSubmitting !== null
+                            }
                             aria-busy={socialSubmitting === "naver"}
                             className="bg-naver text-naver-foreground mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-lg text-base font-bold transition-colors hover:brightness-95 disabled:opacity-60"
                         >
@@ -368,7 +376,9 @@ export function LoginForm({ oauthError }: { oauthError?: string }) {
                                     N
                                 </span>
                             )}
-                            네이버 로그인
+                            {NAVER_LOGIN_ENABLED
+                                ? "네이버 로그인"
+                                : "네이버 로그인 (점검 중)"}
                         </button>
                     </>
                 )}
