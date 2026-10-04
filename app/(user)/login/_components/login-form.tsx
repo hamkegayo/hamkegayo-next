@@ -24,6 +24,7 @@ import {
     OAUTH_ERRORS,
 } from "@/lib/auth/oauth-errors";
 import { createClient } from "@/utils/supabase/client";
+import { authPageWithNext } from "@/lib/auth/navigation";
 import {
     loginDefaultValues,
     partnerLoginSchema,
@@ -395,7 +396,7 @@ export function LoginForm({
                 {/* 하단 링크 */}
                 <div className="text-foreground mt-6 flex items-center justify-center gap-4 text-sm font-semibold">
                     <Link
-                        href="/signup"
+                        href={authPageWithNext("/signup", next)}
                         className="hover:text-brand transition-colors"
                     >
                         회원가입
