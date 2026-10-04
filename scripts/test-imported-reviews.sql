@@ -13,11 +13,10 @@ begin
   if exists (select 1 from public.imported_reviews where author_masked !~ '^.O.$') then
     raise exception '실명 노출';
   end if;
-  if (select title from public.get_public_reviews(1)) <> '다음에도 이용할게요' then
-    raise exception '최신 정렬 불일치';
+  if exists(select 1 from public.get_public_reviews() where source='provided') then
+    raise exception '실제 이용자 동의 미확인 후기 노출';
   end if;
-  if (select count(*) from public.get_public_reviews(6)) <> 6
-    or (select count(*) from public.get_public_reviews(0)) <> 0 then
+  if (select count(*) from public.get_public_reviews(0)) <> 0 then
     raise exception '목록 제한 실패';
   end if;
   if has_table_privilege('anon', 'public.imported_reviews', 'INSERT')
@@ -37,7 +36,7 @@ update public.imported_reviews set published = false where source_key = 'provide
 set local role anon;
 do $$
 begin
-  if (select count(*) from public.get_public_reviews() where source = 'provided') <> 11
+  if (select count(*) from public.get_public_reviews() where source = 'provided') <> 0
     then
     raise exception '비공개 후기 노출';
   end if;

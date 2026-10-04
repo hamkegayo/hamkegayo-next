@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { LegalDocumentView } from "@/components/legal/legal-document";
 import { PRIVACY } from "@/lib/legal/privacy";
@@ -10,5 +11,26 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPage() {
-    return <LegalDocumentView doc={PRIVACY} />;
+    return (
+        <>
+            <aside className="mx-auto mt-8 max-w-4xl rounded-xl border p-4 text-sm leading-relaxed">
+                <strong>후기 공개 안내</strong>
+                <p>
+                    실제 이용자의 별도 공개 동의와 증빙 확인 절차를 준비
+                    중입니다. 구체적인 진료·검사 정보는 공개하지 않습니다. 동의
+                    주체·허용 항목·공개 범위, 동의일부터 3년의 공개 기간 및 철회
+                    방법은{" "}
+                    <Link
+                        href="/review/publication-consent"
+                        className="underline"
+                    >
+                        후기 공개 동의 안내
+                    </Link>
+                    에서 확인할 수 있습니다. 방침 정본 개정과 확인 절차가 완료된
+                    후 공개를 시작합니다.
+                </p>
+            </aside>
+            <LegalDocumentView doc={PRIVACY} />
+        </>
+    );
 }
