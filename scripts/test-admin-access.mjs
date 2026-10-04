@@ -725,6 +725,20 @@ async function main() {
     });
     check("배치 편입 뒤 결제 상태가 바뀌면 파일 반출 차단", unpaidFile.error?.code === "23514");
     await admin.from("payments").update({status: "PAID"}).eq("id", paidFixtureId);
+    // service_role? ??/?? ?? ??? ????. ??? RPC??? ???? ???.
+    await admin.from("settlements").update({ status: "HOLD" }).eq("id", settlement.id);
+    const heldFile = await adminClient.rpc("admin_issue_transfer_file", {
+        p_batch_id: transferBatch.data.id, p_reason: "TEST-177 ?? ?? CSV ??",
+    });
+    check("?? ??? ?? ??? ?? ?? ?? ??", heldFile.error?.code === "23514");
+    const heldRelease = await adminClient.rpc("admin_release_settlements", {
+        p_ids: [settlement.id], p_reason: "TEST-177 ?? ?? ?? ?? ??",
+    });
+    check("?? ??? ??? ??? ?? ?? ??", heldRelease.error?.code === "23514");
+    const heldState = await admin.from("settlements").select("status").eq("id", settlement.id).single();
+    const unissuedState = await admin.from("transfer_batches").select("status,issued_at,last_downloaded_at").eq("id",transferBatch.data.id).single();
+    check("??? ?????? ??? ??? ?? ??", heldState.data?.status === "HOLD" && unissuedState.data?.status === "DRAFT" && unissuedState.data?.issued_at === null && unissuedState.data?.last_downloaded_at === null);
+    await admin.from("settlements").update({ status: "APPROVED" }).eq("id", settlement.id);
     const issuedFile = await adminClient.rpc("admin_issue_transfer_file", {
         p_batch_id: transferBatch.data?.id,
         p_reason: "TEST-56 두 번째 담당자 이체 파일 발급",
@@ -748,6 +762,13 @@ async function main() {
             !!issuedBatch.data?.last_downloaded_at,
         issuedBatch.error?.message,
     );
+    await admin.from("settlements").update({ status: "HOLD" }).eq("id", settlement.id);
+    const heldReissue = await adminClient.rpc("admin_issue_transfer_file", {
+        p_batch_id: transferBatch.data.id, p_reason: "TEST-177 ?? ?? ????? ??",
+    });
+    const unchangedDownload = await admin.from("transfer_batches").select("last_downloaded_at").eq("id",transferBatch.data.id).single();
+    check("?? ?? ? ??? ??? CSV ????? ??", heldReissue.error?.code === "23514" && unchangedDownload.data?.last_downloaded_at === issuedBatch.data?.last_downloaded_at);
+    await admin.from("settlements").update({ status: "APPROVED" }).eq("id", settlement.id);
     await admin
         .from("transfer_batches")
         .update({ created_by: adminId })
