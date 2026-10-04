@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { FAQ_ITEMS, SERVICE_FAQS, matchesFaq } from '../lib/content/faq.ts';
+assert.equal(FAQ_ITEMS.length, 26);
+assert.equal(new Set(FAQ_ITEMS.map((r) => r.id)).size, 26);
+assert.deepEqual(FAQ_ITEMS.map((r) => r.sourceNumber), Array.from({length: 26}, (_, i) => i + 1));
+assert.equal(SERVICE_FAQS.length, 4);
+assert.ok(SERVICE_FAQS.every((r) => FAQ_ITEMS.includes(r)));
+const cancel = FAQ_ITEMS.find((r) => r.sourceNumber === 20);
+assert.ok(matchesFaq(cancel, '10,000'));
+assert.ok(matchesFaq(FAQ_ITEMS[5], 'PLUS'));
+assert.ok(!FAQ_ITEMS.some((r) => matchesFaq(r, 'zz-no-match')));
+assert.ok(FAQ_ITEMS[8].a.includes('8분') && FAQ_ITEMS[8].a.includes('15분'));
+assert.ok(!FAQ_ITEMS.some((r) => r.a.includes('30분 단위') || r.a.includes('24시간 언제든')));
+assert.ok(FAQ_ITEMS[22].a.includes('예약조건'));
+assert.ok(!FAQ_ITEMS[20].a.includes('선결제금액은 환불되지 않습니다'));
+console.log('✅ FAQ 26문답·공통 참조·검색·정책 문안 12개 검사 통과');

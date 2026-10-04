@@ -2,6 +2,7 @@ import { BadgeCheck, Bell, Clock } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import Link from "next/link";
+import { SERVICE_HOURS_LABEL } from "@/lib/service-hours";
 
 import { Section } from "./section";
 
@@ -11,7 +12,7 @@ const ITEMS: { icon: LucideIcon; title: string; desc: string; tag: string }[] =
             icon: Clock,
             title: "24시간 예약 접수",
             desc: "밤에도 예약을 남겨두면 순서대로 매칭돼요.",
-            tag: "서비스는 06시~18시 진행",
+            tag: SERVICE_HOURS_LABEL,
         },
         {
             icon: BadgeCheck,

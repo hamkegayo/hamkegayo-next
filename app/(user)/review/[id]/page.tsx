@@ -87,6 +87,12 @@ export default async function ReviewDetailPage({
                     <span className="text-muted-foreground">{review.date}</span>
                 </div>
 
+                {review.source === "provided" && (
+                    <p className="text-muted-foreground mt-3 text-xs">
+                        이용자가 제공하고 공개에 동의한 후기입니다.
+                    </p>
+                )}
+
                 <div className="bg-border my-6 h-px" />
 
                 <p className="text-foreground leading-relaxed whitespace-pre-wrap">

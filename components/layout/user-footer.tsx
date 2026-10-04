@@ -1,6 +1,7 @@
 import { FooterLinks } from "@/components/layout/footer-links";
 import { NonMedicalNotice } from "@/components/non-medical-notice";
 import { COMPANY, mailOrderLabel } from "@/lib/legal/company";
+import { SERVICE_HOURS_LABEL } from "@/lib/service-hours";
 
 /**
  * 사용자 서비스 공통 푸터.
@@ -52,7 +53,7 @@ export function UserFooter() {
                         <span>{COMPANY.address}</span>
                     </span>
                     <InfoItem label="고객센터" value={COMPANY.tel} />
-                    <InfoItem label="운영시간" value={COMPANY.hours} />
+                    <InfoItem label="고객센터 상담시간" value={COMPANY.hours} />
                     <span className="inline-flex gap-1.5 whitespace-nowrap">
                         <span className="text-muted-foreground/70">이메일</span>
                         <a
@@ -78,6 +79,9 @@ export function UserFooter() {
                     </span>
                 </div>
 
+                <p className="mt-3 text-xs leading-relaxed">
+                    서비스 제공시간: {SERVICE_HOURS_LABEL}
+                </p>
                 <div className="mt-6 space-y-1.5">
                     {/* 전자상거래법 제20조 ① · 이용약관 제3조 ② — 중개자 지위 고지 */}
                     <p className="text-xs leading-relaxed">

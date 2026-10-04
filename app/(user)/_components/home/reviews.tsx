@@ -3,7 +3,10 @@ import Link from "next/link";
 import { Section } from "./section";
 import { ReviewsCarousel } from "./reviews-carousel";
 
-export function Reviews() {
+import { getReviews } from "@/app/(user)/review/_lib/reviews.server";
+
+export async function Reviews() {
+    const reviews = await getReviews(6);
     return (
         <Section>
             <div className="bg-panel-muted rounded-3xl px-4 py-10 md:px-8">
@@ -11,13 +14,16 @@ export function Reviews() {
                     실제 이용자 후기
                 </h2>
                 <p className="text-description-foreground mt-3 text-center text-sm">
-                    서비스 건수{" "}
-                    <span className="text-brand font-bold">12,800건</span> 이상,
-                    서비스 만족도{" "}
-                    <span className="text-brand font-bold">98%</span>
+                    함께가요 이용자가 남겨주신 이야기를 확인해 보세요.
                 </p>
 
-                <ReviewsCarousel />
+                {reviews.length > 0 ? (
+                    <ReviewsCarousel reviews={reviews} />
+                ) : (
+                    <p className="text-muted-foreground mt-8 text-center text-sm">
+                        현재 표시할 후기가 없습니다.
+                    </p>
+                )}
 
                 <div className="mt-10 flex justify-center">
                     <Link
