@@ -1,6 +1,6 @@
 -- #159: 사용자 확정 이벤트 조건 — 신규 이용자 20명, 첫 1시간 기본요금만 무료.
 -- 약관 제9조/제21조: 선택→PG 선결제→확정 순서를 유지한다.
--- 본인인증 수단·식별값 보유기간 확인 전에는 integration_ready=false로 공개/할인을 차단한다.
+-- 인증 이메일 고지·환경 키·운영 검증 완료 전에는 integration_ready=false로 공개/할인을 차단한다.
 create table if not exists public.opening_campaign (
   id boolean primary key default true check (id),
   active boolean not null default false,
@@ -17,7 +17,6 @@ create table if not exists public.opening_event_identities (
   verified_at timestamptz not null,
   excluded boolean not null default false
 );
-comment on table public.opening_event_identities is '본인인증 제공자 확인 후 서버가 기록할 HMAC 식별값. 원시 휴대폰 번호 저장 금지. 공개 조회 없음.';
 comment on table public.opening_event_identities is '인증된 이메일의 서버 HMAC. 원문 이메일 추가 저장 없음. 행사 종료 및 관련 취소·환불 처리 완료 후 파기.';
 create table if not exists public.opening_event_claims (
   id uuid primary key default gen_random_uuid(),
