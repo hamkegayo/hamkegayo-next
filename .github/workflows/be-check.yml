@@ -246,6 +246,11 @@ jobs:
             - name: 관리자 권한·접근통제·접속기록 (#50)
               run: npm run test:admin
 
+            - name: 예약 파트너 상세 · 공개 동의 · 경력 심사 (#173)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-partner-details.sql
+
             - name: 정산 계좌 열람 통제 (#51)
               run: npm run test:payout
 

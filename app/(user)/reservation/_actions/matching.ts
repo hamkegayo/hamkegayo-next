@@ -9,6 +9,48 @@ import {
     PROFILE_PHOTO_URL_TTL,
 } from "@/lib/profile-photo";
 import { kstStamp } from "@/lib/format";
+import type { PartnerDetail } from "@/lib/partner-details";
+
+/** DB RPC가 소유권·수락 관계를 검증한 후 공개 필드만 반환한다. */
+export async function getReservationPartnerDetail(
+    reservationId: string,
+    partnerId: string,
+): Promise<
+    { ok: true; detail: PartnerDetail } | { ok: false; message: string }
+> {
+    try {
+        const supabase = await createClient();
+        const { data, error } = await supabase.rpc(
+            "get_reservation_partner_detail",
+            {
+                p_reservation_id: reservationId,
+                p_partner_id: partnerId,
+            },
+        );
+        if (error || !data)
+            return {
+                ok: false,
+                message:
+                    "파트너 정보를 확인할 수 없습니다. 예약 상태를 확인하거나 다시 시도해 주세요.",
+            };
+        const detail = data as Omit<PartnerDetail, "avatarUrl">;
+        const avatars = detail.publicConsent
+            ? await signPartnerAvatars(createAdminClient(), [detail.partnerId])
+            : new Map<string, string>();
+        return {
+            ok: true,
+            detail: {
+                ...detail,
+                avatarUrl: avatars.get(detail.partnerId) ?? null,
+            },
+        };
+    } catch {
+        return {
+            ok: false,
+            message: "정보를 불러오지 못했습니다. 다시 시도해 주세요.",
+        };
+    }
+}
 
 export type ApplicantQualification = { type: string; issuer: string | null };
 
