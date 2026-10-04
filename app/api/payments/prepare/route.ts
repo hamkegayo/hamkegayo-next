@@ -10,6 +10,7 @@ import {
 } from "@/lib/reservation-window";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
+import { ensureOpeningEventEmail } from "@/lib/opening-event-email.server";
 
 /**
  * 선결제 준비 — 결제창을 열기 직전에 호출한다 (#53).
@@ -106,6 +107,13 @@ export async function POST(request: NextRequest) {
     if (reservation.status !== "MATCHING") {
         return NextResponse.json(
             { error: "결제할 수 있는 상태가 아닙니다.", code: "NOT_MATCHING" },
+            { status: 409 },
+        );
+    }
+
+    if (useOpeningEvent && !(await ensureOpeningEventEmail(user))) {
+        return NextResponse.json(
+            { error: "이메일 인증과 이벤트 참여 조건을 확인해 주세요." },
             { status: 409 },
         );
     }

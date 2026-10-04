@@ -3,6 +3,8 @@ import { createClient } from "@/utils/supabase/server";
 import { OpeningEventPopup } from "@/app/(user)/_components/home/opening-event-popup";
 import { EventControls } from "./event-controls";
 import { kstDateTime } from "@/lib/format";
+import { ClaimRestore } from "./claim-restore";
+import { ExclusionControls } from "./exclusion-controls";
 
 type EventRow = {
     id: string;
@@ -14,10 +16,12 @@ type EventRow = {
     confirmed_at: string | null;
     reservation_status: string;
     identity_verified: boolean;
+    restored_at: string | null;
 };
 type EventStatus = {
     active: boolean;
     ready: boolean;
+    closed: boolean;
     capacity: number;
     used: number;
     held: number;
@@ -52,14 +56,14 @@ export default async function OpeningCampaignPage({
         <div>
             <h1 className="text-2xl font-extrabold">오픈 이벤트</h1>
             <p className="text-muted-foreground mt-2 text-sm">
-                확정 순번은 취소·노쇼·탈퇴 후에도 복원하지 않습니다. 원시 휴대폰
-                번호와 본인인증 식별값은 표시하지 않습니다.
+                고객 취소·노쇼·탈퇴는 혜택을 복원하지 않습니다. 회사·파트너
+                귀책은 전액 환불 확인 후 사유를 기록해 복원합니다. 이메일 HMAC은
+                표시하지 않습니다.
             </p>
             {!event.ready && (
                 <p className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
-                    본인인증 연결·식별값 보유기간·혜택 환불 안내 확인 전 고객
-                    팝업과 실제 할인은 비활성입니다. 아래에서 시안을 검토할 수
-                    있습니다.
+                    이메일 인증·고지·혜택 환불 검증 완료 전 고객 팝업과 실제
+                    할인은 비활성입니다. 아래에서 시안을 검토할 수 있습니다.
                 </p>
             )}
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -81,7 +85,12 @@ export default async function OpeningCampaignPage({
             <div className="mt-5">
                 <OpeningEventPopup enabled={false} preview />
             </div>
-            <EventControls active={event.active} ready={event.ready} />
+            <EventControls
+                active={event.active}
+                ready={event.ready}
+                closed={event.closed}
+            />
+            {!event.closed && <ExclusionControls />}
             <form className="mt-6 flex gap-3">
                 <label className="sr-only" htmlFor="campaign-search">
                     예약번호 검색
@@ -105,12 +114,13 @@ export default async function OpeningCampaignPage({
                             {[
                                 "순번",
                                 "회원",
-                                "본인인증",
+                                "이메일 인증",
                                 "예약번호",
                                 "확정시각",
                                 "혜택",
                                 "배정 상태",
                                 "예약 상태",
+                                "귀책 복원",
                             ].map((label) => (
                                 <th
                                     key={label}
@@ -142,6 +152,17 @@ export default async function OpeningCampaignPage({
                                 <td className="p-3">{row.state}</td>
                                 <td className="p-3">
                                     {row.reservation_status}
+                                </td>
+                                <td className="p-3">
+                                    {row.restored_at ? (
+                                        "복원 완료"
+                                    ) : row.state === "USED" &&
+                                      row.reservation_status === "CANCELLED" &&
+                                      !event.closed ? (
+                                        <ClaimRestore id={row.id} />
+                                    ) : (
+                                        "—"
+                                    )}
                                 </td>
                             </tr>
                         ))}

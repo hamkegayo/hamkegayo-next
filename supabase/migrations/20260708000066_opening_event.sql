@@ -18,6 +18,7 @@ create table if not exists public.opening_event_identities (
   excluded boolean not null default false
 );
 comment on table public.opening_event_identities is '본인인증 제공자 확인 후 서버가 기록할 HMAC 식별값. 원시 휴대폰 번호 저장 금지. 공개 조회 없음.';
+comment on table public.opening_event_identities is '인증된 이메일의 서버 HMAC. 원문 이메일 추가 저장 없음. 행사 종료 및 관련 취소·환불 처리 완료 후 파기.';
 create table if not exists public.opening_event_claims (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid references public.profiles(id) on delete set null,
@@ -53,6 +54,29 @@ $$;
 revoke all on function public.opening_event_status() from public;
 grant execute on function public.opening_event_status() to anon, authenticated, service_role;
 
+-- 사용자 확정: 본인 1회가 아니라 인증된 이메일 계정당 1회. 서버만 등록한다.
+create or replace function public.register_opening_event_email(p_customer_id uuid, p_identity_hash text)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  perform 1 from public.opening_campaign where id for update;
+  if not exists(select 1 from public.opening_campaign where id and active and integration_ready and closed_at is null) then
+    raise exception 'campaign_unavailable' using errcode='23514';
+  end if;
+  if p_identity_hash is null or p_identity_hash !~ '^[a-f0-9]{64}$'
+    or not exists(select 1 from auth.users u join public.profiles p on p.id=u.id
+      where u.id=p_customer_id and u.email_confirmed_at is not null and u.email is not null
+        and p.role='USER' and p.status='ACTIVE') then
+    raise exception 'verified_email_required' using errcode='23514';
+  end if;
+  insert into public.opening_event_identities(customer_id,identity_hash,verification_source,verified_at)
+    values(p_customer_id,p_identity_hash,'SUPABASE_EMAIL',now())
+  on conflict(customer_id) do update set identity_hash=excluded.identity_hash,
+    verification_source='SUPABASE_EMAIL',verified_at=now();
+  -- 기존 운영 제외 표시는 갱신하지 않는다.
+end $$;
+revoke all on function public.register_opening_event_email(uuid,text) from public,anon,authenticated;
+grant execute on function public.register_opening_event_email(uuid,text) to service_role;
+
 -- PG 요청 이전의 결제 행을 잠그고 정원을 임시 확보한다. 확정 순번은 아직 부여하지 않는다.
 create or replace function public.reserve_opening_event(p_payment_id uuid)
 returns integer language plpgsql security definer set search_path = '' as $$
@@ -77,10 +101,12 @@ begin
     raise exception 'claim_expired' using errcode='23514';
   end if;
   select * into identity from public.opening_event_identities where customer_id=r.customer_id;
-  if not found or identity.excluded or identity.verified_at>now()
+  if not found or identity.excluded or identity.verified_at>now() or identity.verification_source<>'SUPABASE_EMAIL'
+    or exists(select 1 from public.opening_event_exclusions where customer_id=r.customer_id)
+    or not exists(select 1 from auth.users where id=r.customer_id and email_confirmed_at is not null)
     or not exists (select 1 from public.profiles where id=r.customer_id and role='USER' and status='ACTIVE')
     or exists (select 1 from public.services s join public.reservations b on b.id=s.reservation_id
-      where b.customer_id=r.customer_id and (s.started_at is not null or s.status in ('COMPLETED','IN_PROGRESS','ENDED')))
+      where b.customer_id=r.customer_id and s.status='COMPLETED')
     or exists (select 1 from public.opening_event_claims where state in ('HELD','USED')
       and (customer_id=r.customer_id or identity_hash=identity.identity_hash)) then
     raise exception 'campaign_ineligible' using errcode='23514';
@@ -118,8 +144,10 @@ begin
     if not found or claim.state<>'HELD' or claim.expires_at<=now()
       or new.discount_amount<>claim.discount_amount
       or exists(select 1 from public.points where payment_id=new.id and reason='USE') then raise exception 'campaign_claim_invalid' using errcode='23514'; end if;
-    update public.opening_campaign set used_count=used_count+1,updated_at=now() where id and used_count<20
-      returning used_count into sequence_no;
+    select min(slot) into sequence_no from generate_series(1,20) slot
+      where not exists(select 1 from public.opening_event_claims where sequence=slot);
+    if sequence_no is null then raise exception 'campaign_full' using errcode='23514'; end if;
+    update public.opening_campaign set used_count=used_count+1,updated_at=now() where id and used_count<20;
     if not found then raise exception 'campaign_full' using errcode='23514'; end if;
     update public.opening_event_claims set state='USED',sequence=sequence_no,confirmed_at=now() where id=claim.id;
   elsif new.status in ('FAILED','CANCELLED') and old.status='PENDING' then
@@ -147,10 +175,10 @@ declare result jsonb;
 begin
   if not public.can_manage_opening_event() then raise exception 'forbidden' using errcode='42501'; end if;
   perform public.log_access('CAMPAIGN_LIST','opening_event_claims',null,null,'오픈 이벤트 현황 조회');
-  select jsonb_build_object('active',c.active,'ready',c.integration_ready,'capacity',c.capacity,
+  select jsonb_build_object('active',c.active,'ready',c.integration_ready,'closed',c.closed_at is not null,'capacity',c.capacity,
     'used',c.used_count,'held',(select count(*) from public.opening_event_claims where state='HELD' and expires_at>now()),
     'rows',coalesce((select jsonb_agg(to_jsonb(rows)) from (
-      select cl.id,b.code,cl.state,cl.sequence,cl.discount_amount,cl.held_at,cl.confirmed_at,b.status as reservation_status,
+      select cl.id,b.code,cl.state,cl.sequence,cl.discount_amount,cl.held_at,cl.confirmed_at,cl.restored_at,b.status as reservation_status,
         case when p.name is null then '탈퇴 회원' else left(p.name,1)||'OO' end as customer,
         true as identity_verified
       from public.opening_event_claims cl join public.reservations b on b.id=cl.reservation_id
@@ -170,7 +198,7 @@ begin
   if p_active is null or length(trim(coalesce(p_reason,''))) not between 5 and 500 then
     raise exception 'invalid_reason' using errcode='22023'; end if;
   perform 1 from public.opening_campaign where id for update;
-  if p_active and not exists(select 1 from public.opening_campaign where id and integration_ready and used_count<20) then
+  if p_active and not exists(select 1 from public.opening_campaign where id and integration_ready and used_count<20 and closed_at is null) then
     raise exception 'integration_not_ready' using errcode='23514'; end if;
   update public.opening_campaign set active=p_active,updated_at=now() where id;
   perform public.log_access('CAMPAIGN_STATUS','opening_campaign',null,null,p_reason);
@@ -188,12 +216,14 @@ begin
   select * into identity from public.opening_event_identities where customer_id=auth.uid();
   return jsonb_build_object('eligible',c.active and c.integration_ready and c.used_count<20
     and r.status='MATCHING' and identity.customer_id is not null and not identity.excluded
-    and identity.verified_at<=now()
+    and not exists(select 1 from public.opening_event_exclusions where customer_id=auth.uid())
+    and identity.verified_at<=now() and identity.verification_source='SUPABASE_EMAIL'
+    and exists(select 1 from auth.users where id=auth.uid() and email_confirmed_at is not null)
     and exists(select 1 from public.profiles where id=auth.uid() and role='USER' and status='ACTIVE')
     and not exists(select 1 from public.opening_event_claims where state in ('HELD','USED')
       and (customer_id=auth.uid() or identity_hash=identity.identity_hash))
     and not exists(select 1 from public.services s join public.reservations b on b.id=s.reservation_id
-      where b.customer_id=auth.uid() and (s.started_at is not null or s.status in ('COMPLETED','IN_PROGRESS','ENDED'))),
+      where b.customer_id=auth.uid() and s.status='COMPLETED'),
     'discount',case r.plan when 'plus' then 25000 else 20000 end);
 end $$;
 revoke all on function public.opening_event_offer(uuid) from public, anon;

@@ -23,6 +23,7 @@ import {
     type SettlementDiff,
 } from "@/lib/pricing";
 import type { PlanCode } from "@/lib/reservation";
+import { openingEventCustomerAmount } from "@/lib/opening-event-charge";
 
 export type FinalizeResult = {
     customerId: string;
@@ -33,6 +34,7 @@ export type FinalizeResult = {
     useDate: string;
     charge: FinalCharge;
     prepaidAmount: number;
+    customerAmount: number;
     diff: SettlementDiff;
 };
 
@@ -113,6 +115,20 @@ export async function finalizeServiceCharge(
             isSurcharge,
         });
 
+        const { data: eventPayment, error: eventError } = await admin
+            .from("payments")
+            .select("gross_amount, discount_amount, campaign_discount_amount")
+            .eq("reservation_id", data.reservation_id)
+            .eq("type", "BASE")
+            .eq("status", "PAID")
+            .maybeSingle();
+        if (eventError) return null;
+        const eventDiscount = eventPayment?.campaign_discount_amount ?? 0;
+        const customerAmount = openingEventCustomerAmount(
+            charge.total,
+            eventDiscount,
+        );
+
         const { error: updateError } = await admin
             .from("reservations")
             .update({
@@ -126,7 +142,10 @@ export async function finalizeServiceCharge(
             return null;
         }
 
-        const prepaidAmount = r.prepaid_amount ?? 0;
+        const prepaidAmount =
+            eventDiscount > 0 && eventPayment
+                ? eventPayment.gross_amount - eventPayment.discount_amount
+                : (r.prepaid_amount ?? 0);
         return {
             customerId: r.customer_id,
             reservationId: data.reservation_id,
@@ -134,7 +153,8 @@ export async function finalizeServiceCharge(
             useDate: r.use_date,
             charge,
             prepaidAmount,
-            diff: calcSettlementDiff(prepaidAmount, charge.total),
+            customerAmount,
+            diff: calcSettlementDiff(prepaidAmount, customerAmount),
         };
     } catch (e) {
         console.error("[finalizeServiceCharge] 산정 실패:", e);
@@ -184,6 +204,15 @@ export async function finalizeNoShowCharge(
         const plan: PlanCode = r.plan === "plus" ? "plus" : "basic";
         const total = oneHourCharge(plan, Number(r.surcharge_rate ?? 0) > 0);
 
+        const { data: eventPayment, error: eventError } = await admin
+            .from("payments")
+            .select("gross_amount, discount_amount, campaign_discount_amount")
+            .eq("reservation_id", data.reservation_id)
+            .eq("type", "BASE")
+            .eq("status", "PAID")
+            .maybeSingle();
+        if (eventError) return null;
+
         const { error: updateError } = await admin
             .from("reservations")
             .update({ billed_minutes: MIN_BILLABLE_MIN, final_amount: total })
@@ -194,7 +223,10 @@ export async function finalizeNoShowCharge(
             return null;
         }
 
-        const prepaidAmount = r.prepaid_amount ?? 0;
+        const prepaidAmount =
+            (eventPayment?.campaign_discount_amount ?? 0) > 0 && eventPayment
+                ? eventPayment.gross_amount - eventPayment.discount_amount
+                : (r.prepaid_amount ?? 0);
         return {
             customerId: r.customer_id,
             reservationId: data.reservation_id,
@@ -213,6 +245,7 @@ export async function finalizeNoShowCharge(
                 minimumApplied: true,
             },
             prepaidAmount,
+            customerAmount: total,
             diff: calcSettlementDiff(prepaidAmount, total),
         };
     } catch (e) {

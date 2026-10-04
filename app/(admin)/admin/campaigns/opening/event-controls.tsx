@@ -1,14 +1,16 @@
 "use client";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { setOpeningEvent } from "./actions";
+import { setOpeningEvent, closeOpeningEvent } from "./actions";
 
 export function EventControls({
     active,
     ready,
+    closed,
 }: {
     active: boolean;
     ready: boolean;
+    closed: boolean;
 }) {
     const [reason, setReason] = useState("");
     const [pending, start] = useTransition();
@@ -26,7 +28,10 @@ export function EventControls({
             </label>
             <button
                 disabled={
-                    pending || (!active && !ready) || reason.trim().length < 5
+                    pending ||
+                    closed ||
+                    (!active && !ready) ||
+                    reason.trim().length < 5
                 }
                 className="bg-brand text-brand-foreground rounded-lg px-4 py-2 font-bold disabled:opacity-40"
                 onClick={() =>
@@ -44,6 +49,25 @@ export function EventControls({
                     : active
                       ? "신규 배정 중단"
                       : "이벤트 활성화"}
+            </button>
+            <button
+                className="border-border rounded-lg border px-4 py-2 disabled:opacity-40"
+                disabled={pending || closed || reason.trim().length < 5}
+                onClick={() =>
+                    start(async () => {
+                        if (
+                            !window.confirm(
+                                "행사를 영구 종료할까요? 관련 취소·환불 완료 후 이메일 HMAC을 파기하며 다시 활성화할 수 없습니다.",
+                            )
+                        )
+                            return;
+                        const result = await closeOpeningEvent(reason);
+                        if (result.ok) toast.success(result.message);
+                        else toast.error(result.message);
+                    })
+                }
+            >
+                {closed ? "행사 종료됨" : "행사 종료"}
             </button>
         </div>
     );

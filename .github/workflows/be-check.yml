@@ -248,6 +248,7 @@ jobs:
                   eval "$(supabase status -o env)"
                   psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-opening-event.sql
                   node --env-file=.env.local scripts/test-opening-event-concurrency.mjs
+                  node --experimental-strip-types --no-warnings scripts/test-opening-event-email.mjs
 
             - name: 관리자 권한·접근통제·접속기록 (#50)
               run: npm run test:admin

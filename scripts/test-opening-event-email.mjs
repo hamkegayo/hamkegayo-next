@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import { openingEventEmailHash } from "../lib/opening-event-email-hash.ts";
+import { openingEventCustomerAmount } from "../lib/opening-event-charge.ts";
+const key = "local-test-key-at-least-thirty-two-characters";
+assert.equal(openingEventEmailHash(" User@Example.com ",key),openingEventEmailHash("user@example.com",key));
+assert.notEqual(openingEventEmailHash("other@example.com",key),openingEventEmailHash("user@example.com",key));
+assert.notEqual(openingEventEmailHash("user@example.com",key),openingEventEmailHash("user@example.com",key+"2"));
+assert.throws(()=>openingEventEmailHash("user@example.com","short"));
+assert.equal(openingEventCustomerAmount(20000,20000),0);
+assert.equal(openingEventCustomerAmount(40000,20000),20000);
+assert.equal(openingEventCustomerAmount(52000,20000),32000);
+assert.equal(openingEventCustomerAmount(60000,20000),40000);
+assert.equal(openingEventCustomerAmount(20000,20000,true),20000);
+assert.equal(openingEventCustomerAmount(26000,20000,true),26000);
+assert.throws(()=>openingEventCustomerAmount(-1,20000));
+console.log("PASS: email normalization/key isolation and event final charge 11 checks");
