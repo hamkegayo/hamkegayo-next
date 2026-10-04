@@ -181,7 +181,9 @@ jobs:
 
                   if [[ "$MIGRATION_COUNT" -gt 0 ]]; then
                     eval "$(supabase status -o env)"
-                    supabase migration up --db-url "$DB_URL"
+                    # main의 운영 보안 이력(67·68) 뒤에 기능 PR의 63~66을
+                    # 추가하는 릴리즈도 기준 데이터 위에서 빠짐없이 검사한다.
+                    supabase migration up --include-all --db-url "$DB_URL"
                   else
                     echo "적용할 신규 마이그레이션이 없습니다."
                   fi
