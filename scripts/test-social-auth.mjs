@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { test, mock } from "node:test";
 
 import { safeInternalPath, SOCIAL_PROVIDERS } from "@/lib/auth/social.ts";
+import { authPageWithNext } from "@/lib/auth/navigation.ts";
 
 import { getNaverUserinfo } from "@/lib/auth/naver-userinfo.ts";
 import {
@@ -10,6 +11,23 @@ import {
     oauthErrorFromLocation,
     providerOAuthError,
 } from "@/lib/auth/oauth-errors.ts";
+
+test("예약 복귀 경로를 일반 로그인 → 회원가입 → 가입 완료 로그인까지 유지한다", () => {
+    for (const destination of ["/reservation", "/reservation?step=2&plan=plus#partner"]) {
+        const signup = new URL(authPageWithNext("/signup", destination), "https://www.hamkegayo.kr");
+        assert.equal(signup.pathname, "/signup");
+        const login = new URL(authPageWithNext("/login", signup.searchParams.get("next")), "https://www.hamkegayo.kr");
+        assert.equal(login.pathname, "/login");
+        assert.equal(safeInternalPath(login.searchParams.get("next")), destination);
+    }
+});
+
+test("회원가입 경유 복귀도 외부 URL을 거절하고 기본 인증 화면 경로를 유지한다", () => {
+    for (const next of [undefined, "/", "//evil.example", "https://evil.example", "/\\evil.example", "javascript:alert(1)"]) {
+        assert.equal(authPageWithNext("/signup", next), "/signup");
+        assert.equal(authPageWithNext("/login", next), "/login");
+    }
+});
 
 test("기존 제공자 식별자와 내부 리디렉션 검증을 유지한다", () => {
     assert.equal(SOCIAL_PROVIDERS.kakao, "kakao");

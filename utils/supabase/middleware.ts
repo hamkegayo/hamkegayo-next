@@ -96,6 +96,11 @@ export async function updateSession(request: NextRequest) {
         if (matches(pathname, AUTH_PAGES) && pathname !== SOCIAL_SIGNUP) {
             if (role === "PARTNER") return redirect(PARTNER_HOME);
             if (role === "ADMIN") return redirect(ADMIN_HOME);
+            if (
+                pathname === "/login" &&
+                request.nextUrl.searchParams.get("next") === "/reservation"
+            )
+                return redirect("/reservation");
             return redirect("/");
         }
 
