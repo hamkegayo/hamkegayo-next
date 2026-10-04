@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight, MessageCircle, X } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import {
     Dialog,
     DialogContent,
@@ -22,9 +23,11 @@ import {
 export function OpeningEventPopup({
     enabled,
     preview = false,
+    reservationHref = "/reservation",
 }: {
     enabled: boolean;
     preview?: boolean;
+    reservationHref?: string;
 }) {
     const dismissedDate = useRef<string | null>(null);
     const [open, setOpen] = useState(false);
@@ -104,24 +107,49 @@ export function OpeningEventPopup({
                         (Plus 25,000원 · Basic 20,000원 상당)
                     </p>
                 </div>
-                {preview ? (
-                    <div className="mt-5 rounded-2xl bg-[#fee500] p-4 text-center font-extrabold text-black">
-                        카카오톡 상담하기 · 미리보기
-                    </div>
-                ) : (
-                    <ContactLink
-                        href={OPENING_EVENT_CHANNEL}
-                        method="support"
-                        external
-                        className="mt-5 flex items-center justify-center gap-3 rounded-2xl bg-[#fee500] p-4 text-lg font-extrabold text-black"
-                    >
-                        <MessageCircle className="size-6 fill-black" />
-                        카카오톡 상담하기
-                        <ChevronRight className="size-6" />
-                    </ContactLink>
-                )}
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                    {preview ? (
+                        <button
+                            type="button"
+                            disabled
+                            className="bg-brand text-brand-foreground flex flex-1 items-center justify-center gap-2 rounded-2xl p-4 text-lg font-extrabold"
+                        >
+                            예약하기 <ChevronRight className="size-6" />
+                        </button>
+                    ) : (
+                        <Link
+                            href={reservationHref}
+                            onClick={() => changeOpen(false)}
+                            className="bg-brand text-brand-foreground hover:bg-brand/90 flex flex-1 items-center justify-center gap-2 rounded-2xl p-4 text-lg font-extrabold"
+                        >
+                            예약하기 <ChevronRight className="size-6" />
+                        </Link>
+                    )}
+                    {preview ? (
+                        <button
+                            type="button"
+                            disabled
+                            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#fee500] p-4 text-lg font-extrabold text-black"
+                        >
+                            <MessageCircle className="size-6 fill-black" />
+                            카카오톡 상담하기
+                        </button>
+                    ) : (
+                        <ContactLink
+                            href={OPENING_EVENT_CHANNEL}
+                            method="support"
+                            external
+                            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#fee500] p-4 text-lg font-extrabold text-black"
+                        >
+                            <MessageCircle className="size-6 fill-black" />
+                            카카오톡 상담하기
+                            <ChevronRight className="size-6" />
+                        </ContactLink>
+                    )}
+                </div>
                 <p className="text-muted-foreground mt-3 text-center text-xs">
-                    상담 신청 후 실제 예약 확정 순으로 혜택이 적용됩니다.
+                    상담 신청이나 버튼 클릭이 아닌 실제 예약 확정 순으로 혜택이
+                    적용됩니다.
                 </p>
                 <details className="text-muted-foreground mt-4 text-xs leading-relaxed">
                     <summary className="text-foreground cursor-pointer font-bold">
@@ -135,8 +163,9 @@ export function OpeningEventPopup({
                 </details>
                 {preview && (
                     <p className="mt-3 text-xs text-amber-700">
-                        시안 검토 화면입니다. 본인인증·운영 조건 확인 전 실제
-                        할인과 고객 팝업은 비활성입니다.
+                        시안 검토 화면입니다. 두 버튼은 이동하지 않습니다.
+                        이메일 인증·운영 조건 확인 전 실제 할인과 고객 팝업은
+                        비활성입니다.
                     </p>
                 )}
             </DialogContent>
