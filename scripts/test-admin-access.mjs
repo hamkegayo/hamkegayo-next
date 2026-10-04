@@ -588,6 +588,27 @@ async function main() {
             settlementList.data?.some((row) => row.id === settlement.id),
         settlementList.error?.message,
     );
+    const noPaymentApproval = await adminClient.rpc("admin_approve_settlements", {
+        p_ids: [settlement.id], p_reason: "TEST-177 결제 없는 정산 차단",
+    });
+    check("결제 연결 없는 정산 승인 차단", noPaymentApproval.error?.code === "23514");
+    const legacyConfirm = await adminClient.rpc("confirm_reservation_partner", {
+        p_reservation_id: seededRes.id, p_partner_id: partnerId,
+    });
+    check("레거시 미결제 예약 확정 RPC 실행 권한 회수", legacyConfirm.error?.code === "42501");
+    const paymentFixture = await admin.from("payments").insert({
+        reservation_id: seededRes.id, type: "BASE", status: "PENDING",
+        order_id: `TEST-177-${Date.now()}`, gross_amount: 40000,
+        discount_amount: 0, commission_amount: 0, payout_amount: 40000,
+    }).select("id").single();
+    if (paymentFixture.error) throw paymentFixture.error;
+    const paidFixtureId = paymentFixture.data.id;
+    await admin.from("settlements").update({payment_id: paidFixtureId}).eq("id", settlement.id);
+    const pendingPaymentApproval = await adminClient.rpc("admin_approve_settlements", {
+        p_ids: [settlement.id], p_reason: "TEST-177 미승인 결제 정산 차단",
+    });
+    check("PENDING 결제는 정산 승인 불가", pendingPaymentApproval.error?.code === "23514");
+    await admin.from("payments").update({status: "PAID", paid_at: new Date().toISOString()}).eq("id", paidFixtureId);
     const approvedSettlement = await adminClient.rpc(
         "admin_approve_settlements",
         {
@@ -646,6 +667,12 @@ async function main() {
         },
     );
     check("계좌 복구 후 정산 재승인", reapprovedSettlement.data === 1);
+    await admin.from("payments").update({status: "FAILED"}).eq("id", paidFixtureId);
+    const unpaidBatch = await adminClient.rpc("admin_create_transfer_batch", {
+        p_ids: [settlement.id], p_reason: "TEST-177 승인 후 결제 상태 재검증",
+    });
+    check("승인된 정산도 결제가 PAID가 아니면 이체 배치 생성 차단", unpaidBatch.error?.code === "23514");
+    await admin.from("payments").update({status: "PAID"}).eq("id", paidFixtureId);
     const transferBatch = await adminClient.rpc("admin_create_transfer_batch", {
         p_ids: [settlement.id],
         p_reason: "TEST-56 승인 정산 이체 배치 생성",
@@ -690,6 +717,12 @@ async function main() {
         .from("transfer_batches")
         .update({ created_by: partnerId })
         .eq("id", transferBatch.data?.id);
+    await admin.from("payments").update({status: "FAILED"}).eq("id", paidFixtureId);
+    const unpaidFile = await adminClient.rpc("admin_issue_transfer_file", {
+        p_batch_id: transferBatch.data?.id, p_reason: "TEST-177 파일 반출 전 결제 검증",
+    });
+    check("배치 편입 뒤 결제 상태가 바뀌면 파일 반출 차단", unpaidFile.error?.code === "23514");
+    await admin.from("payments").update({status: "PAID"}).eq("id", paidFixtureId);
     const issuedFile = await adminClient.rpc("admin_issue_transfer_file", {
         p_batch_id: transferBatch.data?.id,
         p_reason: "TEST-56 두 번째 담당자 이체 파일 발급",
@@ -729,6 +762,12 @@ async function main() {
             !("account_number" in transferItem),
         transferItems.error?.message,
     );
+
+    const completedBatch = await admin.from("transfer_batches").update({status:"COMPLETED"}).eq("id",transferBatch.data.id);
+    const purgedItems = await admin.from("transfer_batch_items").select("account_number,account_last4").eq("batch_id",transferBatch.data.id);
+    check("이체 완료 후 계좌번호 원문 파기 및 끝4자리 유지", !completedBatch.error && purgedItems.data?.every(x=>x.account_number === null && x.account_last4 === "9012"));
+    const reopenBatch = await admin.from("transfer_batches").update({status:"DRAFT"}).eq("id",transferBatch.data.id);
+    check("완료 배치는 계좌 재반출을 위해 재개할 수 없음", reopenBatch.error?.code === "23514");
 
     // =============================================================
     section("5. 예약 RPC — 개인정보를 반환하지 않는다");
@@ -1172,6 +1211,10 @@ async function main() {
         .from("admin_accounts")
         .update({ duty: "계정" })
         .eq("profile_id", adminId);
+    const selfGrant = await adminClient.rpc("admin_grant_role", {
+        p_target: adminId, p_duty: "정산", p_reason: "TEST-177 자기 정산 권한 상승 차단",
+    });
+    check("계정 담당자의 자기 직무 변경 차단", selfGrant.error?.code === "42501");
     const grant = await adminClient.rpc("admin_grant_role", {
         p_target: dedicatedId,
         p_duty: "정산",
@@ -1182,6 +1225,17 @@ async function main() {
         !grant.error,
         grant.error?.message,
     );
+
+    const changeExistingAdmin = await adminClient.rpc("admin_grant_role", {
+        p_target: dedicatedId, p_duty: "심사", p_reason: "TEST-177 기존 관리자 직무 변경 차단",
+    });
+    check("계정 담당자는 다른 기존 관리자 직무도 변경 불가", changeExistingAdmin.error?.code === "42501");
+    await admin.from("admin_accounts").update({duty:"전체"}).eq("profile_id",adminId);
+    const fullAdminChange = await adminClient.rpc("admin_grant_role", {
+        p_target: dedicatedId, p_duty: "정산", p_reason: "TEST-177 전체 관리자 기존 직무 변경",
+    });
+    check("전체 관리자만 다른 기존 관리자 직무 변경 가능", !fullAdminChange.error);
+    await admin.from("admin_accounts").update({duty:"계정"}).eq("profile_id",adminId);
 
     const { data: granted } = await admin
         .from("profiles")
