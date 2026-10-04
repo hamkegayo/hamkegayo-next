@@ -46,14 +46,14 @@ export function HomeHero() {
                 </div>
 
                 {/* 이미지 */}
-                <div className="overflow-hidden rounded-3xl">
+                <div className="relative aspect-[535/415] overflow-hidden rounded-3xl">
                     <Image
                         src="/user/main-hero.png"
-                        alt="병원 동행 파트너와 함께 걷는 어르신"
-                        width={640}
-                        height={480}
+                        alt="병원 대기실에서 동행 파트너와 대화하는 어르신"
+                        fill
+                        sizes="(min-width: 768px) 58vw, 100vw"
                         priority
-                        className="h-full w-full object-cover"
+                        className="object-cover object-right"
                     />
                 </div>
             </div>

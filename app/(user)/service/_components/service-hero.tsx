@@ -34,14 +34,14 @@ export function ServiceHero() {
                 </div>
 
                 {/* 이미지 (교체용 파일: public/user/service-hero.png) */}
-                <div className="overflow-hidden rounded-3xl">
+                <div className="relative aspect-[277/163] overflow-hidden rounded-3xl">
                     <Image
                         src="/user/service-hero.png"
-                        alt="병원 로비에서 어르신과 함께한 동행 파트너"
-                        width={720}
-                        height={460}
+                        alt="동행 파트너의 도움을 받아 병원 접수를 진행하는 어르신"
+                        fill
+                        sizes="(min-width: 768px) 55vw, 100vw"
                         priority
-                        className="h-full w-full object-cover"
+                        className="object-cover object-right"
                     />
                 </div>
             </div>
