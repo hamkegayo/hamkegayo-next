@@ -13,8 +13,8 @@ import { COMPANY, mailOrderLabel } from "./company";
 export const TERMS: LegalDocument = {
     title: "이용약관",
     effectiveDate: "2026년 9월 3일",
-    revisedDate: "2026년 9월 3일",
-    version: "2026-09-03",
+    revisedDate: "2026년 10월 4일",
+    version: "2026-10-04",
     articles: [
         {
             no: "제1조",
@@ -347,11 +347,11 @@ export const TERMS: LegalDocument = {
                 },
                 {
                     type: "p",
-                    text: "③ 서비스 운영시간은 원칙적으로 오전 6시부터 오후 6시까지로 한다.",
+                    text: "③ 서비스 제공시간은 매일 오전 7시부터 오후 7시까지로 하며, 토요일, 일요일, 공휴일 및 대체공휴일을 포함한다.",
                 },
                 {
                     type: "p",
-                    text: "④ 회사가 별도로 안내하지 않는 한 오후 6시 이후의 현장 서비스는 제공하지 않는다.",
+                    text: "④ 회사가 별도로 안내하지 않는 한 오전 7시 이전 및 오후 7시 이후의 현장 서비스는 제공하지 않는다.",
                 },
             ],
         },
