@@ -49,6 +49,9 @@ jobs:
 
             # 본문이 바뀌었는데 version 을 안 올리면 동의 이력이 본문을 식별하지
             # 못한다. 실제로 2026-09-06 개정에서 그 일이 일어났다 (#105).
+            - name: FAQ 문답·공통 참조·검색 (#178)
+              run: node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs scripts/test-faq-content.mjs
+
             - name: 약관·방침 버전 무결성 (#105)
               run: npm run test:legal
 
