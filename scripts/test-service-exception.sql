@@ -34,10 +34,24 @@ select id,'00000185-0000-4000-8000-000000000001','ENDED',now()-interval '1 hour'
 insert into auth.users(id,email) values('00000185-0000-4000-8000-000000000005','exception-admin@example.invalid');
 insert into public.profiles(id,name,role) values('00000185-0000-4000-8000-000000000005','Exception Admin','ADMIN');
 insert into public.admin_accounts(profile_id,duty) values('00000185-0000-4000-8000-000000000005','정산');
+-- 오래된 완료 120건이 미처리 115건 앞의 페이지를 차지하지 않아야 한다.
+insert into public.reservations(id,code,customer_id,plan,patient_name,patient_birth,patient_gender,patient_phone,guardian_name,guardian_phone,relation,treatment,purpose,use_date,arrive_time,reserve_time,duration,duration_minutes,depart_address,hospital_address)
+select gen_random_uuid(),'TEST-EXCEPTION-RESOLVED-'||i,customer_id,plan,patient_name,patient_birth,patient_gender,patient_phone,guardian_name,guardian_phone,relation,treatment,purpose,use_date,arrive_time,reserve_time,duration,duration_minutes,depart_address,hospital_address
+from public.reservations cross join generate_series(1,120) i where id='00000185-0000-4000-8000-000000000003';
+insert into public.services(reservation_id,partner_id,status,started_at,ended_at,termination_kind)
+select id,'00000185-0000-4000-8000-000000000001','COMPLETED',now()-interval '2 days',now()-interval '1 day',
+ case when right(code,1) in ('0','2','4','6','8') then 'PROVIDER_FAULT' else 'EMERGENCY' end
+from public.reservations where code like 'TEST-EXCEPTION-RESOLVED-%';
+insert into public.service_exception_resolutions(service_id,decision,cash_before,final_cash,partner_payout,reason,evidence_reference,decided_by,resolved_by,resolved_at)
+select s.id,case when s.termination_kind='EMERGENCY' then 'EMERGENCY' else 'UNAVAILABLE' end,0,0,0,
+ 'Completed test resolution','PRIVATE-COMPLETED-EVIDENCE','00000185-0000-4000-8000-000000000005','00000185-0000-4000-8000-000000000005',now()-interval '1 day'
+from public.services s join public.reservations r on r.id=s.reservation_id where r.code like 'TEST-EXCEPTION-RESOLVED-%';
 select set_config('request.jwt.claims','{"sub":"00000185-0000-4000-8000-000000000005","role":"authenticated","aal":"aal2"}',true);
 set local role authenticated;
 select pg_temp.assert((select count(*) from public.admin_list_service_exceptions())=101,'first page includes next-page marker');
 select pg_temp.assert((select count(*) from public.admin_list_service_exceptions(100))=15,'new waiting items reachable after first hundred');
+select pg_temp.assert(not exists(select 1 from public.admin_list_service_exceptions() where reservation_code like 'TEST-EXCEPTION-RESOLVED-%'),'resolved provider fault and emergency excluded before pagination');
+select pg_temp.assert((select count(*) from public.admin_list_service_exceptions(200))=0,'completed history does not create extra waiting pages');
 select pg_temp.assert(not exists(select 1 from (select service_id from public.admin_list_service_exceptions() limit 100) a join public.admin_list_service_exceptions(100) b using(service_id)),'same-time pages do not overlap');
 select pg_temp.denied($q$select public.admin_list_service_exceptions(-1)$q$);
 reset role;

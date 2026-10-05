@@ -59,6 +59,7 @@ select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000003
 select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000004','PARTIAL',60000,48000,'Actual service extension','PRIVATE-EVIDENCE-4');
 select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000005','UNAVAILABLE',0,0,'Provider unavailable','PRIVATE-EVIDENCE-5');
 select pg_temp.denied($q$select public.admin_close_opening_event('TEST close before exception refund')$q$);
+select pg_temp.assert((select count(*) from public.admin_list_service_exceptions() where reservation_code like 'TEST-RESOLUTION-%')=5,'planned but unverified decisions remain waiting');
 select pg_temp.denied($q$select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000002','PARTIAL',0,0,'Changed decision','Test evidence')$q$);
 reset role;
 select pg_temp.assert(not exists(select 1 from public.settlements st join public.services s on s.id=st.service_id where s.reservation_id in (select id from public.reservations where code like 'TEST-RESOLUTION-%')),'no settlement before PG verification');
@@ -101,6 +102,10 @@ select pg_temp.assert((select count(*) from public.opening_event_claims where re
 select pg_temp.assert((select sum(amount)=0 from public.points where payment_id='00000082-0002-4000-8000-000000000005'),'zero cash full refund restores actual used points');
 select pg_temp.assert((select count(*) from public.notifications where dedupe_key like 'exception-resolved:00000082-%')=5,'exactly one notification per resolution');
 select pg_temp.assert((select count(*) from public.access_logs where action='SERVICE_EXCEPTION_RESOLVE' and actor_id='00000082-0000-4000-8000-000000000998')=5,'actual verification actor audited');
+select set_config('request.jwt.claims','{"sub":"00000082-0000-4000-8000-000000000998","role":"authenticated","aal":"aal2"}',true);
+set local role authenticated;
+select pg_temp.assert(not exists(select 1 from public.admin_list_service_exceptions() where reservation_code like 'TEST-RESOLUTION-%'),'verified completed resolutions leave waiting list');
+reset role;
 select set_config('request.jwt.claims','{"sub":"00000082-0000-4000-8000-000000000002","role":"authenticated","aal":"aal1"}',true);
 set local role authenticated;
 select pg_temp.assert((public.get_own_service_exception_summary('00000082-0001-4000-8000-000000000002')->>'refund')::integer=58000,'weekend four-hour cash refund visible to owner');

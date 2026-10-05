@@ -31,6 +31,24 @@ alter table public.service_exception_transactions enable row level security;
 revoke all on public.service_exception_resolutions,public.service_exception_transactions from public,anon,authenticated;
 grant all on public.service_exception_resolutions,public.service_exception_transactions to service_role;
 
+-- #203 리뷰: 종료 유형은 이력으로 보존하되 처리 완료 건은 대기 목록에서 제외한다.
+-- 판정 전(행 없음)과 PG 검증 전(resolved_at NULL)은 계속 표시한다.
+create or replace function public.admin_list_service_exceptions(p_offset integer default 0)
+returns table(service_id uuid,reservation_code text,kind text,ended_at timestamptz)
+language plpgsql security definer set search_path='' as $$ begin
+ if not public.can_manage_settlements() then raise exception 'forbidden' using errcode='42501'; end if;
+ if p_offset is null or p_offset<0 then raise exception 'invalid_offset' using errcode='22023'; end if;
+ perform public.log_access('SERVICE_EXCEPTION_LIST','services',null,null,'예외 종료 운영 확인');
+ return query select s.id,r.code,s.termination_kind,s.ended_at
+ from public.services s join public.reservations r on r.id=s.reservation_id
+ where s.termination_kind in ('PROVIDER_FAULT','EMERGENCY')
+  and not exists(select 1 from public.service_exception_resolutions d
+   where d.service_id=s.id and d.resolved_at is not null)
+ order by s.ended_at,s.id limit 101 offset p_offset;
+end $$;
+revoke all on function public.admin_list_service_exceptions(integer) from public,anon;
+grant execute on function public.admin_list_service_exceptions(integer) to authenticated;
+
 -- 고정된 운영 판정 건의 추가결제와 검증된 환불만 예외 보류를 통과한다.
 create or replace function public.guard_service_exception_money() returns trigger
 language plpgsql security definer set search_path='' as $$
