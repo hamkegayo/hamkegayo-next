@@ -193,6 +193,12 @@ export default async function AdminHome() {
             >
                 파트너 자격 심사
             </Link>
+            <Link
+                href="/admin/review-publications"
+                className="text-brand ml-5 font-semibold underline"
+            >
+                후기 공개 관리
+            </Link>
             <div className="mt-6 inline-flex items-center gap-5">
                 <Link
                     href="/admin/settlements"

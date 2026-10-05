@@ -13,8 +13,8 @@ begin
   if exists (select 1 from public.imported_reviews where author_masked !~ '^.O.$') then
     raise exception '실명 노출';
   end if;
-  if exists(select 1 from public.get_public_reviews() where source='provided') then
-    raise exception '실제 이용자 동의 미확인 후기 노출';
+  if (select count(*) from public.get_public_reviews() where source='provided')<>12 then
+    raise exception '본인 동의 확인 후기 공개 누락';
   end if;
   if (select count(*) from public.get_public_reviews(0)) <> 0 then
     raise exception '목록 제한 실패';
@@ -36,7 +36,7 @@ update public.imported_reviews set published = false where source_key = 'provide
 set local role anon;
 do $$
 begin
-  if (select count(*) from public.get_public_reviews() where source = 'provided') <> 0
+  if exists(select 1 from public.get_public_reviews() where id='00000175-0000-4000-8000-000000000012' and source='provided')
     then
     raise exception '비공개 후기 노출';
   end if;

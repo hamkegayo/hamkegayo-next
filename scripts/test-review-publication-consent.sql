@@ -1,4 +1,8 @@
 begin;
+-- 운영 승인 시드와 분리하여 미동의/건강 공개 경계를 검증한다. rollback 복원.
+delete from public.review_publications where source='provided';
+delete from public.review_publication_consents where source='provided';
+update public.imported_reviews set published=false;
 create function pg_temp.assert(p_ok boolean,p_label text) returns void language plpgsql as $$
 begin if p_ok is distinct from true then raise exception 'FAIL: %',p_label; end if; raise notice 'PASS: %',p_label; end $$;
 create function pg_temp.denied(p_sql text,p_label text) returns void language plpgsql as $$
