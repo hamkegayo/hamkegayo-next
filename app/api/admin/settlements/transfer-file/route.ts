@@ -48,16 +48,21 @@ export async function POST(request: NextRequest) {
         p_reason: reason,
     });
     if (error) {
+        const independentApprover = error.message.includes(
+            "independent_approver_required",
+        );
         const secondAdmin =
             error.message.includes("second_admin_required") ||
             error.message.includes("issuer_mismatch");
         return NextResponse.json(
             {
-                message: secondAdmin
-                    ? "배치 생성자와 다른 정산 담당자가 발급해야 합니다. 재다운로드는 최초 발급자만 가능합니다."
-                    : "이체 파일을 발급하지 못했습니다.",
+                message: independentApprover
+                    ? "승인 이력이 확인된 정산만 반출할 수 있으며, 승인 담당자와 다른 정산 담당자가 발급해야 합니다."
+                    : secondAdmin
+                      ? "배치 생성자와 다른 정산 담당자가 발급해야 합니다. 재다운로드는 최초 발급자만 가능합니다."
+                      : "이체 파일을 발급하지 못했습니다.",
             },
-            { status: secondAdmin ? 403 : 409 },
+            { status: independentApprover || secondAdmin ? 403 : 409 },
         );
     }
 
