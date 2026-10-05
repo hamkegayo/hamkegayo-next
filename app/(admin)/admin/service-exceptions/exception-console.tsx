@@ -61,8 +61,16 @@ export function ExceptionConsole({ serviceId }: { serviceId: string }) {
             );
         setDetail(data);
         if (!data.decision) {
-            setDecision(data.kind === "EMERGENCY" ? "EMERGENCY" : "PARTIAL");
-            setFinalCash(String(data.cashPaid));
+            const initialDecision = !data.startedAt
+                ? "UNAVAILABLE"
+                : data.kind === "EMERGENCY"
+                  ? "EMERGENCY"
+                  : "PARTIAL";
+            setDecision(initialDecision);
+            setFinalCash(
+                initialDecision === "UNAVAILABLE" ? "0" : String(data.cashPaid),
+            );
+            setRestore(initialDecision === "UNAVAILABLE" && data.eventUsed);
         }
     }
     async function run(action: () => Promise<void>) {
@@ -178,7 +186,11 @@ export function ExceptionConsole({ serviceId }: { serviceId: string }) {
                                             setFinalCash("0");
                                     }}
                                 >
-                                    {detail.kind === "EMERGENCY" ? (
+                                    {!detail.startedAt ? (
+                                        <option value="UNAVAILABLE">
+                                            제공 불가 · 전액 현금 환불
+                                        </option>
+                                    ) : detail.kind === "EMERGENCY" ? (
                                         <option value="EMERGENCY">
                                             응급 중단
                                         </option>
