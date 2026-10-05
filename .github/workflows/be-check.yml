@@ -260,6 +260,11 @@ jobs:
             - name: 서비스 수행 시각 무결성 (#55)
               run: npm run test:service
 
+            - name: 예외 종료 청구·환불·완료 보류 (#185)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-service-exception.sql
+
             - name: 서비스 시간 · KST 자동 마감 경계 (#176)
               run: |
                   eval "$(supabase status -o env)"
@@ -296,6 +301,12 @@ jobs:
               run: |
                   eval "$(supabase status -o env)"
                   psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-admin-incident-cancel.sql
+
+            - name: 예외 종료 운영 판정·PG 확인·정산 보류 해제 (#185)
+              run: |
+                  node --experimental-strip-types --no-warnings scripts/test-exception-verification.mjs
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-exception-resolution.sql
 
             - name: 관리자 권한·접근통제·접속기록 (#50)
               run: npm run test:admin

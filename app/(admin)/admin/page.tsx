@@ -90,6 +90,12 @@ export default async function AdminHome() {
             >
                 오픈 이벤트 관리
             </Link>
+            <Link
+                href="/admin/service-exceptions"
+                className="text-brand ml-4 text-sm underline"
+            >
+                예외 종료 운영 확인
+            </Link>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {cards.map(

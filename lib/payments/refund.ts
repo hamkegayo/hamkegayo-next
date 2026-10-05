@@ -163,6 +163,24 @@ export async function refundReservationPayment(
     options: { providerFault?: boolean; memo?: string } = {},
 ): Promise<RefundOutcome> {
     const admin = createAdminClient();
+    const exception = await admin
+        .from("services")
+        .select("termination_kind")
+        .eq("reservation_id", reservationId)
+        .maybeSingle();
+    if (
+        exception.error ||
+        ["PROVIDER_FAULT", "EMERGENCY"].includes(
+            exception.data?.termination_kind,
+        )
+    ) {
+        return {
+            ok: false,
+            code: "GATEWAY_FAILED",
+            message:
+                "운영 확인 중인 예약입니다. 별도 예외 정산 절차를 이용해 주세요.",
+        };
+    }
     const payment = await loadBasePayment(admin, reservationId);
 
     if (!payment) {

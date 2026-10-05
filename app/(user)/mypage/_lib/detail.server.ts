@@ -44,6 +44,14 @@ export type ReservationPayment = {
     additional: number;
     /** 서비스 종료 후 최종 산정이 끝났는지 */
     isFinal: boolean;
+    exception?: {
+        pending: boolean;
+        finalCash: number | null;
+        cashBefore: number | null;
+        refund: number;
+        additional: number;
+        restored: boolean;
+    };
 };
 
 /** 확정/완료/취소 예약의 리치 상세 뷰 */
@@ -184,6 +192,7 @@ function toPayment(r: ReservationRow, plan: PlanCode): ReservationPayment {
 
 type ServiceRow = {
     status: ServiceState;
+    termination_kind: string;
     created_at: string;
     started_at: string | null;
     ended_at: string | null;
@@ -266,11 +275,36 @@ export async function getReservationDetail(
         // 서비스 행(확정 시 자동 생성). 소유자 RLS 로 조회 가능.
         const { data: svc } = await supabase
             .from("services")
-            .select("status, created_at, started_at, ended_at")
+            .select(
+                "status, created_at, started_at, ended_at, termination_kind",
+            )
             .eq("reservation_id", r.id)
             .maybeSingle<ServiceRow>();
 
         const planCode: PlanCode = r.plan === "plus" ? "plus" : "basic";
+        const payment = toPayment(r, planCode);
+        if (
+            ["PROVIDER_FAULT", "EMERGENCY"].includes(
+                svc?.termination_kind ?? "",
+            )
+        ) {
+            const summary = await supabase.rpc(
+                "get_own_service_exception_summary",
+                { p_reservation: r.id },
+            );
+            // 조회 실패 시 일반 최소요금이나 완료 금액을 대신 표시하지 않는다.
+            payment.exception =
+                summary.error || !summary.data
+                    ? {
+                          pending: true,
+                          finalCash: null,
+                          cashBefore: null,
+                          refund: 0,
+                          additional: 0,
+                          restored: false,
+                      }
+                    : summary.data;
+        }
 
         const serviceState = svc?.status ?? null;
         const stepIndex =
@@ -301,7 +335,7 @@ export async function getReservationDetail(
             userPhone: r.patient_phone,
             cautions: r.cautions,
             otherRequests: r.other_requests,
-            payment: toPayment(r, planCode),
+            payment,
             includes: PLAN_INCLUDES[planCode],
             stepIndex,
             serviceState,
