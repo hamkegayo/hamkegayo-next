@@ -90,6 +90,12 @@ export default async function AdminHome() {
             >
                 오픈 이벤트 관리
             </Link>
+            <Link
+                href="/admin/service-exceptions"
+                className="text-brand ml-4 text-sm underline"
+            >
+                예외 종료 운영 확인
+            </Link>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {cards.map(
@@ -193,12 +199,24 @@ export default async function AdminHome() {
             >
                 파트너 자격 심사
             </Link>
+            <Link
+                href="/admin/review-publications"
+                className="text-brand ml-5 font-semibold underline"
+            >
+                후기 공개 관리
+            </Link>
             <div className="mt-6 inline-flex items-center gap-5">
                 <Link
                     href="/admin/settlements"
                     className="text-brand inline-block font-semibold underline"
                 >
                     정산 관리
+                </Link>
+                <Link
+                    href="/admin/refunds"
+                    className="text-brand text-sm underline"
+                >
+                    미달분 환불 승인
                 </Link>
                 <LogoutButton />
             </div>

@@ -73,7 +73,7 @@ export function OpeningEventPopup({
     return (
         <Dialog open={open} onOpenChange={changeOpen}>
             {preview && !previewAutoOpen && (
-                <DialogTrigger className="border-border bg-background rounded-lg border px-4 py-2 font-bold">
+                <DialogTrigger className="border-border bg-background hover:bg-muted focus-visible:ring-brand cursor-pointer rounded-lg border px-4 py-2 font-bold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none">
                     팝업 시안 미리보기
                 </DialogTrigger>
             )}
@@ -87,7 +87,7 @@ export function OpeningEventPopup({
                     />
                     <DialogClose
                         aria-label="이벤트 팝업 닫기"
-                        className="text-foreground rounded-full p-2"
+                        className="text-foreground hover:bg-muted focus-visible:ring-brand cursor-pointer rounded-full p-2 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                     >
                         <X className="size-6" />
                     </DialogClose>
@@ -133,24 +133,32 @@ export function OpeningEventPopup({
                         <button
                             type="button"
                             disabled
-                            className="bg-brand text-brand-foreground flex flex-1 items-center justify-center gap-2 rounded-2xl p-4 text-lg font-extrabold"
+                            className="bg-brand text-brand-foreground relative flex flex-1 cursor-not-allowed items-center justify-center rounded-2xl px-12 py-4 text-center text-lg font-extrabold"
                         >
-                            예약하기 <ChevronRight className="size-6" />
+                            예약하기
+                            <ChevronRight
+                                aria-hidden="true"
+                                className="absolute right-4 size-6"
+                            />
                         </button>
                     ) : (
                         <Link
                             href={reservationHref}
                             onClick={() => changeOpen(false)}
-                            className="bg-brand text-brand-foreground hover:bg-brand/90 flex flex-1 items-center justify-center gap-2 rounded-2xl p-4 text-lg font-extrabold"
+                            className="bg-brand text-brand-foreground hover:bg-brand/90 focus-visible:ring-brand relative flex flex-1 cursor-pointer items-center justify-center rounded-2xl px-12 py-4 text-center text-lg font-extrabold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                         >
-                            예약하기 <ChevronRight className="size-6" />
+                            예약하기
+                            <ChevronRight
+                                aria-hidden="true"
+                                className="absolute right-4 size-6"
+                            />
                         </Link>
                     )}
                     {preview ? (
                         <button
                             type="button"
                             disabled
-                            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#fee500] p-4 text-lg font-extrabold text-black"
+                            className="flex flex-1 cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-[#fee500] p-4 text-lg font-extrabold text-black"
                         >
                             <MessageCircle className="size-6 fill-black" />
                             카카오톡 상담하기
@@ -160,7 +168,7 @@ export function OpeningEventPopup({
                             href={OPENING_EVENT_CHANNEL}
                             method="support"
                             external
-                            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#fee500] p-4 text-lg font-extrabold text-black"
+                            className="focus-visible:ring-brand flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#fee500] p-4 text-lg font-extrabold text-black transition-colors hover:bg-[#f0d900] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                         >
                             <MessageCircle className="size-6 fill-black" />
                             카카오톡 상담하기

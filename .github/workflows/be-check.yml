@@ -43,6 +43,9 @@ jobs:
             - name: 요금 계산 단위 테스트 (#46 · #76)
               run: npm run test:pricing
 
+            - name: 승인 환불 중복 방지 · 결과 복구 (#80)
+              run: node --experimental-strip-types --no-warnings scripts/test-approved-refund.mjs
+
             - name: 서비스 시간 · 예약 서버 검증 (#176)
               run: node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs scripts/test-service-hours.mjs
 
@@ -61,11 +64,17 @@ jobs:
             - name: FAQ 문답·공통 참조·검색 (#178)
               run: node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs scripts/test-faq-content.mjs
 
+            - name: 관리자 사고 거래 취소 모의 PG 검증 (#80)
+              run: node --experimental-strip-types --no-warnings scripts/test-incident-cancel.mjs
+
             - name: 약관·방침 버전 무결성 (#105)
               run: npm run test:legal
 
             # 닫아도 다음 날 또 뜨거나, 인앱 브라우저에 "설치하기" 가 떠서 눌러도
             # 아무 일이 없으면 화면만 봐서는 모른다. 날짜와 UA 를 고정해 본다.
+            - name: 자격·경력 증빙 파일 형식 (#199)
+              run: node --experimental-strip-types --no-warnings scripts/test-partner-evidence.mjs
+
             - name: PWA 설치 유도 — 재노출 정책·플랫폼 판정 (#117)
               run: npm run test:pwa
 
@@ -248,16 +257,31 @@ jobs:
             - name: 결제·정산 스키마와 심사용 무기한 토큰 (#49 · #81)
               run: npm run test:payments
 
+            - name: 환불 선점 · MFA · 원장 일회 기록 (#80)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-admin-refund-execution.sql
+
             - name: 동의 이력 불변성 (#58)
               run: npm run test:agreements
 
             - name: 서비스 수행 시각 무결성 (#55)
               run: npm run test:service
 
+            - name: 예외 종료 청구·환불·완료 보류 (#185)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-service-exception.sql
+
             - name: 서비스 시간 · KST 자동 마감 경계 (#176)
               run: |
                   eval "$(supabase status -o env)"
                   psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-service-hours.sql
+
+            - name: 자격·경력 증빙 · 비공개 열람 · 파기 큐 (#199)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-partner-evidence.sql
 
             - name: 파트너 개인정보 3단계 경계 (#66 · #67)
               run: npm run test:partner
@@ -273,11 +297,25 @@ jobs:
               run: |
                   eval "$(supabase status -o env)"
                   psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-imported-reviews.sql
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-confirmed-review-publication.sql
 
             - name: 실제 이용자 후기 공개 동의·3년 만료·철회
               run: |
                   eval "$(supabase status -o env)"
                   psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-review-publication-consent.sql
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-cancelled-transfer-retention.sql
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-public-applicant-ratings.sql
+
+            - name: 관리자 사고 거래 취소 권한·MFA·중복 차단 (#80)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-admin-incident-cancel.sql
+
+            - name: 예외 종료 운영 판정·PG 확인·정산 보류 해제 (#185)
+              run: |
+                  node --experimental-strip-types --no-warnings scripts/test-exception-verification.mjs
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-exception-resolution.sql
 
             - name: 관리자 권한·접근통제·접속기록 (#50)
               run: npm run test:admin
@@ -289,6 +327,11 @@ jobs:
 
             - name: 정산 계좌 열람 통제 (#51)
               run: npm run test:payout
+
+            - name: 이메일 인증 연락처 변경 · 목적/대상/일회 소비 (#64)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-partner-phone-email.sql
 
             - name: 탈퇴 시 보존·파기 (#72)
               run: npm run test:withdrawal

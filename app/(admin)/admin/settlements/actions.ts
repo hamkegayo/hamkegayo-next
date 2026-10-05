@@ -117,8 +117,9 @@ export async function recordTransferResult(
     if (error)
         return {
             ok: false,
-            message:
-                "결과를 기록하지 못했습니다. 권한·배치 상태·정산 금액과 입력 내용을 확인해 주세요.",
+            message: error.message.includes("independent_approver_required")
+                ? "승인 이력이 확인된 정산만 지급 완료로 기록할 수 있으며, 승인 담당자와 다른 정산 담당자가 처리해야 합니다."
+                : "결과를 기록하지 못했습니다. 권한·배치 상태·정산 금액과 입력 내용을 확인해 주세요.",
         };
     revalidatePath("/admin");
     revalidatePath("/admin/settlements");

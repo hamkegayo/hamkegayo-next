@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { kstDateTime } from "@/lib/format";
 import { ReviewControls } from "./review-controls";
 import { WorkHistoryReview } from "./work-history-review";
+import { PartnerEvidenceFiles } from "@/components/partner-evidence-files";
 
 export default async function QualificationsPage({
     searchParams,
@@ -31,7 +32,7 @@ export default async function QualificationsPage({
         const { data: histories, error } = await supabase
             .from("partner_work_histories")
             .select(
-                "id, partner_id, hospital, period, department, duties, status",
+                "id, partner_id, hospital, period, department, duties, status, kind",
             )
             .eq("status", status)
             .order("created_at")
@@ -58,9 +59,9 @@ export default async function QualificationsPage({
                     파트너 근무 경력 심사
                 </h1>
                 <p className="text-muted-foreground mt-2 text-sm">
-                    파트너에게 재직·경력 증빙을 별도로 요청하여 확인하고 검증
-                    결과를 기록해 주세요. 증빙 원본은 고객에게 공개하지
-                    않습니다.
+                    증빙 확인 버튼으로 제출 자료를 확인하고 검증 결과를 기록해
+                    주세요. 기존 별도 제출 자료는 담당자에게 확인해 주세요. 증빙
+                    원본은 고객에게 공개하지 않습니다.
                 </p>
                 <nav aria-label="경력 심사 상태" className="my-6 flex gap-4">
                     <Link
@@ -90,7 +91,10 @@ export default async function QualificationsPage({
                                 {row.hospital}
                             </h2>
                             <p className="mt-2 text-sm">
-                                {row.period} · {row.department}
+                                {row.kind === "COMPANION"
+                                    ? "병원동행 경력"
+                                    : "의료기관 근무 경력"}{" "}
+                                · {row.period} · {row.department}
                             </p>
                             <p className="mt-2 text-sm break-words whitespace-pre-wrap">
                                 {row.duties}
@@ -98,6 +102,11 @@ export default async function QualificationsPage({
                             <WorkHistoryReview
                                 id={row.id}
                                 status={row.status}
+                            />
+                            <PartnerEvidenceFiles
+                                id={row.id}
+                                kind="HISTORY"
+                                admin
                             />
                         </li>
                     ))}
@@ -195,6 +204,11 @@ export default async function QualificationsPage({
                                 .join(" · ")}
                         </p>
                         <ReviewControls id={row.id} status={row.status} />
+                        <PartnerEvidenceFiles
+                            id={row.id}
+                            kind="QUALIFICATION"
+                            admin
+                        />
                     </li>
                 ))}
             </ul>

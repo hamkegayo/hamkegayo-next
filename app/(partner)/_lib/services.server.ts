@@ -51,6 +51,8 @@ export type PartnerServiceView = {
     times: Record<string, string | null>;
     /** 이용자 미도착으로 종료된 건 (약관 제15조 ③) */
     noShow: boolean;
+    exceptionPending: boolean;
+    exceptionResolved?: boolean;
     /** 시스템이 마감한 건. 실제 종료가 아니라는 표시 */
     autoClosedAt: string | null;
     /**
@@ -96,6 +98,8 @@ type ServiceRow = {
     home_departed_at: string | null;
     handover_at: string | null;
     no_show: boolean | null;
+    termination_kind: string;
+    settlements: { amount: number; net: number; reason: string | null }[];
     auto_closed_at: string | null;
     reservations: {
         code: string;
@@ -148,7 +152,7 @@ const SELECT =
     // 약관 제12조 ④ 가 이용시간 분쟁 시 함께 확인하는 자료다.
     "notified_at, hospital_arrived_at, reception_at, wait_started_at, wait_ended_at, " +
     "treatment_started_at, treatment_ended_at, checkout_started_at, checkout_ended_at, " +
-    "home_departed_at, handover_at, no_show, auto_closed_at, " +
+    "home_departed_at, handover_at, no_show, auto_closed_at, termination_kind, settlements(amount,net,reason), " +
     "reservations!inner(code, plan, hospital_address, treatment, patient_name, patient_birth, " +
     "use_date, arrive_time, reserve_time, duration, surcharge_rate, prepaid_amount, billed_minutes, final_amount, " +
     // 확정 후에만 제공되는 단계 2 항목 (#77 · 처리방침 제5조 ②).
@@ -169,6 +173,11 @@ function toView(r: ServiceRow): PartnerServiceView {
 
     const grossAmount = res?.final_amount ?? res?.prepaid_amount ?? 0;
     const payout = calcPartnerPayout(planCode, grossAmount);
+    const exceptionSettlement =
+        ["PROVIDER_FAULT", "EMERGENCY"].includes(r.termination_kind) &&
+        r.status === "COMPLETED"
+            ? r.settlements?.find((s) => s.reason === "SERVICE_EXCEPTION")
+            : undefined;
 
     const person = (
         name: string | null | undefined,
@@ -196,7 +205,7 @@ function toView(r: ServiceRow): PartnerServiceView {
         plannedStartAt: plannedStartMs
             ? new Date(plannedStartMs).toISOString()
             : null,
-        amount: payout.net,
+        amount: exceptionSettlement?.net ?? payout.net,
         grossAmount,
         amountProvisional: res?.final_amount == null,
         durationLabel: res?.billed_minutes
@@ -223,6 +232,10 @@ function toView(r: ServiceRow): PartnerServiceView {
             handover_at: r.handover_at,
         },
         noShow: r.no_show === true,
+        exceptionPending:
+            r.status !== "COMPLETED" &&
+            ["PROVIDER_FAULT", "EMERGENCY"].includes(r.termination_kind),
+        exceptionResolved: !!exceptionSettlement,
         autoClosedAt: r.auto_closed_at,
         conditions: {
             transportTo: res?.transport_to ?? null,

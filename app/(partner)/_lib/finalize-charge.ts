@@ -42,6 +42,7 @@ type Row = {
     arrived_at: string | null;
     started_at: string | null;
     ended_at: string | null;
+    termination_kind: string;
     reservation_id: string;
     reservations: {
         code: string;
@@ -76,13 +77,15 @@ export async function finalizeServiceCharge(
         const { data, error } = await admin
             .from("services")
             .select(
-                "arrived_at, started_at, ended_at, reservation_id, " +
+                "arrived_at, started_at, ended_at, reservation_id, termination_kind, " +
                     "reservations!inner(code, customer_id, plan, use_date, arrive_time, duration, duration_minutes, surcharge_rate, prepaid_amount)",
             )
             .eq("id", serviceId)
             .maybeSingle<Row>();
 
         if (error || !data?.reservations) return null;
+        if (["PROVIDER_FAULT", "EMERGENCY"].includes(data.termination_kind))
+            return null;
 
         const r = data.reservations;
         const endedAtMs = toMs(data.ended_at);
@@ -113,6 +116,7 @@ export async function finalizeServiceCharge(
             durationMinutes,
             actualMinutes: actualMinutesBetween(startMs, endedAtMs),
             isSurcharge,
+            surchargeRate: Number(r.surcharge_rate ?? 0),
         });
 
         const { data: eventPayment, error: eventError } = await admin
@@ -202,7 +206,8 @@ export async function finalizeNoShowCharge(
 
         const r = data.reservations;
         const plan: PlanCode = r.plan === "plus" ? "plus" : "basic";
-        const total = oneHourCharge(plan, Number(r.surcharge_rate ?? 0) > 0);
+        const rate = Number(r.surcharge_rate ?? 0);
+        const total = oneHourCharge(plan, rate > 0, rate);
 
         const { data: eventPayment, error: eventError } = await admin
             .from("payments")
