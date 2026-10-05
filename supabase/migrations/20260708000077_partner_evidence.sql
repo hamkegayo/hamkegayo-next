@@ -41,7 +41,8 @@ begin
  if not public.partner_evidence_enabled() then raise exception 'evidence_notice_pending' using errcode='42501'; end if;
  if not exists(select 1 from public.partner_accounts a join public.profiles p on p.id=a.profile_id where a.profile_id=v_owner and p.status='ACTIVE' and p.role='PARTNER') then raise exception 'forbidden' using errcode='42501'; end if;
  perform 1 from public.partner_accounts where profile_id=v_owner for update;
- if jsonb_typeof(p_files)<>'array' or jsonb_array_length(p_files) not between 1 and 5 then raise exception 'files_required'; end if;
+ if p_files is null or jsonb_typeof(p_files)<>'array' then raise exception 'files_required'; end if;
+ if jsonb_array_length(p_files) not between 1 and 5 then raise exception 'files_required'; end if;
  for f in select value from jsonb_array_elements(p_files) loop
   if f->>'path' not like v_owner::text||'/%' or not exists(select 1 from storage.objects o where o.bucket_id='partner-qualifications' and o.name=f->>'path') then raise exception 'invalid_file'; end if;
  end loop;
