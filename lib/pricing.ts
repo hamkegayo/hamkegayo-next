@@ -6,10 +6,10 @@
  *
  * 근거 조항 (`.claude/legal/terms.md`)
  *  - 제11조 ①   : Basic 시간당 20,000 / Plus 시간당 25,000
- *  - 제11조 ②③ : 최소 청구금액은 각 상품의 1시간 이용요금, 환급하지 않음
- *  - 제11조 ④   : 종료 예정시각 이후 8분까지는 연장요금 없음
- *  - 제11조 ⑤   : 8분 초과 시 실제 초과시간을 15분 단위로 올림
- *  - 제11조 ⑥   : 병원 내 대기시간은 이용시간에 포함
+ *  - 제11조 ③④ : 최소 청구금액은 각 상품의 1시간 이용요금, 환급하지 않음
+ *  - 제11조 ⑤   : 종료 예정시각 이후 8분까지는 연장요금 없음
+ *  - 제11조 ⑥   : 8분 초과 시 실제 초과시간을 15분 단위로 올림
+ *  - 제11조 ⑦   : 병원 내 대기시간은 이용시간에 포함
  *  - 제13조 ①   : 기존 예약의 저장 할증률 보존, #206 신규 예약 한시 면제
  *  - 제15조 ②   : 이용자 지각시간은 이용시간에 포함
  *  - 제16조 ①   : 파트너 지각분은 이용시간으로 청구하지 않음
@@ -26,13 +26,13 @@ import { PLAN_INFO, type PlanCode } from "@/lib/reservation";
 /** 청구 시간 단위(분). 조기 종료·연장 공통으로 이 단위로 올림한다. */
 export const BILLING_UNIT_MIN = 15;
 
-/** 최소 청구시간(분) — 약관 제11조 ②③ */
+/** 최소 청구시간(분) — 약관 제11조 ③④ */
 export const MIN_BILLABLE_MIN = 60;
 
 /** 선결제 최소 시간(분) — 약관 제21조 ① */
 export const MIN_PREPAY_MIN = 120;
 
-/** 연장요금 유예(분) — 약관 제11조 ④ */
+/** 연장요금 유예(분) — 약관 제11조 ⑤ */
 export const EXTENSION_GRACE_MIN = 8;
 
 /** 주말·공휴일 할증률 — 약관 제13조 ① */
@@ -197,7 +197,7 @@ export type FinalCharge = {
     surchargeRate: number;
     /** 최종 이용요금 */
     total: number;
-    /** 최소청구 1시간이 적용됐는지 (제11조 ②③) */
+    /** 최소청구 1시간이 적용됐는지 (제11조 ③④) */
     minimumApplied: boolean;
 };
 
@@ -227,7 +227,7 @@ export function calcFinalCharge(params: {
     let extraMinutes: number;
 
     if (overrun > EXTENSION_GRACE_MIN) {
-        // 연장 — 초과분만 15분 단위로 올림 (제11조 ⑤)
+        // 연장 — 초과분만 15분 단위로 올림 (제11조 ⑥)
         baseMinutes = durationMinutes;
         extraMinutes = ceilToUnit(overrun);
     } else {
@@ -236,7 +236,7 @@ export function calcFinalCharge(params: {
         extraMinutes = 0;
     }
 
-    // 최소청구 1시간 (제11조 ②③)
+    // 최소청구 1시간 (제11조 ③④)
     const minimumApplied = baseMinutes + extraMinutes < MIN_BILLABLE_MIN;
     if (minimumApplied) baseMinutes = MIN_BILLABLE_MIN;
 
@@ -366,7 +366,7 @@ export type CancelFee = {
 /**
  * "해당 상품 1시간 이용요금" — 약관이 여러 곳에서 같은 표현을 쓴다.
  *
- *   · 제11조 ②③ 최소 청구금액
+ *   · 제11조 ③④ 최소 청구금액
  *   · 제19조    2시간 전 이내 취소 · 이용자 노쇼
  *   · 제17조 ②  이용자 귀책 중단
  *

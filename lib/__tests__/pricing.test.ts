@@ -33,7 +33,7 @@ describe("이용시간 문자열 파싱", () => {
     });
 });
 
-describe("15분 단위 올림 (약관 제11조 ⑤)", () => {
+describe("15분 단위 올림 (약관 제11조 ⑥)", () => {
     it.each([
         [1, 15],
         [15, 15],
@@ -83,19 +83,19 @@ describe("최종 이용요금 (약관 제11조)", () => {
         isSurcharge: false,
     };
 
-    it("예정시간 +8분 이내 초과는 연장요금을 받지 않는다", () => {
+    it("예정시간 +8분 이내 초과는 연장요금을 받지 않는다 (제11조 ⑤)", () => {
         const c = calcFinalCharge({ ...base, actualMinutes: 128 });
         expect(c.extraMinutes).toBe(0);
         expect(c.total).toBe(40_000);
     });
 
-    it("8분을 넘으면 초과분 전체를 15분 단위로 올려 청구한다", () => {
+    it("8분을 넘으면 초과분 전체를 15분 단위로 올려 청구한다 (제11조 ⑥)", () => {
         const c = calcFinalCharge({ ...base, actualMinutes: 129 });
         expect(c.extraMinutes).toBe(15);
         expect(c.total).toBe(45_000);
     });
 
-    it("1시간 미만 이용도 최소 1시간을 청구한다", () => {
+    it("1시간 미만 이용도 최소 1시간을 청구한다 (제11조 ③④)", () => {
         const c = calcFinalCharge({ ...base, actualMinutes: 20 });
         expect(c.minimumApplied).toBe(true);
         expect(c.billedMinutes).toBe(60);
