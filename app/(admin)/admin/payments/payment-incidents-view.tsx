@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 
 import { Modal } from "@/components/ui/modal";
+import { IncidentCancelButton } from "./incident-cancel-button";
 import { cn } from "@/lib/utils";
 import { kstDateTime } from "@/lib/format";
 import {
@@ -338,6 +339,17 @@ export function PaymentIncidentsView({
                                         확인 시작
                                     </button>
                                 )}
+                                {incident.status !== "RESOLVED" &&
+                                    [
+                                        "CANCEL_FAILED",
+                                        "APPROVE_INDETERMINATE",
+                                        "STATE_MISMATCH",
+                                    ].includes(incident.kind) && (
+                                        <IncidentCancelButton
+                                            incidentId={incident.id}
+                                            orderId={incident.orderId}
+                                        />
+                                    )}
                                 {incident.status === "ACKNOWLEDGED" && (
                                     <button
                                         type="button"
