@@ -278,6 +278,7 @@ jobs:
               run: |
                   eval "$(supabase status -o env)"
                   psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-review-publication-consent.sql
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-cancelled-transfer-retention.sql
                   psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-public-applicant-ratings.sql
 
             - name: 관리자 권한·접근통제·접속기록 (#50)
