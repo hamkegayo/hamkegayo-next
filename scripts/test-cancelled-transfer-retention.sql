@@ -43,8 +43,8 @@ insert into public.reviews(service_id, customer_id, partner_id, rating, title, c
 
 insert into public.transfer_batches(id,code,status,reason,settlement_count,partner_count,total_net,created_by)
 select ('00000191-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,'TEST-191-'||i,'CANCELLED','test cancellation',1,1,100,'00000173-0000-4000-8000-000000000004' from generate_series(1,3) i;
-insert into public.transfer_batch_items(batch_id,partner_id,amount,bank_code,account_number,account_last4,holder_name)
-select id,'00000173-0000-4000-8000-000000000003',100,'004',null,'0000','Test only' from public.transfer_batches where code like 'TEST-191-%';
+insert into public.transfer_batch_items(batch_id,partner_id,amount,settlement_count,bank_code,bank_name,account_number,account_last4,holder_name)
+select id,'00000173-0000-4000-8000-000000000003',100,1,'004','Test bank',null,'0000','Test only' from public.transfer_batches where code like 'TEST-191-%';
 insert into public.transfer_batch_results(batch_id,status,recorded_by,recorded_at,reference,reason,settlement_ids)
 select id,'CANCELLED','00000173-0000-4000-8000-000000000004',now()-case when code='TEST-191-2' then interval '1 year' else interval '6 years' end,'test-proof','test-reason',array[]::uuid[] from public.transfer_batches where code like 'TEST-191-%';
 select pg_temp.assert((select purge_after=recorded_at+interval '5 years' from public.transfer_batch_results where batch_id='00000191-0000-4000-8000-000000000001'),'orphan result retains fixed deadline');
