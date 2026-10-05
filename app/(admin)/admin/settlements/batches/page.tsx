@@ -107,9 +107,9 @@ export default async function TransferBatchesPage({
                                         }
                                     />
                                     <p className="text-muted-foreground text-xs">
-                                        배치 생성자와 다른 정산 담당자만 최초
-                                        발급할 수 있습니다. CSV에는 전체
-                                        계좌번호가 포함됩니다.
+                                        정산 승인자 및 배치 생성자와 다른 정산
+                                        담당자만 최초 발급할 수 있습니다.
+                                        CSV에는 전체 계좌번호가 포함됩니다.
                                     </p>
                                 </div>
                                 {(selected.status === "DRAFT" ||
