@@ -258,104 +258,13 @@ jobs:
               run: npm run seed:dev
 
             # 아래는 전부 "무엇이 되는가" 가 아니라 **"무엇이 안 되는가"** 를 보는 테스트다.
-            - name: 결제·정산 스키마와 심사용 무기한 토큰 (#49 · #81)
-              run: npm run test:payments
-
-            - name: 환불 선점 · MFA · 원장 일회 기록 (#80)
-              run: |
-                  eval "$(supabase status -o env)"
-                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-admin-refund-execution.sql
-
-            - name: 동의 이력 불변성 (#58)
-              run: npm run test:agreements
-
-            - name: 서비스 수행 시각 무결성 (#55)
-              run: npm run test:service
-
-            - name: 예외 종료 청구·환불·완료 보류 (#185)
-              run: |
-                  eval "$(supabase status -o env)"
-                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-service-exception.sql
-
-            - name: 서비스 시간 · KST 자동 마감 경계 (#176)
-              run: |
-                  eval "$(supabase status -o env)"
-                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-service-hours.sql
-
-            - name: 자격·경력 증빙 · 비공개 열람 · 파기 큐 (#199)
-              run: |
-                  eval "$(supabase status -o env)"
-                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-partner-evidence.sql
-                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-evidence-retention.sql
-                  node --experimental-strip-types --no-warnings scripts/test-evidence-link-ttl.mjs
-
-            - name: 파트너 개인정보 3단계 경계 (#66 · #67)
-              run: npm run test:partner
-
-            - name: 오픈 이벤트 정원·결제·권한 경계 (#159)
-              run: |
-                  eval "$(supabase status -o env)"
-                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-opening-event.sql
-                  node --env-file=.env.local scripts/test-opening-event-concurrency.mjs
-                  node --experimental-strip-types --no-warnings scripts/test-opening-event-email.mjs
-
-            - name: 제공 후기 공개 범위·중복 등록 (#175)
-              run: |
-                  eval "$(supabase status -o env)"
-                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-imported-reviews.sql
-                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-confirmed-review-publication.sql
-
-            - name: 실제 이용자 후기 공개 동의·3년 만료·철회
-              run: |
-                  eval "$(supabase status -o env)"
-                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-review-publication-consent.sql
-                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-cancelled-transfer-retention.sql
-                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-public-applicant-ratings.sql
-
-            - name: 관리자 사고 거래 취소 권한·MFA·중복 차단 (#80)
-              run: |
-                  eval "$(supabase status -o env)"
-                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-admin-incident-cancel.sql
-
-            - name: 예외 종료 운영 판정·PG 확인·정산 보류 해제 (#185)
-              run: |
-                  node --experimental-strip-types --no-warnings scripts/test-exception-verification.mjs
-                  eval "$(supabase status -o env)"
-                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-exception-resolution.sql
-
-            - name: 관리자 권한·접근통제·접속기록 (#50)
-              run: npm run test:admin
-
-            - name: 예약 파트너 상세 · 공개 동의 · 경력 심사 (#173)
-              run: |
-                  eval "$(supabase status -o env)"
-                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-partner-details.sql
-
-            - name: 정산 계좌 열람 통제 (#51)
-              run: npm run test:payout
-
-            - name: 이메일 인증 연락처 변경 · 목적/대상/일회 소비 (#64)
-              run: |
-                  eval "$(supabase status -o env)"
-                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-partner-phone-email.sql
-
-            - name: 탈퇴 시 보존·파기 (#72)
-              run: npm run test:withdrawal
-
-            - name: 보유기간 만료 파기·legal hold·첨부 삭제 (#99)
-              run: npm run test:retention
-
-            # 재설정은 계정을 빼앗겼을 때 되찾는 경로다. "바꿔지는가" 보다
-            # **기존 세션이 죽는가** 가 핵심이고, 그건 GoTrue 의 동작이라
-            # 우리 코드 변경 없이도 사라질 수 있다. 여기서 못 박는다.
-            - name: 비밀번호 재설정·세션 실효 (#127)
-              run: npm run test:reset
-
-            # 개정 고지는 약관 제4조 ③ · 처리방침 제16조 ② 가 요구하는 절차다.
-            # 깨져도 화면은 멀쩡하고 개정이 실제로 일어나야 드러난다 — 그때는 늦다.
-            - name: 약관 재동의 안내·중복 방지 (#91)
-              run: npm run test:reconsent
-
+            # 목록·순서는 scripts/run-db-tests.mjs 한 곳에 있다 — 로컬도 같은 진입점을 쓴다 (#214).
+            # 묶음마다 로그 그룹으로 접히고, 실패한 묶음은 끝에 모아 보여준다.
+            #
             # ⚠️ test:nicepay · test:payapi 는 여기서 돌리지 않는다.
             #    NICEPAY 샌드박스 실호출이라 외부 의존이 생기고 키를 시크릿으로 넣어야 한다.
             #    PG 사고가 CI 실패로 둔갑하면 아무도 CI 를 믿지 않게 된다.
+            - name: DB 통합 테스트 (npm run test:db)
+              run: |
+                  eval "$(supabase status -o env)"
+                  DB_URL="$DB_URL" npm run test:db
