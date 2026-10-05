@@ -14,7 +14,7 @@ export function ServiceHero() {
                 <span className="bg-brand/10 text-brand inline-block rounded-full px-3 py-1 text-sm font-semibold">
                     서비스 소개
                 </span>
-                <h1 className="text-foreground mt-5 text-3xl leading-snug font-extrabold md:text-4xl md:leading-tight">
+                <h1 className="text-foreground mt-5 text-3xl leading-snug font-extrabold break-keep md:text-4xl md:leading-tight">
                     <span className="text-brand">함께가요</span>는 고객님이
                     <br />
                     신뢰할 수 있는 서비스를

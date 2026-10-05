@@ -17,7 +17,7 @@ export function HomeHero() {
                 <span className="bg-brand/10 text-brand inline-block rounded-full px-3 py-1 text-sm font-semibold">
                     전문 병원 동행 서비스
                 </span>
-                <h1 className="text-foreground mt-5 text-3xl leading-snug font-extrabold md:text-4xl md:leading-tight">
+                <h1 className="text-foreground mt-5 text-3xl leading-snug font-extrabold break-keep md:text-4xl md:leading-tight">
                     부모님의 병원 방문,
                     <br />
                     혼자 걱정하지 마세요
