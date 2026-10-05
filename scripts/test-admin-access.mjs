@@ -154,8 +154,8 @@ async function cleanup(adminId) {
 }
 
 /** 테스트용 관리자 계정을 만들고 2단계 인증까지 마친 클라이언트를 돌려준다 */
-async function makeVerifiedAdmin() {
-    const existing = await findUserByEmail(ADMIN_EMAIL);
+async function makeVerifiedAdmin(email = ADMIN_EMAIL) {
+    const existing = await findUserByEmail(email);
     let id;
     if (existing) {
         id = existing.id;
@@ -169,7 +169,7 @@ async function makeVerifiedAdmin() {
         }
     } else {
         const { data, error } = await admin.auth.admin.createUser({
-            email: ADMIN_EMAIL,
+            email,
             password: ADMIN_PASSWORD,
             email_confirm: true,
         });
@@ -181,7 +181,7 @@ async function makeVerifiedAdmin() {
         id,
         role: "ADMIN",
         name: "테스트관리자",
-        email: ADMIN_EMAIL,
+        email,
         status: "ACTIVE",
     });
 
@@ -190,7 +190,7 @@ async function makeVerifiedAdmin() {
         auth: { persistSession: false, autoRefreshToken: false },
     });
     const { error: sErr } = await client.auth.signInWithPassword({
-        email: ADMIN_EMAIL,
+        email,
         password: ADMIN_PASSWORD,
     });
     if (sErr) throw sErr;
@@ -661,7 +661,12 @@ async function main() {
         });
     }
 
-    const reapprovedSettlement = await adminClient.rpc(
+    const { id: approverId, client: approverClient } = await makeVerifiedAdmin(
+        "test-admin-approver-56@example.com",
+    );
+    await admin.from("admin_accounts").upsert({ profile_id: approverId, duty: "정산" });
+    await upgradeToAal2(approverClient);
+    const reapprovedSettlement = await approverClient.rpc(
         "admin_approve_settlements",
         {
             p_ids: [settlement.id],
@@ -669,13 +674,15 @@ async function main() {
         },
     );
     check("계좌 복구 후 정산 재승인", reapprovedSettlement.data === 1);
+    const approvalActor = await admin.from("settlements").select("approved_by").eq("id", settlement.id).single();
+    check("승인 RPC는 인증된 승인 담당자를 기록", approvalActor.data?.approved_by === approverId);
     await admin.from("payments").update({status: "FAILED"}).eq("id", paidFixtureId);
     const unpaidBatch = await adminClient.rpc("admin_create_transfer_batch", {
         p_ids: [settlement.id], p_reason: "TEST-177 승인 후 결제 상태 재검증",
     });
     check("승인된 정산도 결제가 PAID가 아니면 이체 배치 생성 차단", unpaidBatch.error?.code === "23514");
     await admin.from("payments").update({status: "PAID"}).eq("id", paidFixtureId);
-    const transferBatch = await adminClient.rpc("admin_create_transfer_batch", {
+    const transferBatch = await approverClient.rpc("admin_create_transfer_batch", {
         p_ids: [settlement.id],
         p_reason: "TEST-56 승인 정산 이체 배치 생성",
     });
@@ -706,7 +713,7 @@ async function main() {
         "활성 배치에 편입된 정산의 보류 차단",
         batchedHold.error?.code === "23514",
     );
-    const sameAdminIssue = await adminClient.rpc("admin_issue_transfer_file", {
+    const sameAdminIssue = await approverClient.rpc("admin_issue_transfer_file", {
         p_batch_id: transferBatch.data?.id,
         p_reason: "TEST-56 생성자 파일 발급 차단",
     });
@@ -714,11 +721,19 @@ async function main() {
         "배치 생성자는 이체 파일 발급 불가",
         sameAdminIssue.error?.code === "42501",
     );
-    // 두 번째 관리자 역할을 재현하기 위해 생성자만 다른 프로필로 바꾼다.
-    await admin
-        .from("transfer_batches")
-        .update({ created_by: partnerId })
-        .eq("id", transferBatch.data?.id);
+    // 생성자 분리와 별개로 승인자 검증이 적용되는지 확인한다.
+    await admin.from("transfer_batches").update({ created_by: adminId }).eq("id", transferBatch.data.id);
+    const approverFile = await approverClient.rpc("admin_issue_transfer_file", {
+        p_batch_id: transferBatch.data.id, p_reason: "TEST-56 승인자 파일 발급 차단",
+    });
+    check("생성자가 달라도 승인자는 이체 파일 발급 불가", approverFile.error?.message === "independent_approver_required");
+    await admin.from("transfer_batches").update({ created_by: approverId }).eq("id", transferBatch.data.id);
+    await admin.from("settlements").update({ approved_by: null }).eq("id", settlement.id);
+    const unknownApproverFile = await adminClient.rpc("admin_issue_transfer_file", {
+        p_batch_id: transferBatch.data.id, p_reason: "TEST-56 승인 이력 없는 정산 차단",
+    });
+    check("승인 담당자 불명 정산의 파일 발급 차단", unknownApproverFile.error?.message === "independent_approver_required");
+    await admin.from("settlements").update({ approved_by: approverId }).eq("id", settlement.id);
     await admin.from("payments").update({status: "FAILED"}).eq("id", paidFixtureId);
     const unpaidFile = await adminClient.rpc("admin_issue_transfer_file", {
         p_batch_id: transferBatch.data?.id, p_reason: "TEST-177 파일 반출 전 결제 검증",
@@ -769,10 +784,6 @@ async function main() {
     const unchangedDownload = await admin.from("transfer_batches").select("last_downloaded_at").eq("id",transferBatch.data.id).single();
     check("?? ?? ? ??? ??? CSV ????? ??", heldReissue.error?.code === "23514" && unchangedDownload.data?.last_downloaded_at === issuedBatch.data?.last_downloaded_at);
     await admin.from("settlements").update({ status: "APPROVED" }).eq("id", settlement.id);
-    await admin
-        .from("transfer_batches")
-        .update({ created_by: adminId })
-        .eq("id", transferBatch.data?.id);
     const transferItems = await adminClient.rpc(
         "admin_list_transfer_batch_items",
         { p_batch_id: transferBatch.data?.id },
@@ -787,6 +798,8 @@ async function main() {
     );
 
     const resultArgs = { p_batch_id: transferBatch.data.id, p_status: "COMPLETED", p_reference: "TEST-177 은행 결과 대조", p_reason: "TEST-177 전건 지급 성공 확인" };
+    const approverResult = await approverClient.rpc("admin_record_transfer_result", resultArgs);
+    check("승인 담당자는 지급 완료 기록 불가", approverResult.error?.message === "independent_approver_required");
     await admin.from("admin_accounts").update({ duty: "계정" }).eq("profile_id", adminId);
     const wrongTransferDuty = await adminClient.rpc("admin_record_transfer_result", resultArgs);
     check("계정 담당은 이체 결과 기록 차단", wrongTransferDuty.error?.code === "42501");
@@ -1759,6 +1772,8 @@ async function main() {
         await admin.from("care_recipients").delete().eq("id", seededCare.id);
     }
     await cleanup(adminId);
+    await cleanup(approverId);
+    await admin.auth.admin.deleteUser(approverId);
     await admin.auth.admin.deleteUser(adminId);
 
     const { data: leftovers } = await admin
