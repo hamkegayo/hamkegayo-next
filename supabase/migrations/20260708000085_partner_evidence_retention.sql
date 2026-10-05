@@ -82,9 +82,12 @@ for each row execute function public.cleanup_partner_evidence_retention();
 alter table public.partner_qualifications alter column path drop not null,
   alter column filename drop not null, alter column size drop not null;
 
+-- 스토리지 RLS용이지만 public 함수는 RPC로도 호출된다. 경로 소유자/심사 권한자 외에는
+-- 항상 false를 돌려 다른 파트너 파일의 만료·파기 여부를 알 수 없게 한다.
 create function public.partner_evidence_path_readable(p_path text) returns boolean
 language sql stable security definer set search_path='' as $$
   select p_path is not null
+    and ((storage.foldername(p_path))[1]=auth.uid()::text or coalesce(public.can_review_qualifications(),false))
     and not exists(select 1 from public.partner_evidence_deletions d where d.path=p_path)
     and not exists(
       select 1 from public.partner_evidence_retention r
@@ -95,7 +98,7 @@ language sql stable security definer set search_path='' as $$
     );
 $$;
 revoke all on function public.partner_evidence_path_readable(text) from public,anon;
-grant execute on function public.partner_evidence_path_readable(text) to authenticated,service_role;
+grant execute on function public.partner_evidence_path_readable(text) to authenticated;
 drop policy partner_qual_select_own on storage.objects;
 create policy partner_qual_select_own on storage.objects for select to authenticated using(
   bucket_id='partner-qualifications' and (storage.foldername(name))[1]=auth.uid()::text

@@ -49,6 +49,9 @@ select pg_temp.denied($q$select public.manage_partner_evidence_retention('000001
 select public.manage_partner_evidence_retention('00000199-0085-4000-8000-000000000012','HISTORY','appeal','test work appeal');
 update public.partner_evidence_retention set notified_at=now()-interval '30 days'+interval '1 second',expires_at=now()+interval '1 second' where item_id='00000199-0085-4000-8000-000000000010';
 select pg_temp.assert(public.partner_evidence_path_readable('00000199-0085-4000-8000-000000000001/evidence/q.pdf'),'one second before expiry readable');
+select set_config('request.jwt.claims','{"sub":"00000199-0085-4000-8000-000000000003","role":"authenticated","aal":"aal1"}',true);
+select pg_temp.assert(not public.partner_evidence_path_readable('00000199-0085-4000-8000-000000000001/evidence/q.pdf'),'foreign partner RPC learns nothing about another path');
+select set_config('request.jwt.claims','{"sub":"00000199-0085-4000-8000-000000000001","role":"authenticated","aal":"aal1"}',true);
 select * from public.list_partner_evidence_deletions();
 select pg_temp.assert(count(*)=3,'no original purged before deadline') from public.partner_evidence_files;
 update public.partner_evidence_retention set notified_at=now()-interval '30 days',expires_at=now();
