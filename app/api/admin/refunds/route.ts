@@ -7,7 +7,6 @@ import {
     verifyApprovedRefund,
 } from "@/lib/payments/approved-refund";
 import { reportIncident } from "@/lib/payments/incident";
-import { createNotification } from "@/lib/notifications";
 
 export async function POST(request: NextRequest) {
     if (request.headers.get("origin") !== request.nextUrl.origin)
@@ -138,23 +137,6 @@ export async function POST(request: NextRequest) {
             },
             { status: 409 },
         );
-    }
-    if (!recorded.data?.already) {
-        const req = await admin
-            .from("refund_requests")
-            .select("reservation_id,reservations!inner(customer_id)")
-            .eq("id", body.id)
-            .maybeSingle<{
-                reservation_id: string;
-                reservations: { customer_id: string };
-            }>();
-        if (req.data)
-            await createNotification(req.data.reservations.customer_id, {
-                type: "PAYMENT_REFUND",
-                title: "환불이 완료되었어요",
-                body: `${d.amount.toLocaleString()}원이 환불되었습니다. 결제수단에 따라 반영까지 며칠 걸릴 수 있습니다.`,
-                link: `/mypage/reservations/${req.data.reservation_id}`,
-            });
     }
     return NextResponse.json({
         ok: true,

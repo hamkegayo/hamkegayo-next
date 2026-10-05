@@ -7,7 +7,8 @@ create table public.refund_executions (
  balance_before integer not null check(balance_before>0),
  amount integer not null check(amount>0 and amount<=balance_before),
  pg_verified boolean not null default false,
- created_at timestamptz not null default now(), verified_at timestamptz
+ created_at timestamptz not null default now(), verified_at timestamptz,
+ notification_recorded_at timestamptz
 );
 alter table public.refund_executions enable row level security;
 revoke all on public.refund_executions from anon,authenticated;
@@ -58,12 +59,25 @@ end; $$;
 
 create function public.record_verified_refund(p_id uuid,p_balance integer,p_tid text,p_raw jsonb default null) returns jsonb
 language plpgsql security definer set search_path='' as $$
-declare x public.refund_executions; result jsonb;
+declare x public.refund_executions; result jsonb; recipient uuid; reservation uuid;
 begin
  select * into x from public.refund_executions where request_id=p_id for update;
  if x.request_id is null or p_tid is distinct from x.transaction_id or p_balance is distinct from x.balance_before-x.amount then raise exception 'pg_not_verified'; end if;
  update public.refund_executions set pg_verified=true,verified_at=coalesce(verified_at,now()) where request_id=p_id;
  result:=public.record_settlement_refund(p_id,p_raw);
+ -- 원장과 알림을 함께 커밋한다. already=true인 복구에도 누락된 알림을 적재한다.
+ -- 요청 행 잠금 + 기존 알림 중복키 + 기록 시각으로 재조회/동시 요청을 중복 없이 처리.
+ if x.notification_recorded_at is null then
+  select r.customer_id,r.id into recipient,reservation from public.refund_requests q
+    join public.reservations r on r.id=q.reservation_id where q.id=p_id;
+  if not found then raise exception 'notification_recipient_missing'; end if;
+  insert into public.notifications(recipient_id,type,title,body,link,dedupe_key)
+  values(recipient,'PAYMENT_REFUND','환불이 완료되었어요',
+    to_char(x.amount,'FM999,999,999,990')||'원이 환불되었습니다. 결제수단에 따라 반영까지 며칠 걸릴 수 있습니다.',
+    '/mypage/reservations/'||reservation::text,'settlement-refund-completed:'||p_id::text)
+  on conflict(recipient_id,dedupe_key) do nothing;
+  update public.refund_executions set notification_recorded_at=now() where request_id=p_id;
+ end if;
  insert into public.access_logs(actor_id,actor_role,action,target_table,target_id,reason)
  values(x.actor_id,'ADMIN','REFUND_EXECUTION_VERIFIED','refund_requests',p_id,x.reason);
  return result;

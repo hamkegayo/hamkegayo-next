@@ -26,8 +26,23 @@ select pg_temp.denied($q$select public.admin_claim_refund('00000079-0000-4000-80
 select pg_temp.denied($q$select public.record_verified_refund('00000079-0000-4000-8000-000000000007',40000,'test-tid')$q$);
 reset role;
 select pg_temp.denied($q$select public.record_verified_refund('00000079-0000-4000-8000-000000000007',30000,'test-tid')$q$);
+-- 알림 저장 실패 시 원장까지 롤백된다. PG 재취소 없이 같은 조회 결과로 복구한다.
+create function pg_temp.fail_refund_notification() returns trigger language plpgsql as $$ begin
+ if new.dedupe_key='settlement-refund-completed:00000079-0000-4000-8000-000000000007' then raise exception 'simulated notification failure'; end if;return new;end;$$;
+create trigger test_refund_notification_failure before insert on public.notifications for each row execute function pg_temp.fail_refund_notification();
+select pg_temp.denied($q$select public.record_verified_refund('00000079-0000-4000-8000-000000000007',40000,'test-tid')$q$);
+select pg_temp.assert(not exists(select 1 from public.payments where order_id='TEST-REFUND-PAY-S'),'notification failure rolls back refund ledger');
+select pg_temp.assert((select status='APPROVED' from public.refund_requests where id='00000079-0000-4000-8000-000000000007'),'failed notification remains recoverable');
+drop trigger test_refund_notification_failure on public.notifications;
 select public.record_verified_refund('00000079-0000-4000-8000-000000000007',40000,'test-tid');
 select public.record_verified_refund('00000079-0000-4000-8000-000000000007',40000,'test-tid');
+select pg_temp.assert((select count(*) from public.notifications where dedupe_key='settlement-refund-completed:00000079-0000-4000-8000-000000000007' and recipient_id='00000079-0000-4000-8000-000000000002')=1,'exactly one customer refund notification');
+-- 이전 원장 커밋 뒤 알림 누락과 같은 상태에서도 already=true 재조회가 복구한다.
+delete from public.notifications where dedupe_key='settlement-refund-completed:00000079-0000-4000-8000-000000000007';
+update public.refund_executions set notification_recorded_at=null where request_id='00000079-0000-4000-8000-000000000007';
+select pg_temp.assert((public.record_verified_refund('00000079-0000-4000-8000-000000000007',40000,'test-tid')->>'already')::boolean,'already committed refund still restores notification');
+select public.record_verified_refund('00000079-0000-4000-8000-000000000007',40000,'test-tid');
+select pg_temp.assert((select count(*) from public.notifications where dedupe_key='settlement-refund-completed:00000079-0000-4000-8000-000000000007')=1,'recovery notification remains unique');
 select pg_temp.assert((select count(*) from public.payments where order_id='TEST-REFUND-PAY-S')=1,'single refund ledger');
 select pg_temp.assert((select status='COMPLETED' from public.refund_requests where id='00000079-0000-4000-8000-000000000007'),'completed after PG verification');
 rollback;
