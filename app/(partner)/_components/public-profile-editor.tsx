@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import type { PartnerPublicProfile } from "@/lib/partner-details";
-import { COMPANY } from "@/lib/legal/company";
+import { PartnerEvidenceFiles } from "@/components/partner-evidence-files";
 import {
     deletePartnerWorkHistory,
     getPartnerPublicProfile,
@@ -36,8 +36,10 @@ const FIELDS = [
 
 export function PublicProfileEditor({
     initial,
+    evidenceEnabled = false,
 }: {
     initial: PartnerPublicProfile | null;
+    evidenceEnabled?: boolean;
 }) {
     const [profile, setProfile] = useState(initial);
     const [input, setInput] = useState(EMPTY);
@@ -132,17 +134,10 @@ export function PublicProfileEditor({
                     </div>
                     <h3 className="mt-6 font-bold">근무 병원·경력</h3>
                     <p className="text-muted-foreground mt-2 text-sm">
-                        실제 근무 이력을 등록하고 증빙을{" "}
-                        <a
-                            className="underline"
-                            href={`mailto:${COMPANY.email}`}
-                        >
-                            {COMPANY.email}
-                        </a>
-                        로 제출해 주세요. 담당자 김서현이 검증한 경력만
-                        공개합니다. 환자 정보 등 불필요한 개인정보는 제외해
-                        주세요. 수정이 필요하면 삭제 후 새로 등록하여 심사를
-                        받아 주세요.
+                        증빙은 아래 자격·경력 증빙 등록 화면에서 첨부해 주세요.
+                        담당자 김서현이 검증한 경력만 공개합니다. 환자 정보 등
+                        불필요한 개인정보는 제외해 주세요. 수정이 필요하면 삭제
+                        후 새로 등록하여 심사를 받아 주세요.
                     </p>
                     {profile.histories.length === 0 && (
                         <p className="text-muted-foreground mt-4 text-sm">
@@ -158,6 +153,11 @@ export function PublicProfileEditor({
                                 <div className="flex items-start justify-between gap-3">
                                     <p className="font-bold">
                                         {history.hospital}{" "}
+                                        <span className="text-muted-foreground text-xs">
+                                            {history.kind === "COMPANION"
+                                                ? "병원동행 경력"
+                                                : "의료기관 근무 경력"}
+                                        </span>{" "}
                                         <span className="text-brand text-xs">
                                             {history.status === "VERIFIED"
                                                 ? "관리자 검증 완료"
@@ -187,54 +187,62 @@ export function PublicProfileEditor({
                                 <p className="mt-2 text-sm break-words whitespace-pre-wrap">
                                     {history.duties}
                                 </p>
+                                <PartnerEvidenceFiles
+                                    id={history.id}
+                                    kind="HISTORY"
+                                />
                             </li>
                         ))}
                     </ul>
-                    <form
-                        className="mt-5 space-y-3"
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            run(
-                                () => submitPartnerWorkHistory(input),
-                                "경력을 등록했습니다. 관리자 검증 후 공개됩니다.",
-                                true,
-                            );
-                        }}
-                    >
-                        {FIELDS.map((field) => (
-                            <label
-                                key={field.key}
-                                className="block text-sm font-semibold"
-                            >
-                                {field.label}
-                                <input
-                                    required
-                                    disabled={pending}
-                                    maxLength={field.max}
-                                    placeholder={field.placeholder}
-                                    value={input[field.key]}
-                                    onChange={(event) =>
-                                        setInput((previous) => ({
-                                            ...previous,
-                                            [field.key]: event.target.value,
-                                        }))
-                                    }
-                                    className="border-input bg-background mt-1 w-full rounded-lg border p-3 font-normal"
-                                />
-                            </label>
-                        ))}
-                        <button
-                            type="submit"
-                            disabled={pending || profile.histories.length >= 20}
-                            className="bg-brand text-brand-foreground rounded-lg px-5 py-2.5 font-bold disabled:opacity-50"
+                    {!evidenceEnabled && (
+                        <form
+                            className="mt-5 space-y-3"
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                run(
+                                    () => submitPartnerWorkHistory(input),
+                                    "경력을 등록했습니다. 관리자 검증 후 공개됩니다.",
+                                    true,
+                                );
+                            }}
                         >
-                            {pending ? "저장 중…" : "경력 등록"}
-                        </button>
-                        <p className="text-muted-foreground text-xs">
-                            최대 20개까지 등록할 수 있습니다. 개인정보나 환자
-                            정보를 입력하지 마세요.
-                        </p>
-                    </form>
+                            {FIELDS.map((field) => (
+                                <label
+                                    key={field.key}
+                                    className="block text-sm font-semibold"
+                                >
+                                    {field.label}
+                                    <input
+                                        required
+                                        disabled={pending}
+                                        maxLength={field.max}
+                                        placeholder={field.placeholder}
+                                        value={input[field.key]}
+                                        onChange={(event) =>
+                                            setInput((previous) => ({
+                                                ...previous,
+                                                [field.key]: event.target.value,
+                                            }))
+                                        }
+                                        className="border-input bg-background mt-1 w-full rounded-lg border p-3 font-normal"
+                                    />
+                                </label>
+                            ))}
+                            <button
+                                type="submit"
+                                disabled={
+                                    pending || profile.histories.length >= 20
+                                }
+                                className="bg-brand text-brand-foreground rounded-lg px-5 py-2.5 font-bold disabled:opacity-50"
+                            >
+                                {pending ? "저장 중…" : "경력 등록"}
+                            </button>
+                            <p className="text-muted-foreground text-xs">
+                                최대 20개까지 등록할 수 있습니다. 개인정보나
+                                환자 정보를 입력하지 마세요.
+                            </p>
+                        </form>
+                    )}
                 </>
             )}
         </section>

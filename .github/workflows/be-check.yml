@@ -49,6 +49,9 @@ jobs:
             - name: 운영키 조회 검증 스크립트 테스트 (모의 응답만 사용)
               run: npm run test:nicepay-live-check
 
+            - name: 자격·경력 증빙 파일 형식 (#199)
+              run: node --experimental-strip-types --no-warnings scripts/test-partner-evidence.mjs
+
             - name: 이벤트 팝업 시안 스테이징 환경 제한
               run: node --experimental-strip-types --no-warnings scripts/test-opening-event-popup-preview.mjs
 
@@ -291,6 +294,11 @@ jobs:
 
             - name: 정산 계좌 열람 통제 (#51)
               run: npm run test:payout
+
+            - name: 자격·경력 증빙 · 비공개 열람 · 파기 큐 (#199)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-partner-evidence.sql
 
             - name: 탈퇴 시 보존·파기 (#72)
               run: npm run test:withdrawal
