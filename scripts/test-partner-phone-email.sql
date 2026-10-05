@@ -1,0 +1,34 @@
+begin;
+create function pg_temp.assert(ok boolean, label text) returns void language plpgsql as $$
+begin if ok is distinct from true then raise exception 'FAIL: %',label; end if; raise notice 'PASS: %',label; end; $$;
+insert into auth.users(id,email) values ('00000064-0000-4000-8000-000000000001','phone-test@example.invalid');
+insert into public.profiles(id,name,role,email,phone) values ('00000064-0000-4000-8000-000000000001','Phone Test','PARTNER','phone-test@example.invalid','01011111111');
+insert into public.partner_accounts(profile_id,login_id) values ('00000064-0000-4000-8000-000000000001','phone-test-64');
+select pg_temp.assert(not (public.request_partner_phone_change('00000064-0000-4000-8000-000000000001','01022222222',repeat('a',64))->>'ok')::boolean,'unverified email denied');
+insert into public.email_verifications(email,code_hash,expires_at,consumed_at) values ('phone-test@example.invalid',repeat('b',64),now(),now());
+select public.request_partner_phone_change('00000064-0000-4000-8000-000000000001','01022222222',repeat('a',64));
+select pg_temp.assert(not (public.request_partner_phone_change('00000064-0000-4000-8000-000000000001','01022222222',repeat('a',64))->>'ok')::boolean,'resend cooldown');
+do $$ declare v uuid; r jsonb; begin
+ select id into v from public.partner_phone_changes where partner_id='00000064-0000-4000-8000-000000000001';
+ r:=public.verify_partner_phone_change('00000064-0000-4000-8000-000000000002',v,'01022222222',repeat('a',64));
+ perform pg_temp.assert(not (r->>'ok')::boolean,'another actor denied');
+ r:=public.verify_partner_phone_change('00000064-0000-4000-8000-000000000001',v,'01033333333',repeat('a',64));
+ perform pg_temp.assert(not (r->>'ok')::boolean,'changed target denied');
+ r:=public.verify_partner_phone_change('00000064-0000-4000-8000-000000000001',v,'01022222222',repeat('b',64));
+ perform pg_temp.assert(not (r->>'ok')::boolean,'wrong code denied');
+ r:=public.verify_partner_phone_change('00000064-0000-4000-8000-000000000001',v,'01022222222',repeat('a',64));
+ perform pg_temp.assert((r->>'ok')::boolean,'valid code changes phone');
+ r:=public.verify_partner_phone_change('00000064-0000-4000-8000-000000000001',v,'01022222222',repeat('a',64));
+ perform pg_temp.assert(not (r->>'ok')::boolean,'replay denied');
+end $$;
+select pg_temp.assert(phone='01022222222' and phone_verified_at is null,'not marked phone ownership verified') from public.profiles where id='00000064-0000-4000-8000-000000000001';
+select pg_temp.assert(not has_function_privilege('authenticated','public.verify_partner_phone_change(uuid,uuid,text,text)','EXECUTE'),'browser RPC access denied');
+select pg_temp.assert(not has_table_privilege('authenticated','public.partner_phone_changes','SELECT'),'browser OTP read denied');
+update public.partner_phone_changes set consumed_at=null, expires_at=now()-interval '1 second';
+select pg_temp.assert(not (public.verify_partner_phone_change(partner_id,id,phone,repeat('a',64))->>'ok')::boolean,'expired denied') from public.partner_phone_changes;
+update public.partner_phone_changes set expires_at=now()+interval '5 minutes', attempts=5;
+select pg_temp.assert(not (public.verify_partner_phone_change(partner_id,id,phone,repeat('a',64))->>'ok')::boolean,'attempt limit denied') from public.partner_phone_changes;
+update public.partner_phone_changes set attempts=0;
+update public.profiles set email='changed@example.invalid' where id='00000064-0000-4000-8000-000000000001';
+select pg_temp.assert(not (public.verify_partner_phone_change(partner_id,id,phone,repeat('a',64))->>'ok')::boolean,'email change invalidates challenge') from public.partner_phone_changes;
+rollback;

@@ -44,12 +44,14 @@ import {
 import { ProfilePhotoModal } from "../../_components/profile-photo-modal";
 import { SimpleAddModal } from "../../_components/simple-add-modal";
 import { VerifyChangeModal } from "../../_components/verify-change-modal";
+import { PhoneChangeModal } from "../../_components/phone-change-modal";
 import {
     QualificationAddModal,
     type QualificationInput,
 } from "../../_components/qualification-add-modal";
 import { ProfilePreviewModal } from "../../_components/profile-preview-modal";
 import { COMPANY } from "@/lib/legal/company";
+import { PartnerEvidenceFiles } from "@/components/partner-evidence-files";
 
 const QUAL_ICON: Record<QualificationIcon, LucideIcon> = {
     license: IdCard,
@@ -149,6 +151,8 @@ export function PartnerProfileView({
     initialBasicInfo: PartnerBasicInfo;
 }) {
     const [email, setEmail] = useState(initialBasicInfo.email);
+    const [phone, setPhone] = useState(initialBasicInfo.phone);
+    const [phoneOpen, setPhoneOpen] = useState(false);
     const [intro, setIntro] = useState(initialBasicInfo.intro);
     const [savedIntro, setSavedIntro] = useState(initialBasicInfo.intro);
     const [basicInfoPending, startBasicInfoTransition] = useTransition();
@@ -281,9 +285,9 @@ export function PartnerProfileView({
     };
 
     const roleLine = "병원 동행 파트너";
-    const verificationRows = PARTNER_PROFILE.verification.map((row) =>
-        row.label === "이름" ? { ...row, value: initialBasicInfo.name } : row,
-    );
+    const verificationRows = quals
+        .filter((q) => !q.pending)
+        .map((q) => ({ label: "인증 자격", value: q.title }));
 
     return (
         <div className="pb-24">
@@ -370,26 +374,42 @@ export function PartnerProfileView({
                         hint="(수정 가능)"
                         className="h-full"
                     >
+                        <dl className="mb-4 space-y-2 text-sm">
+                            <div>
+                                <dt className="text-muted-foreground">이름</dt>
+                                <dd className="font-bold">
+                                    {initialBasicInfo.name ||
+                                        "등록된 정보 없음"}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-muted-foreground">
+                                    생년월일
+                                </dt>
+                                <dd>등록된 정보 없음</dd>
+                            </div>
+                        </dl>
                         <label className="text-foreground text-sm font-bold">
                             연락처 <span className="text-destructive">*</span>
                         </label>
                         <div className="mt-1.5 flex gap-2">
                             <input
                                 type="tel"
-                                value={initialBasicInfo.phone}
+                                value={phone}
                                 readOnly
                                 className="border-input bg-muted text-muted-foreground min-w-0 flex-1 rounded-lg border px-3.5 py-2.5 text-sm outline-none"
                             />
                             <button
                                 type="button"
-                                disabled
+                                onClick={() => setPhoneOpen(true)}
                                 className="border-border bg-muted text-muted-foreground shrink-0 rounded-lg border px-3.5 text-sm font-bold"
                             >
-                                준비 중
+                                이메일 인증 변경
                             </button>
                         </div>
                         <p className="text-muted-foreground mt-1.5 text-xs font-medium">
-                            휴대폰 인증 연동 후 변경할 수 있습니다.
+                            등록된 연락용 이메일 인증 후 변경합니다. 휴대폰 소유
+                            인증은 아닙니다.
                         </p>
 
                         <label className="text-foreground mt-4 block text-sm font-bold">
@@ -444,9 +464,14 @@ export function PartnerProfileView({
                         className="h-full"
                     >
                         <dl className="divide-border divide-y">
+                            {verificationRows.length === 0 && (
+                                <p className="text-muted-foreground text-sm">
+                                    인증 완료된 자격 없음
+                                </p>
+                            )}
                             {verificationRows.map((row) => (
                                 <div
-                                    key={row.label}
+                                    key={row.value}
                                     className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                                 >
                                     <dt className="text-muted-foreground shrink-0 text-sm">
@@ -587,6 +612,10 @@ export function PartnerProfileView({
                                         <p className="text-muted-foreground truncate text-xs">
                                             {q.detail}
                                         </p>
+                                        <PartnerEvidenceFiles
+                                            id={q.id}
+                                            kind="QUALIFICATION"
+                                        />
                                     </div>
                                     {q.pending ? (
                                         <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-600 dark:bg-amber-500/15">
@@ -634,6 +663,11 @@ export function PartnerProfileView({
             </div>
 
             {/* 모달 */}
+            <PhoneChangeModal
+                open={phoneOpen}
+                onClose={() => setPhoneOpen(false)}
+                onChanged={setPhone}
+            />
             <VerifyChangeModal
                 open={emailOpen}
                 onClose={() => setEmailOpen(false)}

@@ -18,7 +18,7 @@ export async function getPartnerPublicProfile(): Promise<PartnerPublicProfile | 
             .maybeSingle(),
         supabase
             .from("partner_work_histories")
-            .select("id, hospital, period, department, duties, status")
+            .select("id, hospital, period, department, duties, status, kind")
             .eq("partner_id", user.id)
             .order("created_at", { ascending: false }),
         supabase.rpc("partner_public_details_enabled"),

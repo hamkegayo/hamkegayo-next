@@ -4,6 +4,7 @@ export type WorkHistory = {
     period: string;
     department: string;
     duties: string;
+    kind?: "MEDICAL" | "COMPANION";
 };
 
 export type PartnerDetail = {

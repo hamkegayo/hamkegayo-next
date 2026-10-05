@@ -96,10 +96,39 @@ export async function GET(request: NextRequest) {
         );
     }
 
+    const evidenceQueue = await admin.rpc("list_partner_evidence_deletions");
+    if (evidenceQueue.error)
+        return NextResponse.json(
+            { ok: false, error: "증빙 파기 대기 목록 조회 실패" },
+            { status: 500 },
+        );
+    const evidencePaths = (evidenceQueue.data ?? []).map(
+        (row: { path: string }) => row.path,
+    );
+    if (evidencePaths.length) {
+        const deleted = await admin.storage
+            .from("partner-qualifications")
+            .remove(evidencePaths);
+        if (deleted.error)
+            return NextResponse.json(
+                { ok: false, error: "증빙 파일 파기 실패" },
+                { status: 500 },
+            );
+        const confirmed = await admin
+            .from("partner_evidence_deletions")
+            .delete()
+            .in("path", evidencePaths);
+        if (confirmed.error)
+            return NextResponse.json(
+                { ok: false, error: "증빙 파기 결과 기록 실패" },
+                { status: 500 },
+            );
+    }
     return NextResponse.json({
         ok: true,
         expired: data ?? 0,
         attachmentsPurged,
+        evidenceFilesPurged: evidencePaths.length,
         retention,
         at: new Date().toISOString(),
     });
