@@ -16,6 +16,7 @@ export const E2E_PAYMENT = {
 export default defineConfig({
     testDir: "./e2e",
     globalSetup: "./e2e/support/global-setup.ts",
+    globalTeardown: "./e2e/support/global-teardown.ts",
     // 여러 역할이 같은 예약을 순서대로 다루므로 직렬로 실행한다.
     fullyParallel: false,
     workers: 1,

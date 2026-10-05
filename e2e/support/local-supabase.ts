@@ -52,3 +52,35 @@ export async function resetAdminMfa(email: string) {
         });
     }
 }
+
+/**
+ * 테스트가 만든 예약(병원명 접두사)과 연결 데이터를 지운다.
+ *
+ * 예약에는 이용자 생년월일·연락처·진료 목적이 들어가므로 상태만 바꿔 남기지 않는다.
+ * 결제·서비스·지원 기록은 FK cascade 로 함께 지워지고, 예약 링크를 가진 알림은 직접 지운다.
+ * 관리자 접속기록은 감사 기록이며 특정 예약을 가리키지 않으므로 남긴다.
+ */
+export async function deleteE2eReservations(hospitalPrefix: string) {
+    const admin = localSupabaseAdmin();
+    const { data, error } = await admin
+        .from("reservations")
+        .select("id")
+        .like("hospital_name", `${hospitalPrefix}%`);
+    if (error) throw error;
+    const ids = (data ?? []).map((r) => r.id as string);
+    if (ids.length === 0) return 0;
+
+    for (const id of ids) {
+        const { error: nErr } = await admin
+            .from("notifications")
+            .delete()
+            .like("link", `%${id}%`);
+        if (nErr) throw nErr;
+    }
+    const { error: rErr } = await admin
+        .from("reservations")
+        .delete()
+        .in("id", ids);
+    if (rErr) throw rErr;
+    return ids.length;
+}

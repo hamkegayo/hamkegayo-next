@@ -110,7 +110,7 @@ npx playwright test --ui          # 단계별로 보며 디버깅
 
 - **결제는 모의 PG로만 처리합니다.** 결제창 SDK는 Playwright가 모의 스크립트로 바꾸고([`nicepay-sdk.ts`](../e2e/support/nicepay-sdk.ts)), 서버의 승인·조회·취소 호출은 `NICEPAY_API_BASE_URL`로 로컬 모의 서버([`mock-nicepay.mjs`](../e2e/support/mock-nicepay.mjs))에 보냅니다. 이 재지정은 **샌드박스 키 + 루프백 주소일 때만** 적용되어 운영에서는 무시됩니다. 서명·금액 검증과 결제 확정 RPC는 실제 코드 그대로 실행됩니다.
 - 관리자 로그인은 매번 기존 인증기를 지우고, 화면에 표시된 키로 TOTP를 계산해 등록합니다([`totp.ts`](../e2e/support/totp.ts)).
-- 실행 전에 이전 실행이 남긴 예약(병원명 `E2E병원*`)을 취소합니다. 같은 파트너의 일정이 겹치면 선택이 거절되기 때문입니다.
+- 테스트 예약(병원명 `E2E병원*`)에는 이용자 생년월일·연락처·진료 목적이 들어가므로, **실행이 끝나면(global teardown) 예약과 결제·서비스·지원 기록·예약 알림을 삭제**합니다. 중단된 실행이 남긴 예약도 시작할 때(global setup) 지웁니다. 남아 있으면 같은 파트너의 일정이 겹쳐 선택이 거절되기도 합니다.
 - 로컬 Supabase(`127.0.0.1`/`localhost`)가 아니면 실행을 거부합니다.
 - CI에서 실패하면 Actions의 `playwright-report` 아티팩트에서 스크린샷과 트레이스를 확인합니다(`npx playwright show-trace`).
 - 시간이 오래 걸리고 외부 상태에 민감하므로, E2E는 **핵심 흐름에만** 추가합니다. 화면 하나의 세부 동작은 단위·DB 테스트로 검증합니다.
