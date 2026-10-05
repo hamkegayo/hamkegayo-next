@@ -28,11 +28,23 @@ export default function PartnerEvidenceNoticePage() {
                 파기와 별도로 파트너 활동 중 필요한 기간 유지합니다.
             </p>
             <p>
-                이의신청은 My 프로필의 해당 자료에서 접수하거나 고객센터에
-                문의해 주세요. 자료 또는 계정 삭제 시 파일은 파기 대기 목록에
+                이의신청은 My 프로필의 해당 자료에서 접수하거나 아래 문의처로
+                연락해 주세요. 자료 또는 계정 삭제 시 파일은 파기 대기 목록에
                 등록하며, 저장에 연결되지 않은 파일은 하루 뒤 파기 대상입니다.
-                열람·정정·삭제 요청은 {COMPANY.email} 또는 {COMPANY.tel}로
-                접수할 수 있습니다.
+                이의신청과 열람·정정·삭제·동의 철회 요청은 이메일{" "}
+                <a href={`mailto:${COMPANY.email}`} className="underline">
+                    {COMPANY.email}
+                </a>{" "}
+                또는{" "}
+                <a
+                    href={COMPANY.kakaoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                >
+                    카카오톡 채널({COMPANY.kakao})
+                </a>
+                로 접수할 수 있습니다.
             </p>
             <p>
                 주민등록번호 뒷자리·주소는 가리고 환자·이용자 정보를 제출하지
