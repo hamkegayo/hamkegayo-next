@@ -129,7 +129,6 @@ check(
     "future weekend has all slots",
     timeOptionsFor("2026-10-10").length === 25,
 );
-mock.timers.reset();
 for (const [time, duration, valid] of [
     ["17:00", 120, true],
     ["17:30", 120, false],
@@ -168,4 +167,5 @@ check(
         reserveTime: "18:00",
     }).success,
 );
+mock.timers.reset();
 console.log(`${passed} checks passed`);
