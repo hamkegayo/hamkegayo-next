@@ -1,66 +1,54 @@
-import Image from "next/image";
 import Link from "next/link";
 
 import { NonMedicalNotice } from "@/components/non-medical-notice";
 import { COMPANY } from "@/lib/legal/company";
 import { SERVICE_HOURS_LABEL } from "@/lib/service-hours";
 import { ContactLink } from "./contact-link";
-import { Section } from "./section";
+import { PublicHero } from "./public-hero";
 
 export function HomeHero() {
     return (
-        <Section className="md:py-16">
-            <div className="grid items-center gap-12 md:grid-cols-[1fr_1.4fr] md:gap-16">
-                {/* 텍스트 */}
-                <div>
-                    <span className="bg-brand/10 text-brand inline-block rounded-full px-3 py-1 text-sm font-semibold">
-                        전문 병원 동행 서비스
-                    </span>
-                    <h1 className="text-foreground mt-5 text-3xl leading-snug font-extrabold md:text-4xl md:leading-tight">
-                        부모님의 병원 방문,
-                        <br />
-                        혼자 걱정하지 마세요
-                        <br />
-                        <span className="text-brand">함께가요</span>
-                    </h1>
-                    <p className="text-description-foreground mt-5 leading-relaxed">
-                        병원까지 이동, 접수, 대기, 귀가까지
-                        <br />
-                        전문 동행 파트너가 끝까지 함께합니다.
-                    </p>
-                    <div className="mt-8 flex flex-wrap gap-3">
-                        <Link
-                            href="/reservation"
-                            className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-6 py-3 text-sm font-bold transition-colors"
-                        >
-                            서비스 예약하기
-                        </Link>
-                        <ContactLink
-                            href={`tel:${COMPANY.tel}`}
-                            method="phone"
-                            className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-6 py-3 text-sm font-bold transition-colors"
-                        >
-                            전화 상담하기
-                        </ContactLink>
-                    </div>
-                    <p className="text-description-foreground mt-5 text-sm leading-relaxed">
-                        서비스 제공시간: {SERVICE_HOURS_LABEL}
-                    </p>
-                    <NonMedicalNotice className="mt-6 max-w-md" />
+        <PublicHero
+            image="/user/main-hero.png"
+            alt="병원 대기실에서 동행 파트너와 대화하는 어르신"
+        >
+            {/* 텍스트 */}
+            <div>
+                <span className="bg-brand/10 text-brand inline-block rounded-full px-3 py-1 text-sm font-semibold">
+                    전문 병원 동행 서비스
+                </span>
+                <h1 className="text-foreground mt-5 text-3xl leading-snug font-extrabold break-keep md:text-4xl md:leading-tight">
+                    부모님의 병원 방문,
+                    <br />
+                    혼자 걱정하지 마세요
+                    <br />
+                    <span className="text-brand">함께가요</span>
+                </h1>
+                <p className="text-description-foreground mt-5 leading-relaxed">
+                    병원까지 이동, 접수, 대기, 귀가까지
+                    <br />
+                    전문 동행 파트너가 끝까지 함께합니다.
+                </p>
+                <div className="mt-8 flex flex-wrap gap-3">
+                    <Link
+                        href="/reservation"
+                        className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-6 py-3 text-sm font-bold transition-colors"
+                    >
+                        서비스 예약하기
+                    </Link>
+                    <ContactLink
+                        href={`tel:${COMPANY.tel}`}
+                        method="phone"
+                        className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-6 py-3 text-sm font-bold transition-colors"
+                    >
+                        전화 상담하기
+                    </ContactLink>
                 </div>
-
-                {/* 이미지 */}
-                <div className="relative aspect-[535/415] overflow-hidden rounded-3xl">
-                    <Image
-                        src="/user/main-hero.png"
-                        alt="병원 대기실에서 동행 파트너와 대화하는 어르신"
-                        fill
-                        sizes="(min-width: 768px) 58vw, 100vw"
-                        priority
-                        className="object-cover object-right"
-                    />
-                </div>
+                <p className="text-description-foreground mt-5 text-sm leading-relaxed">
+                    서비스 제공시간: {SERVICE_HOURS_LABEL}
+                </p>
+                <NonMedicalNotice className="mt-6 max-w-md" />
             </div>
-        </Section>
+        </PublicHero>
     );
 }
