@@ -408,13 +408,25 @@ export function ServiceDetailView({
                             : "정산 금액"}
                     </p>
                     <p className="text-brand mt-1 text-3xl font-extrabold">
-                        {item.amount.toLocaleString()}원
+                        {item.exceptionPending
+                            ? "운영 확인 대기"
+                            : `${item.amount.toLocaleString()}원`}
                     </p>
                     <p className="text-muted-foreground text-xs">
-                        {item.durationLabel} 기준 · 수수료 차감 후
-                        {item.surcharged ? " · 주말·공휴일 할증 적용" : ""}
+                        {item.exceptionResolved ? (
+                            "실제 제공 내용에 따른 운영 판정 금액"
+                        ) : item.exceptionPending ? (
+                            "판정 및 결제 확인 후 확정"
+                        ) : (
+                            <>
+                                {item.durationLabel} 기준 · 수수료 차감 후
+                                {item.surcharged
+                                    ? " · 주말·공휴일 할증 적용"
+                                    : ""}
+                            </>
+                        )}
                     </p>
-                    {item.amountProvisional && (
+                    {item.amountProvisional && !item.exceptionPending && (
                         <p className="text-muted-foreground text-xs">
                             (실제 이용시간에 따라 종료 후 확정)
                         </p>

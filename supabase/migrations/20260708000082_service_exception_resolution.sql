@@ -100,8 +100,8 @@ begin
  select coalesce(sum(gross_amount-discount_amount),0)::integer into cash from public.payments
   where reservation_id=s.reservation_id and status='PAID';
  if cash<0 then raise exception 'invalid_cash'; end if;
- if p_restore and (not exists(select 1 from public.opening_event_claims cl join public.payments p on p.id=cl.payment_id
-    where cl.reservation_id=s.reservation_id and cl.state='USED' and p.type='BASE' and p.status='PAID')
+ if p_restore and (not exists(select 1 from public.opening_event_claims cl join public.payments pay on pay.id=cl.payment_id
+    where cl.reservation_id=s.reservation_id and cl.state='USED' and pay.type='BASE' and pay.status='PAID')
    or exists(select 1 from public.opening_campaign where id and closed_at is not null))
   then raise exception 'benefit_not_restorable'; end if;
  if p_decision='UNAVAILABLE' and not p_restore and exists(select 1 from public.opening_event_claims
@@ -173,7 +173,7 @@ grant execute on function public.exception_extension_allowed(uuid) to service_ro
 -- 호출자는 PG 조회 결과만 전달하는 서버. 고객 브라우저의 완료 주장으로 해제하지 않는다.
 create function public.record_service_exception_resolution(p_service uuid,p_actor uuid,p_verified jsonb)
 returns void language plpgsql security definer set search_path='' as $$
-declare s public.services; d public.service_exception_resolutions; t record; v jsonb;
+declare s public.services; d public.service_exception_resolutions; tx record; v jsonb;
  base_id uuid; refunded integer; net_cash integer; customer uuid;
 begin
  if not exists(select 1 from public.profiles p join public.admin_accounts a on a.profile_id=p.id
@@ -196,23 +196,23 @@ begin
   or exists(select 1 from public.refund_requests where reservation_id=s.reservation_id)
   or exists(select 1 from public.settlements where service_id=s.id)
   then raise exception 'financial_state_changed'; end if;
- for t in select x.*,p.order_id,p.transaction_id,p.gross_amount,p.discount_amount,p.status,p.type
+ for tx in select x.*,p.order_id,p.transaction_id,p.gross_amount,p.discount_amount,p.status,p.type
   from public.service_exception_transactions x join public.payments p on p.id=x.payment_id where x.service_id=s.id loop
-  select value into v from jsonb_array_elements(p_verified) where value->>'paymentId'=t.payment_id::text;
-  if v is null or t.status<>'PAID' or t.gross_amount-t.discount_amount<>t.cash
-   or v->>'orderId' is distinct from t.order_id
-   or v->>'transactionId' is distinct from t.transaction_id
-   or (v->>'cash')::integer is distinct from t.cash
-   or (v->>'balance')::integer is distinct from t.target_balance
+  select value into v from jsonb_array_elements(p_verified) where value->>'paymentId'=tx.payment_id::text;
+  if v is null or tx.status<>'PAID' or tx.gross_amount-tx.discount_amount<>tx.cash
+   or v->>'orderId' is distinct from tx.order_id
+   or v->>'transactionId' is distinct from tx.transaction_id
+   or (v->>'cash')::integer is distinct from tx.cash
+   or (v->>'balance')::integer is distinct from tx.target_balance
    then raise exception 'pg_verification_mismatch'; end if;
  end loop;
  -- 보류 해제·환불 원장·최종 정산·완료·알림을 하나의 트랜잭션에서 처리한다.
  update public.service_exception_resolutions set resolved_at=now(),resolved_by=p_actor where service_id=s.id;
- for t in select x.*,p.reservation_id from public.service_exception_transactions x join public.payments p on p.id=x.payment_id where x.service_id=s.id loop
-  refunded:=t.cash-t.target_balance;
+ for tx in select x.*,p.reservation_id from public.service_exception_transactions x join public.payments p on p.id=x.payment_id where x.service_id=s.id loop
+  refunded:=tx.cash-tx.target_balance;
   if refunded>0 then
    insert into public.payments(reservation_id,type,status,order_id,gross_amount,discount_amount,commission_amount,payout_amount,paid_at)
-    values(s.reservation_id,'REFUND','PAID','EX-'||t.payment_id::text,-refunded,0,-refunded,0,now());
+    values(s.reservation_id,'REFUND','PAID','EX-'||tx.payment_id::text,-refunded,0,-refunded,0,now());
   end if;
  end loop;
  select payment_id into base_id from public.service_exception_transactions t join public.payments p on p.id=t.payment_id
