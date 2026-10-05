@@ -118,7 +118,7 @@ async function signPartnerAvatars(
 /**
  * 예약의 ACCEPTED 지원 파트너 상세 목록.
  *  - get_reservation_applicants RPC(소유권 내부 검증)로 지원자 조회
- *  - reviews(공개 읽기)로 평점 집계
+ *  - get_reservation_applicant_ratings로 동의가 유효한 공개 후기만 집계
  *  - partner_qualifications(본인만 RLS)는 admin 으로 조회(RPC가 검증한 partner_id 한정, VERIFIED만)
  *  - 프로필 사진도 같은 이유(profiles 는 select_own)로 admin 으로 경로를 읽고
  *    비공개 버킷의 signed URL 을 발급해 내려준다.
@@ -145,20 +145,28 @@ export async function getReservationApplicantsDetailed(
 
         const partnerIds = list.map((a) => a.partner_id);
 
-        // 평점 집계 (reviews 공개 읽기)
-        const { data: reviews } = await supabase
-            .from("reviews")
-            .select("partner_id, rating")
-            .in("partner_id", partnerIds)
-            .returns<{ partner_id: string; rating: number }[]>();
-
-        const ratingMap = new Map<string, { sum: number; count: number }>();
-        (reviews ?? []).forEach((r) => {
-            const cur = ratingMap.get(r.partner_id) ?? { sum: 0, count: 0 };
-            cur.sum += r.rating;
-            cur.count += 1;
-            ratingMap.set(r.partner_id, cur);
-        });
+        // 원문 RLS를 우회하지 않고 공개 동의·만료·철회를 적용한다 (#190).
+        const { data: ratings, error: ratingError } = await supabase.rpc(
+            "get_reservation_applicant_ratings",
+            { p_reservation_id: reservationId },
+        );
+        if (ratingError) throw ratingError;
+        const ratingMap = new Map<
+            string,
+            { rating: number | null; count: number }
+        >();
+        (ratings ?? []).forEach(
+            (r: {
+                partner_id: string;
+                rating: number | null;
+                review_count: number;
+            }) => {
+                ratingMap.set(r.partner_id, {
+                    rating: r.rating == null ? null : Number(r.rating),
+                    count: Number(r.review_count),
+                });
+            },
+        );
 
         // 자격/면허 (본인만 RLS → admin 으로 조회, VERIFIED만)
         const admin = createAdminClient();
@@ -187,7 +195,7 @@ export async function getReservationApplicantsDetailed(
                 partnerId: a.partner_id,
                 name: a.partner_name,
                 appliedAtLabel: formatAppliedAt(a.applied_at),
-                rating: r && r.count > 0 ? r.sum / r.count : null,
+                rating: r?.rating ?? null,
                 reviewCount: r?.count ?? 0,
                 qualifications: qualMap.get(a.partner_id) ?? [],
                 avatarUrl: avatarMap.get(a.partner_id) ?? null,
