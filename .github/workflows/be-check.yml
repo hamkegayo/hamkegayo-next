@@ -61,6 +61,9 @@ jobs:
             - name: FAQ 문답·공통 참조·검색 (#178)
               run: node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs scripts/test-faq-content.mjs
 
+            - name: 관리자 사고 거래 취소 모의 PG 검증 (#80)
+              run: node --experimental-strip-types --no-warnings scripts/test-incident-cancel.mjs
+
             - name: 약관·방침 버전 무결성 (#105)
               run: npm run test:legal
 
@@ -280,6 +283,11 @@ jobs:
                   psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-review-publication-consent.sql
                   psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-cancelled-transfer-retention.sql
                   psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-public-applicant-ratings.sql
+
+            - name: 관리자 사고 거래 취소 권한·MFA·중복 차단 (#80)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-admin-incident-cancel.sql
 
             - name: 관리자 권한·접근통제·접속기록 (#50)
               run: npm run test:admin
