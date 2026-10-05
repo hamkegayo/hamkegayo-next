@@ -43,6 +43,9 @@ jobs:
             - name: 요금 계산 단위 테스트 (#46 · #76)
               run: npm run test:pricing
 
+            - name: 승인 환불 중복 방지 · 결과 복구 (#80)
+              run: node --experimental-strip-types --no-warnings scripts/test-approved-refund.mjs
+
             - name: 서비스 시간 · 예약 서버 검증 (#176)
               run: node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs scripts/test-service-hours.mjs
 
@@ -253,6 +256,11 @@ jobs:
             # 아래는 전부 "무엇이 되는가" 가 아니라 **"무엇이 안 되는가"** 를 보는 테스트다.
             - name: 결제·정산 스키마와 심사용 무기한 토큰 (#49 · #81)
               run: npm run test:payments
+
+            - name: 환불 선점 · MFA · 원장 일회 기록 (#80)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-admin-refund-execution.sql
 
             - name: 동의 이력 불변성 (#58)
               run: npm run test:agreements

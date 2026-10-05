@@ -206,6 +206,12 @@ export default async function AdminHome() {
                 >
                     정산 관리
                 </Link>
+                <Link
+                    href="/admin/refunds"
+                    className="text-brand text-sm underline"
+                >
+                    미달분 환불 승인
+                </Link>
                 <LogoutButton />
             </div>
         </div>
