@@ -297,6 +297,7 @@ jobs:
               run: |
                   eval "$(supabase status -o env)"
                   psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-imported-reviews.sql
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-confirmed-review-publication.sql
 
             - name: 실제 이용자 후기 공개 동의·3년 만료·철회
               run: |
