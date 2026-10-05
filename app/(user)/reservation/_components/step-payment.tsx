@@ -251,6 +251,17 @@ export function StepPayment() {
                             첫 1시간 무료 이벤트 적용 (
                             {eventOffer.discount.toLocaleString()}원)
                         </label>
+                        <p className="mt-2">
+                            <Link
+                                href="/event/opening"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-brand cursor-pointer underline"
+                            >
+                                이벤트 조건·이메일 식별정보 처리 안내 보기 (새
+                                창)
+                            </Link>
+                        </p>
                         <p className="text-muted-foreground mt-2">
                             결제 전에 잔여 혜택을 다시 확인하며, 실제 예약 확정
                             시 순번이 부여됩니다. 포인트와 중복 적용하지
