@@ -225,9 +225,9 @@ function toView(r: ServiceRow): PartnerServiceView {
             handover_at: r.handover_at,
         },
         noShow: r.no_show === true,
-        exceptionPending: ["PROVIDER_FAULT", "EMERGENCY"].includes(
-            r.termination_kind,
-        ),
+        exceptionPending:
+            r.status !== "COMPLETED" &&
+            ["PROVIDER_FAULT", "EMERGENCY"].includes(r.termination_kind),
         autoClosedAt: r.auto_closed_at,
         conditions: {
             transportTo: res?.transport_to ?? null,

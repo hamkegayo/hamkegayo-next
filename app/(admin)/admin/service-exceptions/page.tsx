@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { kstDateTime } from "@/lib/format";
 import Link from "next/link";
+import { ExceptionConsole, UnavailableServiceForm } from "./exception-console";
 export default async function ServiceExceptionsPage({
     searchParams,
 }: {
@@ -29,9 +30,10 @@ export default async function ServiceExceptionsPage({
             <h1 className="text-2xl font-bold">예외 종료 운영 확인</h1>
             <p className="text-muted-foreground mt-3 text-sm">
                 회사·파트너 귀책 및 응급 중단은 자동 청구·환불·정산 승인을
-                보류합니다. 최신 정책과 실제 제공 내용을 확인한 별도 정산 절차가
-                필요합니다. 일반 종료로 임의 변경하지 마세요.
+                보류합니다. 실제 제공 내용과 증빙에 따라 운영 판정 후 PG 잔액을
+                확인하여 해제합니다. 일반 종료로 임의 변경하지 마세요.
             </p>
+            <UnavailableServiceForm />
             <ul className="mt-5 space-y-3">
                 {(data ?? [])
                     .slice(0, 100)
@@ -53,9 +55,7 @@ export default async function ServiceExceptionsPage({
                                         : "응급 중단"}{" "}
                                     · {kstDateTime(r.ended_at)}
                                 </p>
-                                <span className="text-amber-700">
-                                    청구·정산 보류
-                                </span>
+                                <ExceptionConsole serviceId={r.service_id} />
                             </li>
                         ),
                     )}

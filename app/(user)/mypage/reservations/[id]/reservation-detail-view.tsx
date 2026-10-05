@@ -217,84 +217,140 @@ export function ReservationDetailView({ r }: { r: ReservationDetailView }) {
                     {/* 결제 정보 */}
                     <Card
                         title={
-                            r.payment.isFinal ? "결제 정보" : "예상 결제 정보"
+                            r.payment.exception
+                                ? "운영 확인 결제 정보"
+                                : r.payment.isFinal
+                                  ? "결제 정보"
+                                  : "예상 결제 정보"
                         }
                     >
-                        <div className="space-y-3 text-sm">
-                            <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">
-                                    이용요금 ({r.payment.durationLabel})
-                                </span>
-                                <span className="text-foreground font-semibold">
-                                    {r.payment.baseAmount.toLocaleString()}원
-                                </span>
+                        {r.payment.exception ? (
+                            <div className="space-y-3 text-sm">
+                                <p>
+                                    {r.payment.exception.pending
+                                        ? "서비스 종료 내용을 운영 담당자가 확인하고 있습니다. 환불·추가결제 확인이 끝나기 전까지 최종 처리를 보류합니다."
+                                        : "운영 확인과 결제 처리가 완료되었습니다."}
+                                </p>
+                                <p>
+                                    기존 현금 결제액:{" "}
+                                    {r.payment.exception.cashBefore == null
+                                        ? "확인 중"
+                                        : `${r.payment.exception.cashBefore.toLocaleString()}원`}
+                                </p>
+                                <p>
+                                    최종 현금 청구액:{" "}
+                                    {r.payment.exception.finalCash == null
+                                        ? "판정 대기"
+                                        : `${r.payment.exception.finalCash.toLocaleString()}원`}
+                                </p>
+                                <p>
+                                    현금 환불
+                                    {r.payment.exception.pending
+                                        ? " 예정"
+                                        : " 완료"}
+                                    :{" "}
+                                    {r.payment.exception.refund.toLocaleString()}
+                                    원
+                                </p>
+                                <p>
+                                    추가 현금 결제
+                                    {r.payment.exception.pending
+                                        ? " 예정"
+                                        : " 완료"}
+                                    :{" "}
+                                    {r.payment.exception.additional.toLocaleString()}
+                                    원
+                                </p>
+                                {r.payment.exception.restored && (
+                                    <p>사용한 이벤트 혜택을 복원했습니다.</p>
+                                )}
+                                <p className="text-muted-foreground text-xs">
+                                    할인과 사용 포인트를 제외한 현금 금액입니다.
+                                    예외 종료에는 최소 1시간 요금이 자동
+                                    적용되지 않습니다.
+                                </p>
                             </div>
-
-                            {r.payment.surchargeAmount > 0 && (
+                        ) : (
+                            <div className="space-y-3 text-sm">
                                 <div className="flex items-center justify-between">
                                     <span className="text-muted-foreground">
-                                        주말·공휴일 할증 30%
+                                        이용요금 ({r.payment.durationLabel})
                                     </span>
                                     <span className="text-foreground font-semibold">
-                                        +
-                                        {r.payment.surchargeAmount.toLocaleString()}
+                                        {r.payment.baseAmount.toLocaleString()}
                                         원
                                     </span>
                                 </div>
-                            )}
 
-                            <div className="border-border mt-2 flex items-center justify-between border-t pt-3">
-                                <span className="text-foreground font-bold">
-                                    {r.payment.isFinal
-                                        ? "최종 이용요금"
-                                        : "예상 이용요금"}
-                                </span>
-                                <span className="text-foreground text-lg font-extrabold">
-                                    {r.payment.total.toLocaleString()}원
-                                </span>
-                            </div>
+                                {r.payment.surchargeAmount > 0 && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-muted-foreground">
+                                            주말·공휴일 할증 30%
+                                        </span>
+                                        <span className="text-foreground font-semibold">
+                                            +
+                                            {r.payment.surchargeAmount.toLocaleString()}
+                                            원
+                                        </span>
+                                    </div>
+                                )}
 
-                            <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">
-                                    선결제 금액
-                                </span>
-                                <span className="text-foreground font-semibold">
-                                    {r.payment.prepaidAmount.toLocaleString()}원
-                                </span>
-                            </div>
-
-                            {r.payment.additional > 0 && (
-                                <div className="flex items-center justify-between">
-                                    <span className="text-destructive font-bold">
-                                        추가 결제 필요
+                                <div className="border-border mt-2 flex items-center justify-between border-t pt-3">
+                                    <span className="text-foreground font-bold">
+                                        {r.payment.isFinal
+                                            ? "최종 이용요금"
+                                            : "예상 이용요금"}
                                     </span>
-                                    <span className="text-destructive font-extrabold">
-                                        {r.payment.additional.toLocaleString()}
+                                    <span className="text-foreground text-lg font-extrabold">
+                                        {r.payment.total.toLocaleString()}원
+                                    </span>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground">
+                                        선결제 금액
+                                    </span>
+                                    <span className="text-foreground font-semibold">
+                                        {r.payment.prepaidAmount.toLocaleString()}
                                         원
                                     </span>
                                 </div>
-                            )}
 
-                            {r.payment.refund > 0 && (
-                                <div className="flex items-center justify-between">
-                                    <span className="text-brand font-bold">
-                                        환불 예정
-                                    </span>
-                                    <span className="text-brand font-extrabold">
-                                        {r.payment.refund.toLocaleString()}원
-                                    </span>
-                                </div>
-                            )}
+                                {r.payment.additional > 0 && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-destructive font-bold">
+                                            추가 결제 필요
+                                        </span>
+                                        <span className="text-destructive font-extrabold">
+                                            {r.payment.additional.toLocaleString()}
+                                            원
+                                        </span>
+                                    </div>
+                                )}
 
-                            {!r.payment.isFinal && (
-                                <p className="text-description-foreground border-border border-t pt-3 text-xs leading-relaxed">
-                                    선결제 후 서비스가 종료되면 실제
-                                    이용시간으로 최종 요금을 산정합니다. 남는
-                                    금액은 환불하고, 모자란 금액은 추가결제를
-                                    안내드립니다. 최소 1시간분은 청구됩니다.
-                                </p>
-                            )}
-                        </div>
+                                {r.payment.refund > 0 && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-brand font-bold">
+                                            환불 예정
+                                        </span>
+                                        <span className="text-brand font-extrabold">
+                                            {r.payment.refund.toLocaleString()}
+                                            원
+                                        </span>
+                                    </div>
+                                )}
+
+                                {!r.payment.isFinal && (
+                                    <p className="text-description-foreground border-border border-t pt-3 text-xs leading-relaxed">
+                                        선결제 후 서비스가 종료되면 실제
+                                        이용시간으로 최종 요금을 산정합니다.
+                                        남는 금액은 환불하고, 모자란 금액은
+                                        추가결제를 안내드립니다. 최소 1시간분은
+                                        청구됩니다.
+                                    </p>
+                                )}
+                            </div>
+                        )}
                     </Card>
 
                     {r.canCancel && (

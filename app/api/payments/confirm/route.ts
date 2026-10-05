@@ -157,11 +157,17 @@ export async function POST(request: NextRequest) {
             .select("termination_kind")
             .eq("reservation_id", rid)
             .maybeSingle();
+        const exceptionKind = ["PROVIDER_FAULT", "EMERGENCY"].includes(
+            exception.data?.termination_kind,
+        );
+        const allowed = exceptionKind
+            ? await admin.rpc("exception_extension_allowed", {
+                  p_payment: payment.id,
+              })
+            : null;
         if (
             exception.error ||
-            ["PROVIDER_FAULT", "EMERGENCY"].includes(
-                exception.data?.termination_kind,
-            )
+            (exceptionKind && (allowed?.error || allowed?.data !== true))
         ) {
             await netCancelQuietly(auth.orderId);
             return fail(request, "EXCEPTION_REVIEW_PENDING", rid);
