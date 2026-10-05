@@ -17,6 +17,7 @@
 
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
 const STRIP = ["--experimental-strip-types", "--no-warnings"];
 
@@ -188,11 +189,42 @@ function sqlRunner(dbUrl) {
         );
 }
 
+const USAGE = `사용법: npm run test:db [-- --list] [-- --only <키워드>]
+  --list            묶음 목록만 출력
+  --only <키워드>    이름·파일에 키워드가 들어간 묶음만 실행`;
+
+/**
+ * 인자를 엄격하게 해석한다. `--only` 값 누락이나 옵션 오타가 조용히 전체 실행으로
+ * 이어지지 않도록, 해석할 수 없으면 사용법을 출력하고 종료한다.
+ */
+export function parseArgs(argv) {
+    let only = null;
+    let list = false;
+    for (let i = 0; i < argv.length; i += 1) {
+        const arg = argv[i];
+        if (arg === "--list") {
+            list = true;
+        } else if (arg === "--only") {
+            const value = argv[i + 1];
+            if (!value || value.startsWith("--") || !value.trim()) {
+                return { error: "--only 뒤에 키워드를 입력하세요." };
+            }
+            only = value;
+            i += 1;
+        } else {
+            return { error: `알 수 없는 인자: ${arg}` };
+        }
+    }
+    return { only, list };
+}
+
 function main() {
-    const argv = process.argv.slice(2);
-    const only = argv.includes("--only")
-        ? argv[argv.indexOf("--only") + 1]
-        : null;
+    const parsed = parseArgs(process.argv.slice(2));
+    if (parsed.error) {
+        console.error(`${parsed.error}\n\n${USAGE}`);
+        process.exit(2);
+    }
+    const { only, list } = parsed;
     const selected = SUITES.filter(
         ([name, steps]) =>
             !only ||
@@ -202,7 +234,7 @@ function main() {
             ),
     );
 
-    if (argv.includes("--list")) {
+    if (list) {
         selected.forEach(([name], i) =>
             console.log(`${String(i + 1).padStart(2)}. ${name}`),
         );
@@ -251,4 +283,10 @@ function main() {
     }
 }
 
-main();
+// 테스트에서 parseArgs 만 불러올 때는 실행하지 않는다.
+if (
+    process.argv[1] &&
+    import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+    main();
+}
