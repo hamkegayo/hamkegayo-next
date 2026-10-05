@@ -106,7 +106,10 @@ export function PublicProfileEditor({
                             <input
                                 type="checkbox"
                                 checked={profile.consent}
-                                disabled={pending}
+                                disabled={
+                                    pending ||
+                                    (!profile.publicEnabled && !profile.consent)
+                                }
                                 onChange={(event) => {
                                     const consent = event.target.checked;
                                     run(
@@ -120,6 +123,12 @@ export function PublicProfileEditor({
                             />
                             위 항목을 해당 예약자에게 공개하는 데 동의합니다.
                         </label>
+                        {!profile.publicEnabled && (
+                            <p className="text-muted-foreground mt-2 text-sm">
+                                상세 정보 공개는 준비 중입니다. 현재 고객에게
+                                공개되지 않으며 기존 동의는 철회할 수 있습니다.
+                            </p>
+                        )}
                     </div>
                     <h3 className="mt-6 font-bold">근무 병원·경력</h3>
                     <p className="text-muted-foreground mt-2 text-sm">

@@ -27,6 +27,8 @@ export async function getReservationPartnerDetail(
                 p_partner_id: partnerId,
             },
         );
+        if (error?.message.includes("partner_public_release_pending"))
+            return { ok: false, message: "파트너 상세 정보는 준비 중입니다." };
         if (error || !data)
             return {
                 ok: false,

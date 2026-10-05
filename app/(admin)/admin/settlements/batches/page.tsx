@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getTransferBatches } from "./_lib/batches.server";
 import { TransferFileButton } from "./transfer-file-button";
+import { TransferResultForm } from "./transfer-result-form";
 
 export const metadata: Metadata = {
     title: "이체 배치",
@@ -111,6 +112,47 @@ export default async function TransferBatchesPage({
                                         계좌번호가 포함됩니다.
                                     </p>
                                 </div>
+                                {(selected.status === "DRAFT" ||
+                                    selected.status === "FILE_ISSUED") && (
+                                    <TransferResultForm
+                                        key={selected.id}
+                                        batchId={selected.id}
+                                        fileIssued={
+                                            selected.status === "FILE_ISSUED"
+                                        }
+                                    />
+                                )}
+                                {"terminalResult" in result &&
+                                    result.terminalResult && (
+                                        <div className="bg-muted mt-4 rounded-lg p-3 text-sm">
+                                            <p>
+                                                결과 기록:{" "}
+                                                {
+                                                    result.terminalResult
+                                                        .reference
+                                                }
+                                            </p>
+                                            <p>
+                                                사유:{" "}
+                                                {result.terminalResult.reason}
+                                            </p>
+                                            <p>
+                                                {
+                                                    result.terminalResult
+                                                        .recordedBy
+                                                }{" "}
+                                                ·{" "}
+                                                {new Date(
+                                                    result.terminalResult
+                                                        .recordedAt,
+                                                ).toLocaleString("ko-KR")}
+                                            </p>
+                                            <p>
+                                                배치 계좌번호 원문 파기 완료 ·
+                                                내려받은 CSV도 파기해 주세요.
+                                            </p>
+                                        </div>
+                                    )}
                             </>
                         )}
                         <div className="border-border mt-4 overflow-x-auto rounded-lg border">

@@ -10,7 +10,7 @@ export async function getPartnerPublicProfile(): Promise<PartnerPublicProfile | 
         data: { user },
     } = await supabase.auth.getUser();
     if (!user) return null;
-    const [consent, histories] = await Promise.all([
+    const [consent, histories, release] = await Promise.all([
         supabase
             .from("partner_public_profiles")
             .select("consented_at")
@@ -21,10 +21,12 @@ export async function getPartnerPublicProfile(): Promise<PartnerPublicProfile | 
             .select("id, hospital, period, department, duties, status")
             .eq("partner_id", user.id)
             .order("created_at", { ascending: false }),
+        supabase.rpc("partner_public_details_enabled"),
     ]);
     if (consent.error || histories.error) return null;
     return {
         consent: Boolean(consent.data?.consented_at),
+        publicEnabled: !release.error && release.data === true,
         histories: histories.data ?? [],
     };
 }
