@@ -9,7 +9,7 @@ name: E2E Check
 
 on:
     pull_request:
-        branches: ["main", "dev"] # TEMP: #214 PR 검증용, 확인 후 제거
+        branches: ["main"]
     # 필요할 때 Actions 탭에서 수동 실행 (main 에 이 파일이 있어야 보인다)
     workflow_dispatch:
 
