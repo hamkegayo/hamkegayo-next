@@ -282,6 +282,8 @@ jobs:
               run: |
                   eval "$(supabase status -o env)"
                   psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-partner-evidence.sql
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-evidence-retention.sql
+                  node --experimental-strip-types --no-warnings scripts/test-evidence-link-ttl.mjs
 
             - name: 파트너 개인정보 3단계 경계 (#66 · #67)
               run: npm run test:partner

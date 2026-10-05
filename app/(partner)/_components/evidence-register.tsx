@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
@@ -124,6 +125,14 @@ export function EvidenceRegister({ enabled }: { enabled: boolean }) {
     return (
         <section className="bg-background rounded-2xl border p-6">
             <h2 className="text-lg font-bold">자격·경력 증빙 등록</h2>
+            <p className="mt-3 text-sm">
+                증빙 원본은 최초 심사 결과 통지 후 30일간 보관합니다. 기간 내
+                이의신청은 처리 종료까지 파기를 보류합니다.{" "}
+                <Link href="/partner-evidence-notice" className="underline">
+                    수집·보유·파기 안내
+                </Link>
+                를 확인해 주세요.
+            </p>
             {!enabled && (
                 <p role="status" className="text-muted-foreground mt-3 text-sm">
                     추가 증빙 등록은 수집 고지 확인 후 제공됩니다. 기존 등록
