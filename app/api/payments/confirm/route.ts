@@ -151,6 +151,22 @@ export async function POST(request: NextRequest) {
     // 추가결제(#75)는 이미 확정된 예약에 붙는 청구다. 예약 상태 검증(④)과
     // 확정(⑥)이 적용되지 않으므로 여기서 갈라 둔다.
     const isExtension = payment.type === "EXTENSION";
+    if (isExtension) {
+        const exception = await admin
+            .from("services")
+            .select("termination_kind")
+            .eq("reservation_id", rid)
+            .maybeSingle();
+        if (
+            exception.error ||
+            ["PROVIDER_FAULT", "EMERGENCY"].includes(
+                exception.data?.termination_kind,
+            )
+        ) {
+            await netCancelQuietly(auth.orderId);
+            return fail(request, "EXCEPTION_REVIEW_PENDING", rid);
+        }
+    }
 
     // 이미 승인이 끝난 결제 — 새로고침이나 중복 전송이다. 완료 화면으로 보낸다.
     if (payment.status === "PAID") {

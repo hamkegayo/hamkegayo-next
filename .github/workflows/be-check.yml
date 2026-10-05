@@ -292,6 +292,11 @@ jobs:
             - name: 정산 계좌 열람 통제 (#51)
               run: npm run test:payout
 
+            - name: 예외 종료 청구·환불·완료 보류 (#185)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-service-exception.sql
+
             - name: 탈퇴 시 보존·파기 (#72)
               run: npm run test:withdrawal
 

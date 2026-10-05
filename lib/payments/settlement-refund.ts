@@ -127,6 +127,21 @@ export async function executeApprovedRefund(
     if (req.status !== "APPROVED") {
         return { ok: false, message: "승인된 환불 요청이 아닙니다." };
     }
+    const exception = await admin
+        .from("services")
+        .select("termination_kind")
+        .eq("reservation_id", req.reservation_id)
+        .maybeSingle();
+    if (
+        exception.error ||
+        ["PROVIDER_FAULT", "EMERGENCY"].includes(
+            exception.data?.termination_kind,
+        )
+    )
+        return {
+            ok: false,
+            message: "예외 종료는 운영 정산 확인 후 환불할 수 있습니다.",
+        };
 
     const payment = req.payments;
     if (!payment?.transaction_id) {

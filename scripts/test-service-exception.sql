@@ -1,0 +1,28 @@
+begin;
+create function pg_temp.assert(ok boolean,label text) returns void language plpgsql as $$ begin if ok is distinct from true then raise exception 'FAIL: %',label; end if; end; $$;
+create function pg_temp.denied(sql text) returns void language plpgsql as $$ begin begin execute sql; exception when others then return; end; raise exception 'expected denied'; end; $$;
+insert into auth.users(id,email) values ('00000185-0000-4000-8000-000000000001','exception-partner@example.invalid'),('00000185-0000-4000-8000-000000000002','exception-owner@example.invalid');
+insert into public.profiles(id,name,role) values ('00000185-0000-4000-8000-000000000001','Exception Partner','PARTNER'),('00000185-0000-4000-8000-000000000002','Exception Owner','USER');
+insert into public.partner_accounts(profile_id,login_id) values ('00000185-0000-4000-8000-000000000001','exception-test-185');
+insert into public.reservations(id,code,customer_id,plan,patient_name,patient_birth,patient_gender,patient_phone,guardian_name,guardian_phone,relation,treatment,purpose,use_date,arrive_time,reserve_time,duration,duration_minutes,depart_address,hospital_address)
+values ('00000185-0000-4000-8000-000000000003','TEST-EXCEPTION-185','00000185-0000-4000-8000-000000000002','basic','Test','1960-01-01','female','01000000000','Test','01000000000','self','Test','Test','2099-01-01','09:00','09:00','2시간',120,'Test','Test');
+insert into public.services(id,reservation_id,partner_id,status,started_at) values ('00000185-0000-4000-8000-000000000004','00000185-0000-4000-8000-000000000003','00000185-0000-4000-8000-000000000001','IN_PROGRESS',now()-interval '1 hour');
+select set_config('request.jwt.claims','{"sub":"00000185-0000-4000-8000-000000000002","role":"authenticated","aal":"aal1"}',true);
+set local role authenticated;
+select pg_temp.denied($q$select public.end_service_exception('00000185-0000-4000-8000-000000000004','EMERGENCY')$q$);
+reset role;
+select set_config('request.jwt.claims','{"sub":"00000185-0000-4000-8000-000000000001","role":"authenticated","aal":"aal1"}',true);
+set local role authenticated;
+select public.end_service_exception('00000185-0000-4000-8000-000000000004','EMERGENCY','Test interruption');
+select pg_temp.denied($q$select public.complete_service('00000185-0000-4000-8000-000000000004')$q$);
+reset role;
+select pg_temp.assert(status='ENDED' and termination_kind='EMERGENCY' and ended_at is not null,'exception time recorded without completion') from public.services where id='00000185-0000-4000-8000-000000000004';
+select pg_temp.denied($q$insert into public.payments(reservation_id,type,status,order_id,gross_amount,payout_amount) values ('00000185-0000-4000-8000-000000000003','EXTENSION','PENDING','TEST-EXTRA-185',1000,1000)$q$);
+select pg_temp.denied($q$insert into public.payments(reservation_id,type,status,order_id,gross_amount,payout_amount) values ('00000185-0000-4000-8000-000000000003','REFUND','PAID','TEST-REFUND-185',-1000,-1000)$q$);
+select pg_temp.assert(not exists(select 1 from public.settlements where service_id='00000185-0000-4000-8000-000000000004'),'no settlement before review');
+update public.services set termination_kind='NORMAL',status='IN_PROGRESS',ended_at=null where id='00000185-0000-4000-8000-000000000004';
+set local role authenticated;
+select public.end_service_classified('00000185-0000-4000-8000-000000000004','CUSTOMER_EARLY','Customer request');
+reset role;
+select pg_temp.assert(termination_kind='CUSTOMER_EARLY','normal early termination classified') from public.services where id='00000185-0000-4000-8000-000000000004';
+rollback;

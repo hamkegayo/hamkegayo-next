@@ -104,6 +104,9 @@ export function ServiceDetailView({
     const [memoTab, setMemoTab] = useState<MemoTab>("start");
     const [startMemo, setStartMemo] = useState(service.startMemo ?? "");
     const [endMemo, setEndMemo] = useState(service.endMemo ?? "");
+    const [terminationKind, setTerminationKind] = useState<
+        "NORMAL" | "CUSTOMER_EARLY" | "PROVIDER_FAULT" | "EMERGENCY"
+    >("NORMAL");
 
     const cond = service.conditions;
     const startAt = `${item.dateLabel} ${service.startedAtLabel ?? "-"}`;
@@ -216,7 +219,7 @@ export function ServiceDetailView({
 
     const onEndConfirm = () => {
         startTransition(async () => {
-            const res = await endService(service.id, endMemo);
+            const res = await endService(service.id, endMemo, terminationKind);
             if (res.ok) {
                 setEnded(true);
                 setEndOpen(false);
@@ -891,6 +894,40 @@ export function ServiceDetailView({
                         ) : (
                             <>
                                 <PendingBox />
+                                <label className="mt-3 block text-sm font-bold">
+                                    종료 사유
+                                    <select
+                                        value={terminationKind}
+                                        disabled={!started || pending}
+                                        onChange={(e) =>
+                                            setTerminationKind(
+                                                e.target
+                                                    .value as typeof terminationKind,
+                                            )
+                                        }
+                                        className="bg-background mt-2 w-full rounded-lg border p-3"
+                                    >
+                                        <option value="NORMAL">
+                                            정상 종료
+                                        </option>
+                                        <option value="CUSTOMER_EARLY">
+                                            고객 요청 조기 종료
+                                        </option>
+                                        <option value="PROVIDER_FAULT">
+                                            회사·파트너 사유 중단
+                                        </option>
+                                        <option value="EMERGENCY">
+                                            응급 중단
+                                        </option>
+                                    </select>
+                                </label>
+                                {(terminationKind === "PROVIDER_FAULT" ||
+                                    terminationKind === "EMERGENCY") && (
+                                    <p className="mt-2 text-sm text-amber-700">
+                                        종료 시각만 기록하고 청구·정산은 운영
+                                        확인 전까지 보류합니다.
+                                    </p>
+                                )}
                                 <button
                                     type="button"
                                     disabled={!started}
@@ -910,7 +947,7 @@ export function ServiceDetailView({
                     </StepBlock>
 
                     {/* 종료 후: 귀가 완료 + 피드백 */}
-                    {ended && (
+                    {ended && !service.exceptionPending && (
                         <div className="mt-5 rounded-xl border border-amber-300/50 bg-amber-50 p-4 dark:bg-amber-500/10">
                             <p className="text-sm font-bold text-amber-700 dark:text-amber-400">
                                 서비스가 종료되었습니다.
@@ -927,6 +964,16 @@ export function ServiceDetailView({
                                 귀가 완료 및 피드백 작성
                             </button>
                         </div>
+                    )}
+                    {service.exceptionPending && (
+                        <p
+                            role="status"
+                            className="mt-4 rounded-lg border border-amber-300 p-4 text-sm text-amber-700"
+                        >
+                            예외 종료 운영 확인 대기 중입니다. 자동
+                            청구·환불·정산 및 완료 처리가 보류됩니다. 운영
+                            담당자에게 문의해 주세요.
+                        </p>
                     )}
                 </div>
 

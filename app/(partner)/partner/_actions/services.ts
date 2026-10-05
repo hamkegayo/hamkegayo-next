@@ -58,6 +58,8 @@ async function callRpc(
     fn:
         | "start_service"
         | "end_service"
+        | "end_service_exception"
+        | "end_service_classified"
         | "complete_service"
         | "arrive_service"
         | "record_service_time"
@@ -293,10 +295,29 @@ export async function startService(
 export async function endService(
     serviceId: string,
     memo?: string,
+    kind:
+        "NORMAL" | "CUSTOMER_EARLY" | "PROVIDER_FAULT" | "EMERGENCY" = "NORMAL",
 ): Promise<ServiceActionResult> {
+    if (
+        !["NORMAL", "CUSTOMER_EARLY", "PROVIDER_FAULT", "EMERGENCY"].includes(
+            kind,
+        )
+    )
+        return { ok: false, message: "종료 사유를 확인해 주세요." };
+    if (kind === "PROVIDER_FAULT" || kind === "EMERGENCY") {
+        return callRpc(
+            "end_service_exception",
+            {
+                p_service_id: serviceId,
+                p_kind: kind,
+                p_memo: memo?.trim() || null,
+            },
+            serviceId,
+        );
+    }
     const res = await callRpc(
-        "end_service",
-        { p_service_id: serviceId, p_memo: memo?.trim() || null },
+        "end_service_classified",
+        { p_service_id: serviceId, p_kind: kind, p_memo: memo?.trim() || null },
         serviceId,
     );
     if (!res.ok) return res;
