@@ -44,6 +44,7 @@ import {
 import { ProfilePhotoModal } from "../../_components/profile-photo-modal";
 import { SimpleAddModal } from "../../_components/simple-add-modal";
 import { VerifyChangeModal } from "../../_components/verify-change-modal";
+import { PhoneChangeModal } from "../../_components/phone-change-modal";
 import {
     QualificationAddModal,
     type QualificationInput,
@@ -149,6 +150,8 @@ export function PartnerProfileView({
     initialBasicInfo: PartnerBasicInfo;
 }) {
     const [email, setEmail] = useState(initialBasicInfo.email);
+    const [phone, setPhone] = useState(initialBasicInfo.phone);
+    const [phoneOpen, setPhoneOpen] = useState(false);
     const [intro, setIntro] = useState(initialBasicInfo.intro);
     const [savedIntro, setSavedIntro] = useState(initialBasicInfo.intro);
     const [basicInfoPending, startBasicInfoTransition] = useTransition();
@@ -376,20 +379,21 @@ export function PartnerProfileView({
                         <div className="mt-1.5 flex gap-2">
                             <input
                                 type="tel"
-                                value={initialBasicInfo.phone}
+                                value={phone}
                                 readOnly
                                 className="border-input bg-muted text-muted-foreground min-w-0 flex-1 rounded-lg border px-3.5 py-2.5 text-sm outline-none"
                             />
                             <button
                                 type="button"
-                                disabled
+                                onClick={() => setPhoneOpen(true)}
                                 className="border-border bg-muted text-muted-foreground shrink-0 rounded-lg border px-3.5 text-sm font-bold"
                             >
-                                준비 중
+                                이메일 인증 변경
                             </button>
                         </div>
                         <p className="text-muted-foreground mt-1.5 text-xs font-medium">
-                            휴대폰 인증 연동 후 변경할 수 있습니다.
+                            등록된 연락용 이메일 인증 후 변경합니다. 휴대폰 소유
+                            인증은 아닙니다.
                         </p>
 
                         <label className="text-foreground mt-4 block text-sm font-bold">
@@ -634,6 +638,11 @@ export function PartnerProfileView({
             </div>
 
             {/* 모달 */}
+            <PhoneChangeModal
+                open={phoneOpen}
+                onClose={() => setPhoneOpen(false)}
+                onChanged={setPhone}
+            />
             <VerifyChangeModal
                 open={emailOpen}
                 onClose={() => setEmailOpen(false)}

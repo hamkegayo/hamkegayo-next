@@ -290,6 +290,11 @@ jobs:
             - name: 정산 계좌 열람 통제 (#51)
               run: npm run test:payout
 
+            - name: 이메일 인증 연락처 변경 · 목적/대상/일회 소비 (#64)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-partner-phone-email.sql
+
             - name: 탈퇴 시 보존·파기 (#72)
               run: npm run test:withdrawal
 
