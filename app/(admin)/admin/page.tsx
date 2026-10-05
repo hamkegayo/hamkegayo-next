@@ -90,12 +90,6 @@ export default async function AdminHome() {
             >
                 오픈 이벤트 관리
             </Link>
-            <Link
-                href="/admin/refunds"
-                className="text-brand ml-4 text-sm underline"
-            >
-                미달분 환불 승인
-            </Link>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {cards.map(
@@ -205,6 +199,12 @@ export default async function AdminHome() {
                     className="text-brand inline-block font-semibold underline"
                 >
                     정산 관리
+                </Link>
+                <Link
+                    href="/admin/refunds"
+                    className="text-brand text-sm underline"
+                >
+                    미달분 환불 승인
                 </Link>
                 <LogoutButton />
             </div>
