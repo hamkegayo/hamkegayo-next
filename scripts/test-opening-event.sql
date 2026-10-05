@@ -1,7 +1,9 @@
 begin;
+-- Release 84 activates the event; test readiness blocking explicitly and roll it back.
+update public.opening_campaign set active=false,integration_ready=false where id;
 create function pg_temp.assert(ok boolean,label text) returns void language plpgsql as $$
 begin if ok is distinct from true then raise exception 'FAIL: %',label; end if; raise notice 'PASS: %',label; end $$;
-select pg_temp.assert((select not enabled from public.opening_event_status()),'default inactive/readiness gate');
+select pg_temp.assert((select not enabled from public.opening_event_status()),'explicit inactive/readiness gate');
 select pg_temp.assert(not has_function_privilege('authenticated','public.reserve_opening_event(uuid)','execute'),'client cannot reserve a benefit');
 select pg_temp.assert(not has_table_privilege('anon','public.opening_event_identities','select') and not has_table_privilege('authenticated','public.opening_event_claims','update'),'identity and claim data private');
 select pg_temp.assert(has_function_privilege('service_role','public.reserve_opening_event(uuid)','execute'),'trusted server can reserve');
