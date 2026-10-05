@@ -2,7 +2,7 @@
 -- 정상 이용/부분환불은 기존 환불 경로를 유지한다. 권한·MFA·감사 필수.
 create table public.payment_incident_cancellations (
   payment_id uuid primary key references public.payments(id) on delete cascade,
-  incident_id uuid not null references public.payment_incidents(id) on delete cascade,
+  incident_id uuid references public.payment_incidents(id) on delete set null,
   actor_id uuid not null references public.profiles(id),
   reason text not null check (char_length(reason) between 5 and 500),
   status text not null default 'CHECKING' check (status in ('CHECKING','UNKNOWN','COMPLETED')),

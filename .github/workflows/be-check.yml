@@ -49,9 +49,6 @@ jobs:
             - name: 운영키 조회 검증 스크립트 테스트 (모의 응답만 사용)
               run: npm run test:nicepay-live-check
 
-            - name: 관리자 사고 거래 취소 모의 PG 검증 (#80)
-              run: node --experimental-strip-types --no-warnings scripts/test-incident-cancel.mjs
-
             - name: 이벤트 팝업 시안 스테이징 환경 제한
               run: node --experimental-strip-types --no-warnings scripts/test-opening-event-popup-preview.mjs
 
@@ -63,6 +60,9 @@ jobs:
             # 못한다. 실제로 2026-09-06 개정에서 그 일이 일어났다 (#105).
             - name: FAQ 문답·공통 참조·검색 (#178)
               run: node --experimental-strip-types --no-warnings --import ./scripts/_ts-alias.mjs scripts/test-faq-content.mjs
+
+            - name: 관리자 사고 거래 취소 모의 PG 검증 (#80)
+              run: node --experimental-strip-types --no-warnings scripts/test-incident-cancel.mjs
 
             - name: 약관·방침 버전 무결성 (#105)
               run: npm run test:legal
@@ -284,6 +284,11 @@ jobs:
                   psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-cancelled-transfer-retention.sql
                   psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-public-applicant-ratings.sql
 
+            - name: 관리자 사고 거래 취소 권한·MFA·중복 차단 (#80)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-admin-incident-cancel.sql
+
             - name: 관리자 권한·접근통제·접속기록 (#50)
               run: npm run test:admin
 
@@ -294,11 +299,6 @@ jobs:
 
             - name: 정산 계좌 열람 통제 (#51)
               run: npm run test:payout
-
-            - name: 관리자 사고 거래 취소 권한·MFA·중복 차단 (#80)
-              run: |
-                  eval "$(supabase status -o env)"
-                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-admin-incident-cancel.sql
 
             - name: 탈퇴 시 보존·파기 (#72)
               run: npm run test:withdrawal

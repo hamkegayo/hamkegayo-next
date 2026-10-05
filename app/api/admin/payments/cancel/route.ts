@@ -43,15 +43,18 @@ export async function POST(request: NextRequest) {
             { status: 409 },
         );
     const admin = createAdminClient();
-    const { completed, transactionId: tid } = await cancelIncidentTransaction(
-        getPaymentGateway(),
-        {
+    let result = { completed: false, transactionId: null as string | null };
+    try {
+        result = await cancelIncidentTransaction(getPaymentGateway(), {
             orderId: data.orderId,
             amount: data.amount,
             reason: body.reason.trim(),
             inspect: body.inspect === true,
-        },
-    );
+        });
+    } catch {
+        // 키 설정/어댑터 초기화 실패도 claim을 UNKNOWN으로 기록한다.
+    }
+    const { completed, transactionId: tid } = result;
     const recorded = await admin.rpc("record_incident_cancel", {
         p_payment: data.paymentId,
         p_completed: completed,

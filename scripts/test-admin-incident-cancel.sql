@@ -33,4 +33,7 @@ select pg_temp.assert(status='UNKNOWN','unknown protected') from public.payment_
 select public.record_incident_cancel('00000080-0000-4000-8000-000000000004',true,'test-tid');
 select pg_temp.assert(status='CANCELLED','cancelled persisted') from public.payments where id='00000080-0000-4000-8000-000000000004';
 select pg_temp.assert(exists(select 1 from public.access_logs where action='INCIDENT_CANCEL_COMPLETED' and actor_id='00000080-0000-4000-8000-000000000001'),'audit actor persisted');
+-- 사고 보유기간이 결제 원장보다 짧아도 재취소 방지 기록은 결제와 함께 유지한다.
+delete from public.payment_incidents where id='00000080-0000-4000-8000-000000000005';
+select pg_temp.assert(exists(select 1 from public.payment_incident_cancellations where payment_id='00000080-0000-4000-8000-000000000004' and incident_id is null),'claim survives incident deletion');
 rollback;
