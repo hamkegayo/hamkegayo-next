@@ -46,13 +46,15 @@ create function public.guard_service_exception_settlement() returns trigger lang
 end; $$;
 create trigger service_exception_settlement before insert or update on public.settlements for each row execute function public.guard_service_exception_settlement();
 
-create function public.admin_list_service_exceptions()
+create function public.admin_list_service_exceptions(p_offset integer default 0)
 returns table(service_id uuid,reservation_code text,kind text,ended_at timestamptz)
 language plpgsql security definer set search_path='' as $$ begin
  if not public.can_manage_settlements() then raise exception 'forbidden' using errcode='42501'; end if;
+ if p_offset is null or p_offset<0 then raise exception 'invalid_offset' using errcode='22023'; end if;
  perform public.log_access('SERVICE_EXCEPTION_LIST','services',null,null,'예외 종료 운영 확인');
- return query select s.id,r.code,s.termination_kind,s.ended_at from public.services s join public.reservations r on r.id=s.reservation_id where s.termination_kind in ('PROVIDER_FAULT','EMERGENCY') order by s.ended_at limit 100;
+ -- 한 건을 더 조회해 다음 페이지 유무를 확인한다. 동일 종료 시각도 id로 정렬한다.
+ return query select s.id,r.code,s.termination_kind,s.ended_at from public.services s join public.reservations r on r.id=s.reservation_id where s.termination_kind in ('PROVIDER_FAULT','EMERGENCY') order by s.ended_at,s.id limit 101 offset p_offset;
 end; $$;
-revoke all on function public.admin_list_service_exceptions() from public,anon;
-grant execute on function public.admin_list_service_exceptions() to authenticated;
+revoke all on function public.admin_list_service_exceptions(integer) from public,anon;
+grant execute on function public.admin_list_service_exceptions(integer) to authenticated;
 revoke all on function public.guard_service_exception_complete(),public.guard_service_exception_money(),public.guard_service_exception_settlement() from public,anon,authenticated;
