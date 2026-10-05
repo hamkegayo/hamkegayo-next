@@ -287,17 +287,36 @@ class NicepayGateway implements PaymentGateway {
  * 명시 설정보다 접두사 판별을 쓰는 이유는, 키만 바꿔 끼우면 호스트가 따라오게 해서
  * **샌드박스 키로 운영 API 를 때리는 사고**를 원천 차단하기 위해서다.
  */
-export function resolveNicepayHosts(clientKey: string): {
+export function resolveNicepayHosts(
+    clientKey: string,
+    apiBaseOverride?: string,
+): {
     apiBase: string;
     sandbox: boolean;
 } {
     const sandbox = /^S\d_/.test(clientKey);
+    // E2E 전용(#214): 샌드박스 키 + 루프백 주소일 때만 모의 PG 서버로 보낸다.
+    // 운영 키이거나 외부 주소면 무시하므로 설정 실수로 결제가 다른 곳으로 새지 않는다.
+    const loopback = sandbox ? loopbackOrigin(apiBaseOverride) : null;
+    if (loopback) return { apiBase: loopback, sandbox };
     return {
         apiBase: sandbox
             ? "https://sandbox-api.nicepay.co.kr"
             : "https://api.nicepay.co.kr",
         sandbox,
     };
+}
+
+function loopbackOrigin(value: string | undefined): string | null {
+    if (!value) return null;
+    try {
+        const url = new URL(value);
+        const local =
+            url.hostname === "127.0.0.1" || url.hostname === "localhost";
+        return local && url.protocol === "http:" ? url.origin : null;
+    } catch {
+        return null;
+    }
 }
 
 let gateway: PaymentGateway | null = null;
@@ -318,7 +337,10 @@ export function getPaymentGateway(): PaymentGateway {
         );
     }
 
-    const { apiBase } = resolveNicepayHosts(clientKey);
+    const { apiBase } = resolveNicepayHosts(
+        clientKey,
+        process.env.NICEPAY_API_BASE_URL,
+    );
     gateway = new NicepayGateway(clientKey, secretKey, apiBase);
     return gateway;
 }
