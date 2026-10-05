@@ -85,8 +85,8 @@ check(
 );
 check("Plus 는 1시간 25,000", feeIn(60, { plan: "plus" }).amount === 25000);
 check(
-    "주말·공휴일 할증이 붙는다 (20,000 → 26,000)",
-    feeIn(60, { isSurcharge: true }).amount === 26000,
+    "신규 주말 예약의 취소 비용도 할증 0%",
+    feeIn(60, { isSurcharge: true }).amount === 20000,
 );
 check(
     "회사·파트너 귀책은 임박해도 무료 (제16조 ⑦)",
@@ -103,8 +103,8 @@ console.log("\n▶ 1시간 이용요금 (제11조 ②③ · 제17조 ② · 제1
 check("Basic 1시간은 20,000", oneHourCharge("basic", false) === 20000);
 check("Plus 1시간은 25,000", oneHourCharge("plus", false) === 25000);
 check(
-    "주말·공휴일 할증이 붙는다 (20,000 → 26,000)",
-    oneHourCharge("basic", true) === 26000,
+    "신규 주말 예약의 노쇼 1시간 비용도 할증 0%",
+    oneHourCharge("basic", true) === 20000,
 );
 check(
     "취소수수료의 1시간 구간과 같은 값이다",
@@ -129,8 +129,8 @@ check(
     calcPrepayment("basic", 60, false).amount === 40000,
 );
 check(
-    "주말은 30% 할증 (40,000 → 52,000, 제13조 ①)",
-    calcPrepayment("basic", 120, true).amount === 52000,
+    "신규 주말 예약은 별도 고지 전까지 할증 0%",
+    calcPrepayment("basic", 120, true).amount === 40000,
 );
 
 const short = calcFinalCharge({
@@ -173,7 +173,7 @@ for (const [rate, finalTotal, cancelTotal] of [
     [0.3, 58500, 26000],
     [0.15, 51750, 23000],
 ]) {
-    // 현재 30% 정책과 다른 0%/15%를 포함해 저장 값으로 선결제·연장·취소·정산한다.
+    // 현재 0% 정책과 다른 기존 예약의 30%/15%도 저장 값으로 계산한다.
     const payment = calcPaymentAmounts({
         plan: "basic",
         durationMinutes: 240,

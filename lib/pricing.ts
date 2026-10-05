@@ -10,7 +10,7 @@
  *  - 제11조 ④   : 종료 예정시각 이후 8분까지는 연장요금 없음
  *  - 제11조 ⑤   : 8분 초과 시 실제 초과시간을 15분 단위로 올림
  *  - 제11조 ⑥   : 병원 내 대기시간은 이용시간에 포함
- *  - 제13조 ①   : 토·일·공휴일·대체공휴일 30% 할증 (기획 확정 — 모든 금액에 적용)
+ *  - 제13조 ①   : 기존 예약의 저장 할증률 보존, #206 신규 예약 한시 면제
  *  - 제15조 ②   : 이용자 지각시간은 이용시간에 포함
  *  - 제16조 ①   : 파트너 지각분은 이용시간으로 청구하지 않음
  *  - 제21조 ①   : 예상 이용시간 2시간분 선결제
@@ -36,7 +36,9 @@ export const MIN_PREPAY_MIN = 120;
 export const EXTENSION_GRACE_MIN = 8;
 
 /** 주말·공휴일 할증률 — 약관 제13조 ① */
-export const SURCHARGE_RATE = 0.3;
+// #206 운영 결정: 신규 예약은 별도 고지 전까지 주말·공휴일 할증 면제.
+// 기존 예약은 surchargeRateOf의 저장된 할증률을 우선 적용한다.
+export const SURCHARGE_RATE = 0;
 
 /**
  * 파트너 선택 후 선결제 기한(분) — 약관 제9조 ④.
@@ -100,7 +102,7 @@ export function ceilToUnit(
     return Math.ceil(minutes / unit) * unit;
 }
 
-/** 할증 여부 → 할증률 (0 또는 0.3) */
+/** 저장된 할증률 우선. 신규 견적은 현재 운영 할증률을 사용한다. */
 export function surchargeRateOf(
     isSurcharge: boolean,
     storedRate?: number,
