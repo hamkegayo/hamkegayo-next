@@ -125,7 +125,9 @@ export default async function PartnerManagement() {
                                                 {s.dateLabel} {s.timeLabel}
                                             </div>
                                             <div className="text-brand w-28 shrink-0 text-right font-bold">
-                                                {s.amount.toLocaleString()}원
+                                                {s.exceptionPending
+                                                    ? "운영 확인 대기"
+                                                    : `${s.amount.toLocaleString()}원`}
                                             </div>
                                             <div className="w-24 shrink-0">
                                                 {statusBadge}
@@ -174,8 +176,9 @@ export default async function PartnerManagement() {
                                                     {s.customerAge})
                                                 </span>
                                                 <span className="text-brand font-bold">
-                                                    {s.amount.toLocaleString()}
-                                                    원
+                                                    {s.exceptionPending
+                                                        ? "운영 확인 대기"
+                                                        : `${s.amount.toLocaleString()}원`}
                                                 </span>
                                             </div>
                                             <p className="text-muted-foreground mt-1 text-xs">

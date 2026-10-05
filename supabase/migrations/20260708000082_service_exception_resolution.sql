@@ -302,3 +302,37 @@ returns void language plpgsql security definer set search_path='' as $$ begin
 end $$;
 revoke all on function public.admin_close_opening_event(text) from public,anon;
 grant execute on function public.admin_close_opening_event(text) to authenticated;
+
+-- 70의 정상/노쇼 계산은 유지한다. 예외 완료는 위에서 검증한 단일 최종
+-- 정산이 이미 있으므로 정상 요금 계산이나 추가 정산 삽입을 실행하지 않는다.
+create or replace function public.create_settlement_on_complete()
+returns trigger language plpgsql security definer set search_path='' as $$
+declare r public.reservations%rowtype; p public.payments%rowtype; gross integer;
+ discount integer:=0; fee integer; amount integer; rate numeric;
+begin
+ if new.termination_kind in ('PROVIDER_FAULT','EMERGENCY') then
+  if new.status='COMPLETED' and old.status is distinct from new.status
+   and not exists(select 1 from public.service_exception_resolutions d join public.settlements st on st.service_id=d.service_id
+    where d.service_id=new.id and d.resolved_at is not null and st.reason='SERVICE_EXCEPTION'
+     and st.net=d.partner_payout and st.amount=d.final_cash)
+   then raise exception 'verified_exception_settlement_required'; end if;
+  return new;
+ end if;
+ if new.status='COMPLETED' and old.status is distinct from new.status then
+  select * into r from public.reservations where id=new.reservation_id;
+  select * into p from public.payments where reservation_id=new.reservation_id and type='BASE'
+   and status='PAID' order by paid_at desc nulls last,id limit 1;
+  gross:=coalesce(r.final_amount,r.prepaid_amount,case r.plan when 'plus' then 25000 else 20000 end);
+  rate:=coalesce(r.fee_rate,case r.plan when 'plus' then 0.24 else 0.20 end);
+  if coalesce(p.campaign_discount_amount,0)>0 and not new.no_show then
+   gross:=p.gross_amount; discount:=p.campaign_discount_amount; rate:=p.commission_rate;
+  elsif coalesce(p.campaign_discount_amount,0)>0 and new.no_show then
+   gross:=p.gross_amount-p.discount_amount; rate:=p.commission_rate;
+   update public.payments set commission_amount=round(gross*rate),payout_amount=gross-round(gross*rate) where id=p.id;
+  end if;
+  fee:=round(gross*rate)-discount; amount:=gross-discount;
+  insert into public.settlements(service_id,partner_id,amount,fee,net,payment_id,reason)
+   values(new.id,new.partner_id,amount,fee,amount-fee,p.id,'SERVICE_COMPLETED') on conflict do nothing;
+ end if;
+ return new;
+end $$;

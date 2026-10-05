@@ -286,7 +286,11 @@ export function ServiceDetailView({
                                     ? "예상 정산 금액"
                                     : "정산 금액"
                             }
-                            value={`${item.amount.toLocaleString()}원`}
+                            value={
+                                item.exceptionPending
+                                    ? "운영 확인 대기"
+                                    : `${item.amount.toLocaleString()}원`
+                            }
                             valueClass="text-brand"
                         />
                     </div>

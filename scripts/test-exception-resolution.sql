@@ -5,7 +5,7 @@ insert into auth.users(id,email) values('00000082-0000-4000-8000-000000000999','
 insert into public.profiles(id,name,role) values('00000082-0000-4000-8000-000000000999','Resolution Partner','PARTNER'),('00000082-0000-4000-8000-000000000998','Resolution Admin','ADMIN');
 insert into public.partner_accounts(profile_id,login_id) values('00000082-0000-4000-8000-000000000999','resolution-partner');
 insert into public.admin_accounts(profile_id,duty) values('00000082-0000-4000-8000-000000000998','정산');
-update public.opening_campaign set active=false,integration_ready=false,closed_at=null,used_count=1 where id;
+update public.opening_campaign set active=false,integration_ready=false,closed_at=null,used_count=3 where id;
 do $$ declare i integer; uid uuid; rid uuid; pid uuid; sid uuid; gross integer; discount integer; campaign integer;
 begin
  for i in 1..5 loop
@@ -25,9 +25,9 @@ begin
     case when i=1 then null else now()-interval '4 hours' end,case when i=1 then null else now() end,case when i=1 then 'NORMAL' when i=3 then 'EMERGENCY' else 'PROVIDER_FAULT' end);
   insert into public.payments(id,reservation_id,type,status,order_id,transaction_id,gross_amount,discount_amount,campaign_discount_amount,commission_amount,payout_amount,paid_at)
    values(pid,rid,'BASE','PAID','TEST-RESOLUTION-'||i,case when i=5 then null else 'TEST-RESOLUTION-TID-'||i end,gross,discount,campaign,0,gross-discount,now());
-  if i=1 then
+  if i in (1,2,3) then
    insert into public.opening_event_claims(customer_id,identity_hash,payment_id,reservation_id,discount_amount,state,sequence,confirmed_at,expires_at)
-    values(uid,repeat('a',64),pid,rid,20000,'USED',1,now(),now()+interval '1 hour');
+    values(uid,md5(uid::text)||md5(uid::text),pid,rid,campaign,'USED',i,now(),now()+interval '1 hour');
   end if;
   if i=5 then
    insert into public.points(user_id,amount,reason,reservation_id,payment_id) values(uid,-40000,'USE',rid,pid);
@@ -58,6 +58,7 @@ select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000002
 select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000003','EMERGENCY',32500,24700,'Actual emergency service','PRIVATE-EVIDENCE-3');
 select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000004','PARTIAL',60000,48000,'Actual service extension','PRIVATE-EVIDENCE-4');
 select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000005','UNAVAILABLE',0,0,'Provider unavailable','PRIVATE-EVIDENCE-5');
+select pg_temp.denied($q$select public.admin_close_opening_event('TEST close before exception refund')$q$);
 select pg_temp.denied($q$select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000002','PARTIAL',0,0,'Changed decision','Test evidence')$q$);
 reset role;
 select pg_temp.assert(not exists(select 1 from public.settlements st join public.services s on s.id=st.service_id where s.reservation_id in (select id from public.reservations where code like 'TEST-RESOLUTION-%')),'no settlement before PG verification');
@@ -95,7 +96,8 @@ begin
  end loop;
 end $$;
 select pg_temp.assert((select state='RELEASED' and restored_by='00000082-0000-4000-8000-000000000998' and restored_at is not null from public.opening_event_claims where payment_id='00000082-0002-4000-8000-000000000001'),'benefit restored after full cash refund');
-select pg_temp.assert((select used_count=0 and not active and not integration_ready from public.opening_campaign where id),'campaign activation unchanged');
+select pg_temp.assert((select used_count=2 and not active and not integration_ready from public.opening_campaign where id),'campaign activation unchanged and partial/emergency benefit not restored');
+select pg_temp.assert((select count(*) from public.opening_event_claims where reservation_id in ('00000082-0001-4000-8000-000000000002','00000082-0001-4000-8000-000000000003') and state='USED' and restored_at is null)=2,'partial/emergency retain event use');
 select pg_temp.assert((select sum(amount)=0 from public.points where payment_id='00000082-0002-4000-8000-000000000005'),'zero cash full refund restores actual used points');
 select pg_temp.assert((select count(*) from public.notifications where dedupe_key like 'exception-resolved:00000082-%')=5,'exactly one notification per resolution');
 select pg_temp.assert((select count(*) from public.access_logs where action='SERVICE_EXCEPTION_RESOLVE' and actor_id='00000082-0000-4000-8000-000000000998')=5,'actual verification actor audited');
