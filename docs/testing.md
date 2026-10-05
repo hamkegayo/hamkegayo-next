@@ -15,7 +15,8 @@
 
 ```bash
 npm run lint && npm run typecheck
-npm run test:pricing          # 요금 계산 (기본요금·연장·할증·최소청구)
+npm run test:unit             # Vitest 단위 테스트 (아래 참고)
+npm run test:pricing          # 요금 계산 경계값 회귀 (기본요금·연장·할증·최소청구)
 npm run test:legal            # 약관·방침 본문 해시와 버전 무결성
 npm run check:links           # 알림·리다이렉트 경로가 실제 라우트인지
 npm run test:migration-lint   # 위험 DDL 검사기 자체 테스트
@@ -28,6 +29,33 @@ npm run test:nicepay-live-check  # 운영키 조회 스크립트 (모의 응답�
 ```
 
 `package.json`에 스크립트가 없는 순수 검사는 `node --experimental-strip-types --no-warnings [--import ./scripts/_ts-alias.mjs] scripts/<파일>.mjs`로 실행합니다. 전체 목록은 [`.github/workflows/be-check.yml`](../.github/workflows/be-check.yml)의 `fast` job에 있습니다.
+
+### 단위 테스트 (Vitest)
+
+**새 순수 로직 테스트는 Vitest로 작성합니다.** 기존 `scripts/test-*.mjs`는 그대로 유지하며 필요할 때 점진적으로 옮깁니다.
+
+```bash
+npm run test:unit             # vitest run — 한 번 실행
+npx vitest                    # 감시 모드
+```
+
+- 파일은 대상 모듈 옆 `__tests__/<모듈>.test.ts`에 둡니다. 예: [`lib/__tests__/pricing.test.ts`](../lib/__tests__/pricing.test.ts)
+- `@/` 경로 별칭을 그대로 쓸 수 있습니다.
+- [`vitest.config.ts`](../vitest.config.ts)가 `TZ=UTC`로 고정합니다. 운영 서버(Vercel)와 같은 조건이라, 개발 PC(KST)에서만 통과하는 시간대 버그가 드러납니다.
+
+```ts
+import { describe, expect, it } from "vitest";
+
+import { calcPrepayment } from "@/lib/pricing";
+
+describe("선결제 (약관 제21조 ①)", () => {
+    it("예상 이용시간이 2시간 미만이어도 2시간분을 받는다", () => {
+        expect(calcPrepayment("basic", 60, false).amount).toBe(40_000);
+    });
+});
+```
+
+테스트 이름에는 근거가 되는 약관 조항이나 이슈 번호를 적어, 실패했을 때 무엇이 깨졌는지 바로 알 수 있게 합니다.
 
 ## 2. DB 통합 (로컬 Supabase)
 

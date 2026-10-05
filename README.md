@@ -94,11 +94,11 @@ npm run dev                    # http://localhost:3000
 
 ## 테스트
 
-| 계층      | 실행                                                             | CI          |
-| --------- | ---------------------------------------------------------------- | ----------- |
-| 순수 검사 | `npm run lint` · `npm run typecheck` · `npm run test:pricing` 등 | 모든 PR     |
-| DB 통합   | `npx supabase start` 후 `npm run test:partner` 등                | 모든 PR     |
-| 외부 연동 | `npm run test:nicepay` (샌드박스 키 필요)                        | 제외 (수동) |
+| 계층      | 실행                                                                   | CI          |
+| --------- | ---------------------------------------------------------------------- | ----------- |
+| 순수 검사 | `npm run test:unit` (Vitest) · `npm run lint` · `npm run typecheck` 등 | 모든 PR     |
+| DB 통합   | `npx supabase start` 후 `npm run test:partner` 등                      | 모든 PR     |
+| 외부 연동 | `npm run test:nicepay` (샌드박스 키 필요)                              | 제외 (수동) |
 
 계층별 전체 명령과 새 테스트 작성 원칙은 [docs/testing.md](docs/testing.md)에 있습니다.
 
