@@ -146,6 +146,7 @@ function feeFor(row: PaymentRow, providerFault: boolean): CancelFee {
         startAtMs: startAtMs ?? Date.now(),
         nowMs: Date.now(),
         isSurcharge: Number(r?.surcharge_rate ?? 0) > 0,
+        surchargeRate: Number(r?.surcharge_rate ?? 0),
         providerFault,
     });
 }

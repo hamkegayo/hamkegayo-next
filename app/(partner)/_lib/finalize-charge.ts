@@ -116,6 +116,7 @@ export async function finalizeServiceCharge(
             durationMinutes,
             actualMinutes: actualMinutesBetween(startMs, endedAtMs),
             isSurcharge,
+            surchargeRate: Number(r.surcharge_rate ?? 0),
         });
 
         const { data: eventPayment, error: eventError } = await admin
@@ -205,7 +206,8 @@ export async function finalizeNoShowCharge(
 
         const r = data.reservations;
         const plan: PlanCode = r.plan === "plus" ? "plus" : "basic";
-        const total = oneHourCharge(plan, Number(r.surcharge_rate ?? 0) > 0);
+        const rate = Number(r.surcharge_rate ?? 0);
+        const total = oneHourCharge(plan, rate > 0, rate);
 
         const { data: eventPayment, error: eventError } = await admin
             .from("payments")

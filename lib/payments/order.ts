@@ -64,7 +64,12 @@ export function calcPaymentAmounts(params: {
     const { plan, durationMinutes, surchargeRate, feeRate } = params;
 
     // 예약 시점에 고정한 할증률을 그대로 쓴다(공휴일 지정이 나중에 바뀌어도 흔들리지 않게).
-    const prepayment = calcPrepayment(plan, durationMinutes, surchargeRate > 0);
+    const prepayment = calcPrepayment(
+        plan,
+        durationMinutes,
+        surchargeRate > 0,
+        surchargeRate,
+    );
     const gross = prepayment.amount;
 
     // 사용 포인트는 총액을 넘을 수 없다.
