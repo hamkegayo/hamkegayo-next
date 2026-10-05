@@ -33,6 +33,18 @@ export default function PrivacyPage() {
                 </p>
             </aside>
             <LegalDocumentView doc={PRIVACY} />
+            <aside className="mx-auto my-8 max-w-4xl rounded-xl border p-4 text-sm">
+                <strong>첫 1시간 무료 이벤트 식별정보 안내</strong>
+                <p>
+                    인증 이메일 HMAC의 처리 목적·항목·보유 및 파기 기준과 권리
+                    행사 방법은{" "}
+                    <Link href="/event/opening" className="underline">
+                        이벤트 안내
+                    </Link>
+                    에서 확인할 수 있습니다. 일반 예약은 이벤트 참여 없이도
+                    가능합니다.
+                </p>
+            </aside>
         </>
     );
 }
