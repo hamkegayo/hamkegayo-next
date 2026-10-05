@@ -16,9 +16,6 @@ export function PublicHero({
     return (
         <Section className="md:py-16">
             <div className="relative isolate overflow-hidden rounded-3xl lg:aspect-[962/542] lg:min-h-[600px]">
-                <div className="relative z-10 pb-8 lg:w-[46%] lg:px-6 lg:py-12">
-                    {children}
-                </div>
                 <Image
                     src={image}
                     alt={alt}
@@ -29,6 +26,9 @@ export function PublicHero({
                     priority
                     className="h-auto w-full lg:absolute lg:inset-0 lg:h-full lg:object-contain"
                 />
+                <div className="relative z-10 pt-6 pb-8 lg:w-[46%] lg:px-6 lg:py-12">
+                    {children}
+                </div>
             </div>
         </Section>
     );
