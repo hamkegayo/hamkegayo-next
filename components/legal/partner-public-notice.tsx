@@ -1,3 +1,8 @@
+import {
+    operationalNoticeEffectiveDate,
+    OPERATIONAL_NOTICE_ANNOUNCED_DATE,
+} from "@/lib/legal/operational-release";
+
 export function PartnerPublicNotice() {
     return (
         <aside
@@ -5,6 +10,14 @@ export function PartnerPublicNotice() {
             aria-label="파트너 프로필 공개 안내"
         >
             <strong>파트너 프로필 공개 안내</strong>
+            <p>
+                개인정보처리방침 부속 고지 버전:
+                partner-disclosure-2026-10-05-v1
+            </p>
+            <p>
+                공고일: {OPERATIONAL_NOTICE_ANNOUNCED_DATE} · 시행일:{" "}
+                {operationalNoticeEffectiveDate()}
+            </p>
             <p>
                 파트너 선택 전 서비스 제공자 정보 확인을 위해, 파트너가 공개에
                 동의한 사진·표시 이름·자기소개 및 관리자 검증 근무
