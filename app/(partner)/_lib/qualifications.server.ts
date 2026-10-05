@@ -6,7 +6,7 @@ export type QualificationView = {
     icon: "license";
     title: string;
     detail: string;
-    filename: string;
+    filename: string | null;
     /** 인증 대기 여부 (PENDING) */
     pending: boolean;
 };
@@ -17,7 +17,7 @@ type Row = {
     reg_no: string | null;
     acquired_date: string | null;
     issuer: string | null;
-    filename: string;
+    filename: string | null;
     status: "PENDING" | "VERIFIED";
 };
 

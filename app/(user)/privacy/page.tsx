@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { LegalDocumentView } from "@/components/legal/legal-document";
 import { PRIVACY } from "@/lib/legal/privacy";
+import { PartnerPublicNotice } from "@/components/legal/partner-public-notice";
 
 export const metadata: Metadata = {
     title: "개인정보처리방침",
@@ -13,6 +14,7 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
     return (
         <>
+            <PartnerPublicNotice />
             <aside className="mx-auto mt-8 max-w-4xl rounded-xl border p-4 text-sm leading-relaxed">
                 <strong>후기 공개 안내</strong>
                 <p>
@@ -30,7 +32,30 @@ export default function PrivacyPage() {
                     후 공개를 시작합니다.
                 </p>
             </aside>
+            <aside className="mx-auto my-8 max-w-4xl rounded-xl border p-4 text-sm">
+                <strong>파트너 자격·경력 증빙 수집 안내</strong>
+                <p>
+                    증빙 원본의 심사 결과 통지 후 30일 보유·이의신청·파기 및
+                    수집 항목은{" "}
+                    <Link href="/partner-evidence-notice" className="underline">
+                        파트너 증빙 안내
+                    </Link>
+                    에서 확인할 수 있습니다.
+                </p>
+            </aside>
             <LegalDocumentView doc={PRIVACY} />
+            <aside className="mx-auto my-8 max-w-4xl rounded-xl border p-4 text-sm">
+                <strong>첫 1시간 무료 이벤트 식별정보 안내</strong>
+                <p>
+                    인증 이메일 HMAC의 처리 목적·항목·보유 및 파기 기준과 권리
+                    행사 방법은{" "}
+                    <Link href="/event/opening" className="underline">
+                        이벤트 안내
+                    </Link>
+                    에서 확인할 수 있습니다. 일반 예약은 이벤트 참여 없이도
+                    가능합니다.
+                </p>
+            </aside>
         </>
     );
 }

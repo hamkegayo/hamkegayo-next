@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
-
-const QUALIFICATION_FILE_URL_TTL_SECONDS = 5 * 60;
+import { evidenceLinkTTL } from "@/lib/evidence-retention";
 
 export async function reviewWorkHistory(input: {
     id: string;
@@ -60,6 +59,17 @@ export async function reviewQualification(input: {
 
 export async function openQualificationFile(id: string, reason: string) {
     const supabase = await createClient();
+    const { data: retention, error: retentionError } = await supabase.rpc(
+        "partner_evidence_retention_status",
+        { p_id: id, p_kind: "QUALIFICATION" },
+    );
+    const ttl = retentionError ? 0 : evidenceLinkTTL(retention);
+    if (!ttl)
+        return {
+            ok: false as const,
+            message:
+                "증빙 원본 보유기간이 종료됐거나 상태를 확인하지 못했습니다.",
+        };
     const { data: path, error } = await supabase.rpc(
         "admin_get_qualification_file",
         {
@@ -75,7 +85,7 @@ export async function openQualificationFile(id: string, reason: string) {
     }
     const { data, error: fileError } = await supabase.storage
         .from("partner-qualifications")
-        .createSignedUrl(path, QUALIFICATION_FILE_URL_TTL_SECONDS);
+        .createSignedUrl(path, ttl);
     if (fileError || !data)
         return {
             ok: false as const,

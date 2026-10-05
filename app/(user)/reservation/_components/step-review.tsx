@@ -301,7 +301,10 @@ export function StepReview() {
 
                                 {quote && quote.surchargeAmount > 0 && (
                                     <div className="text-muted-foreground flex items-center justify-between">
-                                        <span>주말·공휴일 할증 30%</span>
+                                        <span>
+                                            주말·공휴일 할증{" "}
+                                            {quote.surchargeRate * 100}%
+                                        </span>
                                         <span className="text-foreground font-semibold">
                                             +
                                             {quote.surchargeAmount.toLocaleString()}
