@@ -58,17 +58,9 @@ revoke all on function public.append_evidence_retention_notice() from public,ano
 create trigger evidence_retention_notice before insert on public.notifications
 for each row execute function public.append_evidence_retention_notice();
 
--- 기존 자료는 실제 심사 감사 시각이 있는 경우에만 이력을 연결한다. 없는 시각을 만들어 넣지 않는다.
-insert into public.partner_evidence_retention(kind,item_id,partner_id,notified_at,expires_at)
-select 'QUALIFICATION',q.id,q.partner_id,max(l.occurred_at),max(l.occurred_at)+interval '30 days'
-from public.partner_qualifications q join public.access_logs l on l.target_id=q.id
-where l.action='QUALIFICATION_REVIEW' and l.target_table='partner_qualifications'
-group by q.id,q.partner_id;
-insert into public.partner_evidence_retention(kind,item_id,partner_id,notified_at,expires_at)
-select 'HISTORY',h.id,h.partner_id,max(l.occurred_at),max(l.occurred_at)+interval '30 days'
-from public.partner_work_histories h join public.access_logs l on l.target_id=h.id
-where l.action='WORK_HISTORY_REVIEW' and l.target_table='partner_work_histories'
-group by h.id,h.partner_id;
+-- 이전 심사 알림에는 30일 고지가 없었다. 새 정책을 과거 알림에 소급하지 않는다.
+-- 기존 심사 자료는 담당자가 결과/30일 기준을 실제 재통지한 후 그 시각부터 계산한다.
+-- 과거 심사 감사 기록은 그대로 보존하며 시행일/통지일을 임의 생성하지 않는다.
 
 create function public.cleanup_partner_evidence_retention() returns trigger
 language plpgsql security definer set search_path='' as $$
