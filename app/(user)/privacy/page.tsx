@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { LegalDocumentView } from "@/components/legal/legal-document";
 import { PRIVACY } from "@/lib/legal/privacy";
+import { PartnerPublicNotice } from "@/components/legal/partner-public-notice";
 
 export const metadata: Metadata = {
     title: "개인정보처리방침",
@@ -13,6 +14,7 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
     return (
         <>
+            <PartnerPublicNotice />
             <aside className="mx-auto mt-8 max-w-4xl rounded-xl border p-4 text-sm leading-relaxed">
                 <strong>후기 공개 안내</strong>
                 <p>

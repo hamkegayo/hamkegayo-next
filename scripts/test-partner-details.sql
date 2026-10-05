@@ -1,5 +1,7 @@
 -- #173 integration test. Transaction-local fixtures; always rolled back.
 begin;
+-- Release 83 enables production; explicitly test the disabled gate in this rollback fixture.
+update public.partner_public_release set enabled=false;
 create function pg_temp.assert(p_ok boolean, p_label text) returns void language plpgsql as $$
 begin
   if p_ok is distinct from true then raise exception 'FAIL: %', p_label; end if;
@@ -46,7 +48,7 @@ select pg_temp.denied($q$select public.get_reservation_partner_detail('00000173-
 reset role;
 select set_config('request.jwt.claims', '{"sub":"00000173-0000-4000-8000-000000000002","role":"authenticated","aal":"aal1"}', true);
 set local role authenticated;
-select pg_temp.assert(not public.partner_public_details_enabled(),'public details default disabled');
+select pg_temp.assert(not public.partner_public_details_enabled(),'explicitly disabled public details gate');
 select pg_temp.denied($q$select public.get_reservation_partner_detail('00000173-0000-4000-8000-000000000005','00000173-0000-4000-8000-000000000003')$q$,'details blocked before notice release');
 select pg_temp.denied('update public.partner_public_release set enabled=true','customer cannot enable release');
 reset role;
