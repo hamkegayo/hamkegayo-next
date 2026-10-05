@@ -72,7 +72,7 @@ const NOTICES: { icon: LucideIcon; lines: string[] }[] = [
     {
         icon: Clock,
         lines: [
-            "주말, 공휴일 30% 할증이 붙습니다.",
+            "별도 고지 전까지 주말·공휴일 할증 없이 이용하실 수 있습니다.",
             "심야 (22시 ~ 07시) 50% 할증이 붙습니다.",
         ],
     },

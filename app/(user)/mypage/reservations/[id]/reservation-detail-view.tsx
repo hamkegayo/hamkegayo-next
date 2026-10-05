@@ -285,7 +285,7 @@ export function ReservationDetailView({ r }: { r: ReservationDetailView }) {
                                 {r.payment.surchargeAmount > 0 && (
                                     <div className="flex items-center justify-between">
                                         <span className="text-muted-foreground">
-                                            주말·공휴일 할증 30%
+                                            주말·공휴일 할증
                                         </span>
                                         <span className="text-foreground font-semibold">
                                             +
