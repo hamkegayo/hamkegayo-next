@@ -1,18 +1,17 @@
-import { BadgeCheck, Bell, Clock } from "lucide-react";
+import { BadgeCheck, Bell, CalendarDays } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import Link from "next/link";
-import { SERVICE_HOURS_LABEL } from "@/lib/service-hours";
 
 import { Section } from "./section";
 
 const ITEMS: { icon: LucideIcon; title: string; desc: string; tag: string }[] =
     [
         {
-            icon: Clock,
-            title: "24시간 예약 접수",
-            desc: "밤에도 예약을 남겨두면 순서대로 매칭돼요.",
-            tag: SERVICE_HOURS_LABEL,
+            icon: CalendarDays,
+            title: "주말에도 동행",
+            desc: "평일에 시간을 내기 어려우신가요? 주말·공휴일에도 병원 방문을 함께합니다.",
+            tag: "주말·공휴일 포함",
         },
         {
             icon: BadgeCheck,
