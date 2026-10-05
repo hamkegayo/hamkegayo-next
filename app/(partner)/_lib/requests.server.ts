@@ -239,6 +239,7 @@ export async function getPartnerRequestDetail(
             planCode,
             row.duration_minutes ?? 120,
             surcharged,
+            Number(row.surcharge_rate ?? 0),
         ).amount;
 
         return {

@@ -20,7 +20,9 @@ import {
     calcCancelRefund,
     calcFinalCharge,
     calcPrepayment,
+    surchargeRateOf,
 } from "@/lib/pricing";
+import { calcPaymentAmounts } from "@/lib/payments/order";
 import {
     isPastSlot,
     MIN_LEAD_MINUTES,
@@ -57,6 +59,7 @@ function feeIn(minutes, opts = {}) {
         startAtMs: NOW + minutes * MIN,
         nowMs: NOW,
         isSurcharge: opts.isSurcharge ?? false,
+        surchargeRate: opts.surchargeRate,
         providerFault: opts.providerFault,
     });
 }
@@ -163,6 +166,59 @@ check(
     over.extraMinutes === 15 && over.total === 45000,
     `연장 ${over.extraMinutes}분 / ${over.total}원`,
 );
+
+console.log("\n▶ 예약 할증률 스냅샷 보존 (#206)");
+for (const [rate, finalTotal, cancelTotal] of [
+    [0, 45000, 20000],
+    [0.3, 58500, 26000],
+    [0.15, 51750, 23000],
+]) {
+    // 현재 30% 정책과 다른 0%/15%를 포함해 저장 값으로 선결제·연장·취소·정산한다.
+    const payment = calcPaymentAmounts({
+        plan: "basic",
+        durationMinutes: 240,
+        surchargeRate: rate,
+        feeRate: 0.2,
+        pointsToUse: 1000,
+    });
+    check(
+        `${rate}: 4시간 결제/포인트/정산 원장 일치`,
+        payment.gross === Math.round(80000 * (1 + rate)) &&
+            payment.gross - payment.discount - payment.commission ===
+                payment.payout &&
+            payment.payout === Math.round(payment.gross * 0.8),
+    );
+    const final = calcFinalCharge({
+        plan: "basic",
+        durationMinutes: 120,
+        actualMinutes: 129,
+        isSurcharge: true,
+        surchargeRate: rate,
+    });
+    check(
+        `${rate}: 15분 연장도 저장된 할증률 적용`,
+        final.total === finalTotal && final.surchargeRate === rate,
+    );
+    check(
+        `${rate}: 취소/노쇼 1시간 요금 일치`,
+        feeIn(60, { isSurcharge: true, surchargeRate: rate }).amount ===
+            cancelTotal && oneHourCharge("basic", true, rate) === cancelTotal,
+    );
+    check(
+        `${rate}: Plus 선결제도 저장된 할증률 적용`,
+        calcPrepayment("plus", 120, true, rate).amount ===
+            Math.round(50000 * (1 + rate)),
+    );
+}
+for (const invalid of [NaN, Infinity, -0.1, 1.01]) {
+    let rejected = false;
+    try {
+        surchargeRateOf(true, invalid);
+    } catch {
+        rejected = true;
+    }
+    check(`잘못된 저장 할증률 거부: ${invalid}`, rejected);
+}
 
 // =============================================================
 console.log("\n▶ 예약 가능 시각 (지난 시각 차단)");

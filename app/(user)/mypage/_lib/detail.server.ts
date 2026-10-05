@@ -159,7 +159,12 @@ function toPayment(r: ReservationRow, plan: PlanCode): ReservationPayment {
         parseDurationMinutes(r.duration) ??
         MIN_PREPAY_MIN;
 
-    const prepayment = calcPrepayment(plan, durationMinutes, surcharged);
+    const prepayment = calcPrepayment(
+        plan,
+        durationMinutes,
+        surcharged,
+        Number(r.surcharge_rate ?? 0),
+    );
     const prepaidAmount = r.prepaid_amount ?? prepayment.amount;
 
     const isFinal = r.final_amount != null;

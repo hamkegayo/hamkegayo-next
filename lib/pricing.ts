@@ -101,7 +101,17 @@ export function ceilToUnit(
 }
 
 /** 할증 여부 → 할증률 (0 또는 0.3) */
-export function surchargeRateOf(isSurcharge: boolean): number {
+export function surchargeRateOf(
+    isSurcharge: boolean,
+    storedRate?: number,
+): number {
+    // 기존 예약은 생성 시 저장한 할증률을 사용한다. 현재 정책 상수와 분리한다(#206).
+    if (storedRate !== undefined) {
+        if (!Number.isFinite(storedRate) || storedRate < 0 || storedRate > 1) {
+            throw new Error("예약 할증률이 올바르지 않습니다.");
+        }
+        return storedRate;
+    }
     return isSurcharge ? SURCHARGE_RATE : 0;
 }
 
@@ -146,9 +156,10 @@ export function calcPrepayment(
     plan: PlanCode,
     durationMinutes: number,
     isSurcharge: boolean,
+    storedRate?: number,
 ): Prepayment {
     const prepayMinutes = Math.max(MIN_PREPAY_MIN, durationMinutes);
-    const rate = surchargeRateOf(isSurcharge);
+    const rate = surchargeRateOf(isSurcharge, storedRate);
     const baseAmount = baseAmountFor(plan, prepayMinutes);
     const amount = withSurcharge(baseAmount, rate);
 
@@ -201,10 +212,12 @@ export function calcFinalCharge(params: {
     /** 실제 이용시간(분) */
     actualMinutes: number;
     isSurcharge: boolean;
+    /** 기존 예약에 저장된 할증률. 0도 유효한 스냅샷이다. */
+    surchargeRate?: number;
 }): FinalCharge {
     const { plan, durationMinutes, isSurcharge } = params;
     const actualMinutes = Math.max(0, Math.round(params.actualMinutes));
-    const rate = surchargeRateOf(isSurcharge);
+    const rate = surchargeRateOf(isSurcharge, params.surchargeRate);
 
     const overrun = actualMinutes - durationMinutes;
 
@@ -358,10 +371,14 @@ export type CancelFee = {
  *  할증을 포함한다 — calcFinalCharge 가 최소청구를 할증 포함으로 계산하므로
  *  같은 표현이 다른 금액이 되지 않게 맞춘다.
  */
-export function oneHourCharge(plan: PlanCode, isSurcharge: boolean): number {
+export function oneHourCharge(
+    plan: PlanCode,
+    isSurcharge: boolean,
+    storedRate?: number,
+): number {
     return withSurcharge(
         baseAmountFor(plan, MIN_BILLABLE_MIN),
-        surchargeRateOf(isSurcharge),
+        surchargeRateOf(isSurcharge, storedRate),
     );
 }
 
@@ -372,6 +389,8 @@ export function calcCancelFee(params: {
     /** 취소 시각 (epoch ms) */
     nowMs: number;
     isSurcharge: boolean;
+    /** 예약 생성 시 저장한 할증률로 취소수수료를 계산한다. */
+    surchargeRate?: number;
     /** 회사 또는 파트너 귀책이면 수수료를 받지 않는다 (제19조 · 제16조 ⑦) */
     providerFault?: boolean;
 }): CancelFee {
@@ -392,7 +411,11 @@ export function calcCancelFee(params: {
     }
 
     return {
-        amount: oneHourCharge(params.plan, params.isSurcharge),
+        amount: oneHourCharge(
+            params.plan,
+            params.isSurcharge,
+            params.surchargeRate,
+        ),
         bracket: "ONE_HOUR",
         minutesUntilStart,
     };
