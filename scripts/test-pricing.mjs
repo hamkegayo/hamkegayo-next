@@ -98,7 +98,7 @@ check(
     feeIn(-30).bracket === "ONE_HOUR",
 );
 
-console.log("\n▶ 1시간 이용요금 (제11조 ②③ · 제17조 ② · 제19조)");
+console.log("\n▶ 1시간 이용요금 (제11조 ③④ · 제17조 ② · 제19조)");
 
 check("Basic 1시간은 20,000", oneHourCharge("basic", false) === 20000);
 check("Plus 1시간은 25,000", oneHourCharge("plus", false) === 25000);
@@ -140,7 +140,7 @@ const short = calcFinalCharge({
     isSurcharge: false,
 });
 check(
-    "30분만 써도 1시간이 청구된다 (제11조 ②③)",
+    "30분만 써도 1시간이 청구된다 (제11조 ③④)",
     short.total === 20000 && short.minimumApplied === true,
 );
 
@@ -151,7 +151,7 @@ const grace = calcFinalCharge({
     isSurcharge: false,
 });
 check(
-    "8분까지는 연장요금이 없다 (제11조 ④)",
+    "8분까지는 연장요금이 없다 (제11조 ⑤)",
     grace.total === 40000 && grace.extraMinutes === 0,
 );
 
@@ -162,7 +162,7 @@ const over = calcFinalCharge({
     isSurcharge: false,
 });
 check(
-    "8분을 넘으면 15분 단위로 올린다 (제11조 ⑤)",
+    "8분을 넘으면 15분 단위로 올린다 (제11조 ⑥)",
     over.extraMinutes === 15 && over.total === 45000,
     `연장 ${over.extraMinutes}분 / ${over.total}원`,
 );
