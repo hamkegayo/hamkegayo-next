@@ -32,6 +32,17 @@ export default function PrivacyPage() {
                     후 공개를 시작합니다.
                 </p>
             </aside>
+            <aside className="mx-auto my-8 max-w-4xl rounded-xl border p-4 text-sm">
+                <strong>파트너 자격·경력 증빙 수집 안내</strong>
+                <p>
+                    증빙 원본의 심사 결과 통지 후 30일 보유·이의신청·파기 및
+                    수집 항목은{" "}
+                    <Link href="/partner-evidence-notice" className="underline">
+                        파트너 증빙 안내
+                    </Link>
+                    에서 확인할 수 있습니다.
+                </p>
+            </aside>
             <LegalDocumentView doc={PRIVACY} />
             <aside className="mx-auto my-8 max-w-4xl rounded-xl border p-4 text-sm">
                 <strong>첫 1시간 무료 이벤트 식별정보 안내</strong>

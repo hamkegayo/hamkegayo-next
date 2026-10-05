@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { openPartnerEvidence } from "@/app/(partner)/partner/_actions/evidence";
+import { EvidenceRetentionControls } from "@/components/evidence-retention-controls";
 
 export function PartnerEvidenceFiles({
     id,
@@ -18,6 +19,7 @@ export function PartnerEvidenceFiles({
     const [expiresAt, setExpiresAt] = useState(0);
     return (
         <div className="mt-3 space-y-2">
+            <EvidenceRetentionControls id={id} kind={kind} admin={admin} />
             {admin && (
                 <label className="block text-sm">
                     증빙 열람 사유
@@ -46,10 +48,10 @@ export function PartnerEvidenceFiles({
                             return;
                         }
                         setLinks(result.links);
-                        setExpiresAt(Date.now() + 300000);
+                        setExpiresAt(Date.now() + result.expiresIn * 1000);
                         if (!result.links.length)
                             toast.info(
-                                "등록된 화면 증빙이 없습니다. 기존 제출 자료는 담당자에게 확인해 주세요.",
+                                "열람할 증빙이 없습니다. 보유기간 종료 또는 기존 별도 제출 여부를 확인해 주세요.",
                             );
                     } catch {
                         toast.error("증빙 조회에 실패했습니다.");

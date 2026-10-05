@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { evidenceLinkTTL } from "@/lib/evidence-retention";
 import {
     evidenceFileType,
     EVIDENCE_MAX_FILES,
@@ -80,6 +81,17 @@ export async function openPartnerEvidence(
     reason: string,
 ) {
     const client = await createClient();
+    const { data: retention, error: retentionError } = await client.rpc(
+        "partner_evidence_retention_status",
+        { p_id: id, p_kind: kind },
+    );
+    const ttl = retentionError ? 0 : evidenceLinkTTL(retention);
+    if (!ttl)
+        return {
+            ok: false as const,
+            message:
+                "보유기간 또는 증빙 상태를 확인해 주세요. 만료된 원본은 열람할 수 없습니다.",
+        };
     const { data, error } = await client.rpc("open_partner_evidence", {
         p_id: id,
         p_kind: kind,
@@ -94,7 +106,7 @@ export async function openPartnerEvidence(
     for (const file of data as { path: string; filename: string }[]) {
         const result = await client.storage
             .from("partner-qualifications")
-            .createSignedUrl(file.path, 300);
+            .createSignedUrl(file.path, ttl);
         if (result.error || !result.data)
             return {
                 ok: false as const,
@@ -102,5 +114,5 @@ export async function openPartnerEvidence(
             };
         links.push({ filename: file.filename, url: result.data.signedUrl });
     }
-    return { ok: true as const, links };
+    return { ok: true as const, links, expiresIn: ttl };
 }

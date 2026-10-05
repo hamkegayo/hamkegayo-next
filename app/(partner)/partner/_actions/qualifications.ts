@@ -116,7 +116,7 @@ export async function deleteQualification(id: string): Promise<SimpleResult> {
         .maybeSingle();
     if (!row) return { ok: false, message: "자격을 찾을 수 없습니다." };
 
-    await supabase.storage.from(BUCKET).remove([row.path]);
+    if (row.path) await supabase.storage.from(BUCKET).remove([row.path]);
     const { error } = await supabase
         .from("partner_qualifications")
         .delete()
