@@ -24,7 +24,8 @@ export function PublicHero({
                     alt={alt}
                     width={962}
                     height={542}
-                    sizes="(min-width: 1280px) 1248px, calc(100vw - 32px)"
+                    // 원본 PNG를 그대로 제공해 히어로의 추가 손실 압축을 피한다.
+                    unoptimized
                     priority
                     className="h-auto w-full lg:absolute lg:inset-0 lg:h-full lg:object-contain"
                 />
