@@ -69,6 +69,9 @@ jobs:
 
             # 닫아도 다음 날 또 뜨거나, 인앱 브라우저에 "설치하기" 가 떠서 눌러도
             # 아무 일이 없으면 화면만 봐서는 모른다. 날짜와 UA 를 고정해 본다.
+            - name: 자격·경력 증빙 파일 형식 (#199)
+              run: node --experimental-strip-types --no-warnings scripts/test-partner-evidence.mjs
+
             - name: PWA 설치 유도 — 재노출 정책·플랫폼 판정 (#117)
               run: npm run test:pwa
 
@@ -261,6 +264,11 @@ jobs:
               run: |
                   eval "$(supabase status -o env)"
                   psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-service-hours.sql
+
+            - name: 자격·경력 증빙 · 비공개 열람 · 파기 큐 (#199)
+              run: |
+                  eval "$(supabase status -o env)"
+                  psql "$DB_URL" -v ON_ERROR_STOP=1 -f scripts/test-partner-evidence.sql
 
             - name: 파트너 개인정보 3단계 경계 (#66 · #67)
               run: npm run test:partner
