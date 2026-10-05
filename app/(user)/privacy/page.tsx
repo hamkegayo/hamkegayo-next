@@ -30,7 +30,6 @@ export default function PrivacyPage() {
                     후 공개를 시작합니다.
                 </p>
             </aside>
-            <LegalDocumentView doc={PRIVACY} />
             <aside className="mx-auto my-8 max-w-4xl rounded-xl border p-4 text-sm">
                 <strong>파트너 자격·경력 증빙 수집 안내</strong>
                 <p>
@@ -42,6 +41,7 @@ export default function PrivacyPage() {
                     에서 확인할 수 있습니다.
                 </p>
             </aside>
+            <LegalDocumentView doc={PRIVACY} />
         </>
     );
 }

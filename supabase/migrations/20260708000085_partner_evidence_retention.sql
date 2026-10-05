@@ -75,8 +75,10 @@ language plpgsql security definer set search_path='' as $$
 begin
   delete from public.partner_evidence_retention where item_id=old.id
     and kind=case when tg_table_name='partner_qualifications' then 'QUALIFICATION' else 'HISTORY' end;
-  if tg_table_name='partner_qualifications' and old.path is not null then
-    insert into public.partner_evidence_deletions(path) values(old.path) on conflict do nothing;
+  if tg_table_name='partner_qualifications' then
+    if old.path is not null then
+      insert into public.partner_evidence_deletions(path) values(old.path) on conflict do nothing;
+    end if;
   end if;
   return old;
 end $$;
