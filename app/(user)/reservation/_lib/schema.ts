@@ -86,6 +86,11 @@ export const step2Schema = z.object({
         .string()
         .regex(/^(\d{10})?$/)
         .optional(),
+    // 서버 서명과 서명한 기준 주소. 검증은 서버(createReservation)가 한다 (#232 리뷰).
+    departRegionToken: z.string().max(100).optional(),
+    departRegionBase: z.string().max(200).optional(),
+    hospitalRegionToken: z.string().max(100).optional(),
+    hospitalRegionBase: z.string().max(200).optional(),
 
     // 매뉴얼 1장 — 이동수단·귀가수단·종료방식이 없으면 업무를 시작할 수 없다.
     // 파트너 개인차량 운송과 대리운전은 선택지 자체에 없다(매뉴얼 2장).

@@ -4,8 +4,10 @@ import { useState, useTransition } from "react";
 import { MapPin, Search, X } from "lucide-react";
 
 import { Modal } from "@/components/ui/modal";
-import type { AddressResult } from "@/lib/juso.server";
-import { searchReservationAddress } from "../_actions/address";
+import {
+    searchReservationAddress,
+    type SignedAddressResult,
+} from "../_actions/address";
 
 /**
  * 도로명주소 검색 팝업 (#226). 고른 주소의 법정동코드는 파트너 활동 지역 매칭에 쓴다.
@@ -18,11 +20,13 @@ export function AddressSearchModal({
 }: {
     title: string;
     onClose: () => void;
-    onSelect: (address: AddressResult) => void;
+    onSelect: (address: SignedAddressResult) => void;
 }) {
     const [keyword, setKeyword] = useState("");
-    const [results, setResults] = useState<AddressResult[] | null>(null);
+    const [results, setResults] = useState<SignedAddressResult[] | null>(null);
     const [total, setTotal] = useState(0);
+    /** 서버가 알려 준 다음 페이지 여부 — 최대 20페이지 (#232 리뷰) */
+    const [hasMore, setHasMore] = useState(false);
     const [page, setPage] = useState(1);
     const [message, setMessage] = useState("");
     const [pending, startTransition] = useTransition();
@@ -36,8 +40,9 @@ export function AddressSearchModal({
                 return;
             }
             setMessage("");
-            setPage(nextPage);
+            setPage(res.page);
             setTotal(res.total);
+            setHasMore(res.hasMore);
             setResults((prev) =>
                 nextPage === 1
                     ? res.results
@@ -96,6 +101,12 @@ export function AddressSearchModal({
                 건물명(예: 서울아산병원)이나 &ldquo;원주시 단계동&rdquo;처럼
                 검색할 수도 있습니다.
             </p>
+            {/* #232 리뷰 — 검색어 외부 전송 안내(사용자 결정: 화면 안내만, 2026-10-06) */}
+            <p className="text-muted-foreground px-5 pt-1 text-xs break-keep">
+                검색어는 주소 확인을 위해 행정안전부 도로명주소 서비스로
+                전송되며, 함께가요는 검색어를 저장하지 않습니다. 동·호수는 검색
+                후 주소 칸에 이어서 적어 주세요.
+            </p>
 
             <div className="mx-5 mt-3 mb-5 min-h-32 flex-1 overflow-y-auto">
                 {message ? (
@@ -137,7 +148,7 @@ export function AddressSearchModal({
                                 </button>
                             </li>
                         ))}
-                        {results.length < total && (
+                        {hasMore && (
                             <li>
                                 <button
                                     type="button"

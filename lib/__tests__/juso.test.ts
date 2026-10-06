@@ -69,6 +69,8 @@ describe("도로명주소 검색", () => {
         expect(res).toEqual({
             ok: true,
             total: 2,
+            page: 1,
+            hasMore: false,
             results: [
                 {
                     roadAddr: "서울특별시 송파구 올림픽로43길 88 (풍납동)",
@@ -111,6 +113,35 @@ describe("도로명주소 검색", () => {
         expect(await searchRoadAddress("서울아산병원")).toMatchObject({
             ok: false,
             reason: "error",
+        });
+    });
+});
+
+describe("도로명주소 검색 페이지 (#232 리뷰)", () => {
+    it("다음 페이지 여부를 알려 주고 20페이지에서 멈춘다", async () => {
+        vi.stubEnv("JUSO_CONFM_KEY", "test-key");
+        const many = () =>
+            jusoResponse({ errorCode: "0", totalCount: "500" }, [
+                {
+                    roadAddr: "서울특별시 송파구 올림픽로43길 88",
+                    admCd: "1171010300",
+                },
+            ]);
+        vi.stubGlobal(
+            "fetch",
+            vi.fn().mockImplementation(() => Promise.resolve(many())),
+        );
+        expect(await searchRoadAddress("올림픽로", 1)).toMatchObject({
+            page: 1,
+            hasMore: true,
+        });
+        expect(await searchRoadAddress("올림픽로", 20)).toMatchObject({
+            page: 20,
+            hasMore: false,
+        });
+        expect(await searchRoadAddress("올림픽로", 21)).toMatchObject({
+            ok: false,
+            reason: "invalid",
         });
     });
 });
