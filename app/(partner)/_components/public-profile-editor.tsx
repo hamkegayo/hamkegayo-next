@@ -135,9 +135,9 @@ export function PublicProfileEditor({
                     <h3 className="mt-6 font-bold">근무 병원·경력</h3>
                     <p className="text-muted-foreground mt-2 text-sm">
                         증빙은 아래 자격·경력 증빙 등록 화면에서 첨부해 주세요.
-                        담당자 김서현이 검증한 경력만 공개합니다. 환자 정보 등
-                        불필요한 개인정보는 제외해 주세요. 수정이 필요하면 삭제
-                        후 새로 등록하여 심사를 받아 주세요.
+                        담당자가 검증한 경력만 공개합니다. 환자 정보 등 불필요한
+                        개인정보는 제외해 주세요. 수정이 필요하면 삭제 후 새로
+                        등록하여 심사를 받아 주세요.
                     </p>
                     {profile.histories.length === 0 && (
                         <p className="text-muted-foreground mt-4 text-sm">
