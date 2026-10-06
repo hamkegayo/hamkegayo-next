@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 // 브라우저 E2E(계층 4, #214). 로컬 Supabase + 모의 PG 위에서 핵심 흐름만 검증한다.
-// 실제 NICEPAY·메일은 호출하지 않는다 — docs/testing.md
+// 실제 NICEPAY·메일은 호출하지 않는다 — 테스트 가이드(Notion) https://app.notion.com/p/3f1169f76f9f819ca52ef036622c3fc1
 const PORT = 3100;
 const BASE_URL = `http://localhost:${PORT}`;
 const CI = !!process.env.CI;
