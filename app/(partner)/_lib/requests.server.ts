@@ -17,6 +17,13 @@ import { runExpirySweep } from "@/lib/expire-matchings";
 import { formatUseDate, kstToday, toHhmm, weekdayOf } from "@/lib/format";
 import { planDisplay, type PlanCode } from "@/lib/reservation";
 import { calcPartnerPayout, calcPrepayment } from "@/lib/pricing";
+import { isPublicHoliday } from "@/lib/holidays";
+import {
+    MATCH_LABEL,
+    matchRequest,
+    type ServerMatch,
+} from "@/lib/partner-matching";
+import { getMyPartnerActivity } from "./activity.server";
 
 /** 단계 1 RPC 가 돌려주는 행 */
 type OpenRow = {
@@ -58,6 +65,17 @@ export type PartnerMatchingItem = {
     timeLabel: string;
     /** 예상 소요시간(원본 duration 문자열) */
     duration: string;
+    /**
+     * 내 활동 정보와 맞는지 (#226). 활동 정보가 없으면 null.
+     * matched 는 설정한 필수 조건이 모두 맞을 때, hits 는 맞은 항목 이름.
+     */
+    match: { matched: boolean; hits: string[] } | null;
+};
+
+export type PartnerMatchingView = {
+    items: PartnerMatchingItem[];
+    /** 활동 정보를 하나라도 설정했는지 — 아니면 "설정하면 먼저 보여 드려요" 안내 */
+    activitySet: boolean;
 };
 
 /** basic/plus → Basic/Plus (공용 헬퍼 래핑, 알 수 없는 값은 Basic) */
@@ -134,15 +152,17 @@ export async function getPartnerMatchingCount(): Promise<number> {
 }
 
 /**
- * 로그인한 파트너에게 내려줄 수락 대기 예약 목록.
+ * 로그인한 파트너에게 내려줄 수락 대기 예약 목록과 "내 조건에 맞음" 판정 (#226).
+ *
+ * 맞는 요청을 위로 올리고(맞음 > 선호 병원 > 맞은 항목 수), 맞지 않는 요청도 숨기지 않는다.
+ * 활동 정보가 없거나 판정 조회가 실패하면 지금처럼 이용일 순 그대로다 — 매칭은 보조 정보라
+ * 실패해도 요청 목록 자체는 보여야 한다.
  * 비로그인/비파트너/조회 실패 시 빈 배열을 반환한다(화면은 빈 상태로 처리).
  */
-export async function getPartnerMatchingRequests(): Promise<
-    PartnerMatchingItem[]
-> {
+export async function getPartnerMatchingView(): Promise<PartnerMatchingView> {
     try {
         const rows = await fetchOpenRows();
-        return rows.map((r) => ({
+        const base = rows.map((r) => ({
             id: r.id,
             plan: planLabel(r.plan),
             hospital: hospitalLabel(r),
@@ -150,10 +170,88 @@ export async function getPartnerMatchingRequests(): Promise<
             dateLabel: formatDateLabel(r.use_date),
             timeLabel: toHhmm(r.reserve_time),
             duration: r.duration,
-        }));
+            match: null,
+        })) satisfies PartnerMatchingItem[];
+
+        const load = await getMyPartnerActivity();
+        const activity = load.ok ? load.activity : null;
+        const activitySet =
+            activity !== null &&
+            (activity.regions.length > 0 ||
+                activity.transports.length > 0 ||
+                activity.mobility.length > 0 ||
+                activity.hospitals.length > 0 ||
+                Object.values(activity.times).some((t) => t !== null));
+        if (!activitySet || rows.length === 0)
+            return { items: base, activitySet };
+
+        const supabase = await createClient();
+        const { data: serverRows, error } = await supabase.rpc(
+            "partner_open_reservation_matches",
+            { p_ids: rows.map((r) => r.id) },
+        );
+        if (error) return { items: base, activitySet };
+        const server = new Map<string, ServerMatch>(
+            (
+                serverRows as {
+                    reservation_id: string;
+                    region_match: boolean | null;
+                    transport_match: boolean | null;
+                }[]
+            ).map((m) => [
+                m.reservation_id,
+                { region: m.region_match, transport: m.transport_match },
+            ]),
+        );
+
+        const dates = [...new Set(rows.map((r) => r.use_date))];
+        const holidays = new Set(
+            (
+                await Promise.all(
+                    dates.map(async (d) =>
+                        (await isPublicHoliday(d)) ? d : null,
+                    ),
+                )
+            ).filter(Boolean),
+        );
+
+        const scored = rows.map((r, i) => {
+            const m = matchRequest(
+                {
+                    useDate: r.use_date,
+                    arriveTime: r.arrive_time,
+                    durationMinutes: r.duration_minutes,
+                    mobilityStatus: r.mobility_status,
+                    hospitalName: r.hospital_name,
+                    isHoliday: holidays.has(r.use_date),
+                },
+                activity,
+                server.get(r.id) ?? { region: null, transport: null },
+            );
+            return {
+                item: {
+                    ...base[i],
+                    match: {
+                        matched: m.matched,
+                        hits: m.hits.map((k) => MATCH_LABEL[k]),
+                    },
+                },
+                score: m.score,
+                order: i,
+            };
+        });
+        scored.sort((a, b) => b.score - a.score || a.order - b.order);
+        return { items: scored.map((s) => s.item), activitySet };
     } catch {
-        return [];
+        return { items: [], activitySet: false };
     }
+}
+
+/** 수락 대기 목록 (홈 화면 등). 맞는 요청이 위에 온다. */
+export async function getPartnerMatchingRequests(): Promise<
+    PartnerMatchingItem[]
+> {
+    return (await getPartnerMatchingView()).items;
 }
 
 // =============================================================
