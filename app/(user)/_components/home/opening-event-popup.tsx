@@ -133,7 +133,7 @@ export function OpeningEventPopup({
                         <button
                             type="button"
                             disabled
-                            className="bg-brand text-brand-foreground relative flex flex-1 cursor-not-allowed items-center justify-center rounded-2xl px-12 py-4 text-center text-lg font-extrabold"
+                            className="bg-brand text-brand-foreground relative flex flex-1 cursor-not-allowed items-center justify-center rounded-2xl px-12 py-4 text-center text-lg font-extrabold whitespace-nowrap sm:text-base"
                         >
                             예약하기
                             <ChevronRight
@@ -145,7 +145,7 @@ export function OpeningEventPopup({
                         <Link
                             href={reservationHref}
                             onClick={() => changeOpen(false)}
-                            className="bg-brand text-brand-foreground hover:bg-brand/90 focus-visible:ring-brand relative flex flex-1 cursor-pointer items-center justify-center rounded-2xl px-12 py-4 text-center text-lg font-extrabold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                            className="bg-brand text-brand-foreground hover:bg-brand/90 focus-visible:ring-brand relative flex flex-1 cursor-pointer items-center justify-center rounded-2xl px-12 py-4 text-center text-lg font-extrabold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none sm:text-base"
                         >
                             예약하기
                             <ChevronRight
@@ -158,21 +158,28 @@ export function OpeningEventPopup({
                         <button
                             type="button"
                             disabled
-                            className="flex flex-1 cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-[#fee500] p-4 text-lg font-extrabold text-black"
+                            className="flex flex-1 cursor-not-allowed items-center justify-center gap-1.5 rounded-2xl bg-[#fee500] p-4 text-lg font-extrabold whitespace-nowrap text-black sm:text-base"
                         >
-                            <MessageCircle className="size-6 fill-black" />
+                            <MessageCircle className="size-6 shrink-0 fill-black" />
                             카카오톡 상담하기
+                            <ChevronRight
+                                aria-hidden="true"
+                                className="size-6 shrink-0"
+                            />
                         </button>
                     ) : (
                         <ContactLink
                             href={OPENING_EVENT_CHANNEL}
                             method="support"
                             external
-                            className="focus-visible:ring-brand flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#fee500] p-4 text-lg font-extrabold text-black transition-colors hover:bg-[#f0d900] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                            className="focus-visible:ring-brand flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-2xl bg-[#fee500] p-4 text-lg font-extrabold whitespace-nowrap text-black transition-colors hover:bg-[#f0d900] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none sm:text-base"
                         >
-                            <MessageCircle className="size-6 fill-black" />
+                            <MessageCircle className="size-6 shrink-0 fill-black" />
                             카카오톡 상담하기
-                            <ChevronRight className="size-6" />
+                            <ChevronRight
+                                aria-hidden="true"
+                                className="size-6 shrink-0"
+                            />
                         </ContactLink>
                     )}
                 </div>
