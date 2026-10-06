@@ -3,6 +3,24 @@ import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 
 /**
+ * 호스트가 정확히 127.0.0.1 또는 localhost 인지 본다.
+ * 접두사만 보면 `http://localhost.attacker.example` 도 통과해 service_role 키가 외부로 나간다 (#221 리뷰).
+ */
+export function isLocalSupabaseUrl(url: string | undefined): boolean {
+    if (!url) return false;
+    let parsed: URL;
+    try {
+        parsed = new URL(url);
+    } catch {
+        return false;
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return false;
+    }
+    return parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost";
+}
+
+/**
  * 로컬 Supabase service_role 클라이언트. E2E 준비·정리에만 쓴다.
  * .env.local(또는 환경 변수)이 로컬 스택이 아니면 즉시 중단한다 — 운영·스테이징 보호.
  */
@@ -20,7 +38,7 @@ export function localSupabaseAdmin() {
         process.env.NEXT_PUBLIC_SUPABASE_URL ?? env.NEXT_PUBLIC_SUPABASE_URL;
     const key =
         process.env.SUPABASE_SERVICE_ROLE_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.test(url)) {
+    if (!url || !isLocalSupabaseUrl(url)) {
         throw new Error(
             `E2E 는 로컬 Supabase 에서만 실행합니다 (현재: ${url ?? "없음"}).`,
         );
