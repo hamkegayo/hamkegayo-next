@@ -6,7 +6,10 @@ insert into public.profiles(id,name,role) values ('00000199-0000-4000-8000-00000
 insert into public.partner_accounts(profile_id,login_id) values ('00000199-0000-4000-8000-000000000001','evidence-test-199');
 insert into public.admin_accounts(profile_id,duty) values ('00000199-0000-4000-8000-000000000002','심사');
 insert into storage.objects(bucket_id,name) values ('partner-qualifications','00000199-0000-4000-8000-000000000001/evidence/one.pdf'),('partner-qualifications','00000199-0000-4000-8000-000000000001/evidence/two.pdf');
-select pg_temp.assert(not public.partner_evidence_enabled(),'notice gate default closed');
+select pg_temp.assert(public.partner_evidence_enabled(),'release 86 opens upload after notice');
+-- 고지 철회 등으로 다시 닫았을 때 제출이 막히는지 확인한다(롤백되므로 실제 값은 바뀌지 않는다).
+update public.partner_evidence_release set enabled=false;
+select pg_temp.assert(not public.partner_evidence_enabled(),'closed gate blocks submission');
 select pg_temp.denied($q$select public.submit_partner_evidence('00000199-0000-4000-8000-000000000001','QUALIFICATION','{"type":"Test"}','[{"path":"00000199-0000-4000-8000-000000000001/evidence/one.pdf","filename":"one.pdf","size":10}]')$q$);
 update public.partner_evidence_release set enabled=true;
 select public.submit_partner_evidence('00000199-0000-4000-8000-000000000001','COMPANION','{"hospital":"Test Agency","department":"Partner","duties":"Companion","startedOn":"2020-01-01","currentJob":true}','[{"path":"00000199-0000-4000-8000-000000000001/evidence/one.pdf","filename":"one.pdf","size":10},{"path":"00000199-0000-4000-8000-000000000001/evidence/two.pdf","filename":"two.pdf","size":10}]');

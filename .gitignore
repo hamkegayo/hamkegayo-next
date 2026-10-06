@@ -49,3 +49,9 @@ plan*
 # 에이전트 로컬 설정
 .claude/
 .agents/
+
+# Playwright E2E (#214)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
