@@ -1,15 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Avatar } from "@/components/ui/avatar";
 import { useRouter } from "next/navigation";
-import {
-    AlertTriangle,
-    Bell,
-    Check,
-    Search,
-    Send,
-    UserRound,
-} from "lucide-react";
+import { AlertTriangle, Bell, Check, Search, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { Section } from "@/app/(user)/_components/home/section";
@@ -306,9 +300,12 @@ export function StepMatching() {
                                         key={a.partnerId}
                                         className="border-border bg-background flex items-center gap-4 rounded-xl border p-4"
                                     >
-                                        <div className="bg-muted flex size-12 shrink-0 items-center justify-center rounded-full">
-                                            <UserRound className="text-muted-foreground size-6" />
-                                        </div>
+                                        <Avatar
+                                            src={a.avatarUrl}
+                                            alt={`${a.name} 파트너 프로필 사진`}
+                                            className="bg-muted size-12 shrink-0"
+                                            iconClassName="text-muted-foreground"
+                                        />
                                         <div className="min-w-0 flex-1">
                                             <p className="text-foreground flex items-center gap-1.5 font-bold">
                                                 {a.name}

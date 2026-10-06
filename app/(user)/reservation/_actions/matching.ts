@@ -4,10 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
-import {
-    PROFILE_PHOTO_BUCKET,
-    PROFILE_PHOTO_URL_TTL,
-} from "@/lib/profile-photo";
+import { getConsentedPartnerAvatars } from "@/lib/partner-avatars.server";
 import { kstStamp } from "@/lib/format";
 import type { PartnerDetail } from "@/lib/partner-details";
 
@@ -37,7 +34,7 @@ export async function getReservationPartnerDetail(
             };
         const detail = data as Omit<PartnerDetail, "avatarUrl">;
         const avatars = detail.publicConsent
-            ? await signPartnerAvatars(createAdminClient(), [detail.partnerId])
+            ? await getConsentedPartnerAvatars([detail.partnerId])
             : new Map<string, string>();
         return {
             ok: true,
@@ -73,46 +70,6 @@ export type DetailedApplicant = {
 /** 지원 시각 라벨 (MM.DD HH:mm · KST) */
 function formatAppliedAt(iso: string): string {
     return kstStamp(iso) ?? "";
-}
-
-/**
- * 파트너 id → 프로필 사진 signed URL 맵.
- * 사진 미등록 파트너는 맵에 담기지 않아 화면에서 기본 아이콘으로 폴백된다.
- */
-async function signPartnerAvatars(
-    admin: ReturnType<typeof createAdminClient>,
-    partnerIds: string[],
-): Promise<Map<string, string>> {
-    const map = new Map<string, string>();
-
-    const { data: rows } = await admin
-        .from("profiles")
-        .select("id, avatar_path")
-        .in("id", partnerIds)
-        .not("avatar_path", "is", null)
-        .returns<{ id: string; avatar_path: string }[]>();
-
-    if (!rows || rows.length === 0) return map;
-
-    const { data: signed } = await admin.storage
-        .from(PROFILE_PHOTO_BUCKET)
-        .createSignedUrls(
-            rows.map((r) => r.avatar_path),
-            PROFILE_PHOTO_URL_TTL,
-        );
-    if (!signed) return map;
-
-    const urlByPath = new Map<string, string>();
-    signed.forEach((s) => {
-        if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl);
-    });
-
-    rows.forEach((r) => {
-        const url = urlByPath.get(r.avatar_path);
-        if (url) map.set(r.id, url);
-    });
-
-    return map;
 }
 
 /**
@@ -186,8 +143,8 @@ export async function getReservationApplicantsDetailed(
             qualMap.set(q.partner_id, arr);
         });
 
-        // 프로필 사진 (profiles 는 본인만 RLS → admin 으로 경로 조회 후 signed URL 발급)
-        const avatarMap = await signPartnerAvatars(admin, partnerIds);
+        // 프로필 사진 — 공개에 동의한 파트너만(공개 고지 "사진", 매칭 중). 동의 전에는 아이콘.
+        const avatarMap = await getConsentedPartnerAvatars(partnerIds);
 
         return list.map((a) => {
             const r = ratingMap.get(a.partner_id);
