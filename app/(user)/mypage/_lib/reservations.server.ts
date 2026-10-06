@@ -26,8 +26,11 @@ export type MatchingReservationView = {
     hospital: string;
     datetimeLabel: string;
     planLabel: string;
-    /** 수락한(지원한) 파트너 수. 0명이어도 카드를 보여 준다 */
-    applicantCount: number;
+    /**
+     * 수락한(지원한) 파트너 수. 0명이어도 카드를 보여 준다.
+     * null = 조회 실패 — "지원자 없음"으로 보이지 않게 구분한다.
+     */
+    applicantCount: number | null;
 };
 
 /** 최근 예약 내역(완료/취소) */
@@ -111,11 +114,12 @@ export async function getMyReservations(): Promise<{
         const matchingRows = data.filter((r) => r.status === "MATCHING");
         const applicantCounts = await Promise.all(
             matchingRows.map(async (r) => {
-                const { data: applicants } = await supabase.rpc(
-                    "get_reservation_applicants",
-                    { p_reservation_id: r.id },
-                );
-                return Array.isArray(applicants) ? applicants.length : 0;
+                const { data: applicants, error: applicantsError } =
+                    await supabase.rpc("get_reservation_applicants", {
+                        p_reservation_id: r.id,
+                    });
+                if (applicantsError || !Array.isArray(applicants)) return null;
+                return applicants.length;
             }),
         );
         const matching: MatchingReservationView[] = matchingRows.map(

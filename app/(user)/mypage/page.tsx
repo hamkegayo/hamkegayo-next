@@ -71,14 +71,17 @@ export default async function MypageHome() {
                                         <p
                                             className={cn(
                                                 "mt-1 text-sm font-semibold",
-                                                m.applicantCount > 0
+                                                m.applicantCount !== null &&
+                                                    m.applicantCount > 0
                                                     ? "text-brand"
                                                     : "text-muted-foreground",
                                             )}
                                         >
-                                            {m.applicantCount > 0
-                                                ? `지원한 파트너 ${m.applicantCount}명 · 선택하러 가기`
-                                                : "아직 지원한 파트너가 없어요"}
+                                            {m.applicantCount === null
+                                                ? "지원 현황을 불러오지 못했어요 · 상세에서 확인하기"
+                                                : m.applicantCount > 0
+                                                  ? `지원한 파트너 ${m.applicantCount}명 · 선택하러 가기`
+                                                  : "아직 지원한 파트너가 없어요"}
                                         </p>
                                     </div>
                                     <ChevronRight className="text-muted-foreground size-5 shrink-0" />
