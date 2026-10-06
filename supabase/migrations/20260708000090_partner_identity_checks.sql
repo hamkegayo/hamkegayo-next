@@ -56,43 +56,69 @@ begin
   if exists (select 1 from public.partner_identity_checks where partner_id = auth.uid() and status = 'VERIFIED') then
     raise exception 'already_verified' using errcode = '22023';
   end if;
+  -- 확인 중에는 다시 제출할 수 없다. 담당자가 보고 있는 값이 결정 직전에 바뀌지 않게 한다 (#235 리뷰).
+  if exists (select 1 from public.partner_identity_checks where partner_id = auth.uid() and status = 'PENDING') then
+    raise exception 'already_pending' using errcode = '22023';
+  end if;
   insert into public.partner_identity_checks(partner_id, birth_date, status, submitted_at, purge_after, decided_at, decided_by)
   values (auth.uid(), p_birth_date, 'PENDING', now(), now() + interval '30 days', null, null)
   on conflict (partner_id) do update set
     birth_date = excluded.birth_date, status = 'PENDING', submitted_at = now(),
-    purge_after = now() + interval '30 days', decided_at = null, decided_by = null;
+    purge_after = now() + interval '30 days', decided_at = null, decided_by = null
+  where public.partner_identity_checks.status in ('REJECTED', 'EXPIRED');
+  if not found then raise exception 'already_pending' using errcode = '22023'; end if;
 end;
 $$;
 revoke all on function public.submit_partner_birth_date(date) from public, anon;
 grant execute on function public.submit_partner_birth_date(date) to authenticated;
 
+-- 반려 사유에 생년월일·주민번호 같은 원문이 들어가면 접속기록·알림에 영구히 남는다 (#235 리뷰).
+-- 날짜 형식(1990-03-15, 1990.3.15, 1990년 3월 15일, 90-03-15)과 6자리 이상 숫자를 거부한다.
+create function public.identity_reason_has_personal_data(p_reason text)
+returns boolean language sql immutable set search_path = '' as $$
+  select coalesce(p_reason, '') ~ '[0-9]{6,}'
+      or coalesce(p_reason, '') ~ '[0-9]{2,4}\s*[-./년]\s*[0-9]{1,2}\s*[-./월]\s*[0-9]{1,2}'
+      or coalesce(p_reason, '') ~ '(주민|생년월일\s*[:은는]?\s*[0-9])';
+$$;
+
 -- 심사 권한 + 2단계 인증(can_review_qualifications). 결정과 동시에 생년월일을 파기한다.
-create function public.admin_decide_partner_identity(p_partner_id uuid, p_verified boolean, p_reason text)
-returns void language plpgsql security definer set search_path = '' as $$
+-- p_expected_submitted_at: 담당자 화면이 읽은 제출 시각. 그 사이 바뀌었으면 결정하지 않는다(낙관적 잠금).
+-- 확인 완료는 자유 문구 없이 고정 기록만 남긴다. 반려 사유는 생년월일·번호가 없을 때만 받는다.
+create function public.admin_decide_partner_identity(
+  p_partner_id uuid, p_expected_submitted_at timestamptz, p_verified boolean, p_reason text
+) returns void language plpgsql security definer set search_path = '' as $$
+declare v_reason text := nullif(btrim(coalesce(p_reason, '')), '');
 begin
   if not public.can_review_qualifications() then
     raise exception 'forbidden' using errcode = '42501';
   end if;
-  if p_verified is null or p_reason is null or length(btrim(p_reason)) < 2 or length(p_reason) > 300 then
+  if p_verified is null or p_expected_submitted_at is null then
     raise exception 'invalid_review' using errcode = '22023';
+  end if;
+  if not p_verified and (v_reason is null or length(v_reason) < 2 or length(v_reason) > 300) then
+    raise exception 'invalid_review' using errcode = '22023';
+  end if;
+  if not p_verified and public.identity_reason_has_personal_data(v_reason) then
+    raise exception 'reason_contains_personal_data' using errcode = '22023';
   end if;
   update public.partner_identity_checks
      set status = case when p_verified then 'VERIFIED' else 'REJECTED' end,
          birth_date = null, decided_at = now(), decided_by = auth.uid()
-   where partner_id = p_partner_id and status = 'PENDING';
+   where partner_id = p_partner_id and status = 'PENDING' and submitted_at = p_expected_submitted_at;
   if not found then raise exception 'identity_check_changed' using errcode = 'P0002'; end if;
   perform public.log_access('PARTNER_IDENTITY_REVIEW', 'partner_identity_checks', p_partner_id, p_partner_id,
-    case when p_verified then 'VERIFIED' else 'REJECTED' end || ': ' || btrim(p_reason));
+    case when p_verified then 'VERIFIED: 자격 증빙과 대조 확인' else 'REJECTED: ' || v_reason end);
   insert into public.notifications(recipient_id, type, title, body, link)
   values (p_partner_id, 'PARTNER_IDENTITY_REVIEW',
     case when p_verified then '본인확인이 완료되었습니다' else '본인확인이 반려되었습니다' end,
     case when p_verified then '입력하신 생년월일은 확인 후 파기했습니다.'
-         else btrim(p_reason) || ' 입력하신 생년월일은 파기했습니다. 다시 제출해 주세요.' end,
+         else v_reason || ' 입력하신 생년월일은 파기했습니다. 다시 제출해 주세요.' end,
     '/partner/profile');
 end;
 $$;
-revoke all on function public.admin_decide_partner_identity(uuid, boolean, text) from public, anon;
-grant execute on function public.admin_decide_partner_identity(uuid, boolean, text) to authenticated;
+revoke all on function public.identity_reason_has_personal_data(text) from public, anon;
+revoke all on function public.admin_decide_partner_identity(uuid, timestamptz, boolean, text) from public, anon;
+grant execute on function public.admin_decide_partner_identity(uuid, timestamptz, boolean, text) to authenticated;
 
 -- 30일이 지난 미처리 생년월일 파기. 매일 실행한다.
 create function public.purge_expired_partner_birth_dates()

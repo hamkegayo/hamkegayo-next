@@ -108,7 +108,10 @@ export default async function IdentityChecksPage() {
                                     ))}
                                 </ul>
                             )}
-                            <IdentityDecision partnerId={row.partner_id} />
+                            <IdentityDecision
+                                partnerId={row.partner_id}
+                                submittedAt={row.submitted_at}
+                            />
                         </li>
                     );
                 })}
