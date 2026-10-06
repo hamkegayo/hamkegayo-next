@@ -162,3 +162,27 @@ describe("선호 병원 검색", () => {
         });
     });
 });
+
+describe("심평원 인증키", () => {
+    it("HIRA_SERVICE_KEY 가 있으면 공공데이터포털 공통 키보다 먼저 쓴다", async () => {
+        vi.stubEnv("HIRA_SERVICE_KEY", "hira-key");
+        vi.stubEnv("DATA_GO_KR_SERVICE_KEY", "common-key");
+        const fetchMock = vi.fn().mockResolvedValue(json(HIRA_OK));
+        vi.stubGlobal("fetch", fetchMock);
+        await searchHospitals("아산병원");
+        expect(String(fetchMock.mock.calls[0][0])).toContain(
+            "serviceKey=hira-key",
+        );
+    });
+
+    it("전용 키가 없으면 공통 키로 호출한다", async () => {
+        vi.stubEnv("HIRA_SERVICE_KEY", "");
+        vi.stubEnv("DATA_GO_KR_SERVICE_KEY", "common-key");
+        const fetchMock = vi.fn().mockResolvedValue(json(HIRA_OK));
+        vi.stubGlobal("fetch", fetchMock);
+        await searchHospitals("아산병원");
+        expect(String(fetchMock.mock.calls[0][0])).toContain(
+            "serviceKey=common-key",
+        );
+    });
+});

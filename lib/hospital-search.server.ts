@@ -3,7 +3,7 @@
  *
  * 1순위: 건강보험심사평가원 병원정보서비스(공공데이터포털 B551182/hospInfoServicev2).
  *        의료기관만 나오고 종별(상급종합·종합·병원·의원 등)을 함께 준다.
- *        DATA_GO_KR_SERVICE_KEY 에 이 API 활용신청이 되어 있어야 한다.
+ *        HIRA_SERVICE_KEY(없으면 DATA_GO_KR_SERVICE_KEY)에 이 API 활용신청이 되어 있어야 한다.
  * 2순위: 활용신청 전이거나 호출이 실패하면 도로명주소 API 건물명 검색으로 대신한다.
  *        건물명에 의료기관 표현이 있는 것만 남기고 아파트·생활관·연구동 등은 뺀다.
  * 둘 다 안 되면 화면은 직접 입력만 쓴다. 검색어는 병원 이름뿐이라 개인정보가 아니다.
@@ -85,7 +85,9 @@ export function hiraItems(body: unknown): HiraItem[] | null {
 }
 
 async function searchHira(keyword: string): Promise<HospitalResult[] | null> {
-    const key = process.env.DATA_GO_KR_SERVICE_KEY;
+    // 심평원 전용 키가 있으면 그것을, 없으면 같은 공공데이터포털 계정의 일반 인증키를 쓴다.
+    const key =
+        process.env.HIRA_SERVICE_KEY || process.env.DATA_GO_KR_SERVICE_KEY;
     if (!key) return null;
     // 일반 인증키(Encoding)를 그대로 붙인다 — lib/holidays.ts 와 같다.
     const url =
