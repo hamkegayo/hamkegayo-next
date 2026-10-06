@@ -103,6 +103,14 @@ export const SUITES = [
         "파트너 활동 정보 · 값 검증 · 공개 동의 v2 (#226)",
         [sql("test-partner-activity.sql")],
     ],
+    [
+        "예약 주소 법정동코드 · 형식 · 3년 파기 (#226)",
+        [sql("test-reservation-region-codes.sql")],
+    ],
+    [
+        "수락 대기 요청 매칭 · 지역/이동수단 판정 · 주소 비노출 (#226)",
+        [sql("test-partner-request-matches.sql")],
+    ],
     ["정산 계좌 열람 통제 (#51)", [npm("test:payout")]],
     [
         "이메일 인증 연락처 변경 · 목적/대상/일회 소비 (#64)",
