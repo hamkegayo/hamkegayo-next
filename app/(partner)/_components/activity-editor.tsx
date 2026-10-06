@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { MapPin, Plus, X } from "lucide-react";
+import { Building2, MapPin, Plus, Search, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
@@ -21,7 +21,11 @@ import {
     type PartnerActivity,
 } from "@/lib/partner-activity";
 import type { TransportCode } from "@/lib/handover";
-import { savePartnerActivity } from "../partner/_actions/activity";
+import {
+    savePartnerActivity,
+    searchPreferredHospitals,
+} from "../partner/_actions/activity";
+import type { HospitalResult } from "@/lib/hospital-search.server";
 import { RegionPickerModal } from "./region-picker-modal";
 
 const DEFAULT_RANGE: [string, string] = ["09:00", "18:00"];
@@ -87,6 +91,12 @@ export function ActivityEditor({
 }) {
     const [pending, startTransition] = useTransition();
     const [hospital, setHospital] = useState("");
+    /** 선호 병원 검색 결과. null 은 아직 검색 안 함 */
+    const [hospitalResults, setHospitalResults] = useState<
+        HospitalResult[] | null
+    >(null);
+    const [hospitalMessage, setHospitalMessage] = useState("");
+    const [hospitalSearching, startHospitalSearch] = useTransition();
     const [pickerOpen, setPickerOpen] = useState(false);
 
     const selectedRegions = value.regions
@@ -114,8 +124,30 @@ export function ActivityEditor({
     const setDay = (day: ActivityDay, next: [string, string] | null) =>
         set({ times: { ...value.times, [day]: next } });
 
-    const addHospital = () => {
-        const name = hospital.trim();
+    const searchHospital = () => {
+        const keyword = hospital.trim();
+        if (keyword.replace(/\s/g, "").length < 2) {
+            setHospitalMessage("병원 이름을 2글자 이상 입력해 주세요.");
+            setHospitalResults(null);
+            return;
+        }
+        // 이전 검색 결과가 새 검색어의 결과처럼 보이지 않게 먼저 비운다.
+        setHospitalResults(null);
+        setHospitalMessage("");
+        startHospitalSearch(async () => {
+            const res = await searchPreferredHospitals(keyword);
+            if (!res.ok) {
+                setHospitalResults(null);
+                setHospitalMessage(res.message);
+                return;
+            }
+            setHospitalMessage("");
+            setHospitalResults(res.results);
+        });
+    };
+
+    const addHospital = (picked?: string) => {
+        const name = (picked ?? hospital).trim();
         if (!name) return;
         if (name.length > ACTIVITY_LIMITS.hospitalLength) {
             toast.error(
@@ -132,6 +164,8 @@ export function ActivityEditor({
         if (!value.hospitals.includes(name))
             set({ hospitals: [...value.hospitals, name] });
         setHospital("");
+        setHospitalResults(null);
+        setHospitalMessage("");
     };
 
     const save = () => {
@@ -397,34 +431,100 @@ export function ActivityEditor({
 
                 <Panel
                     title="선호 병원"
-                    hint={`동행 경험이 많은 병원을 직접 입력합니다. (${value.hospitals.length}/${ACTIVITY_LIMITS.hospitals})`}
+                    hint={`동행 경험이 많은 병원을 검색해 고르거나 직접 입력합니다. (${value.hospitals.length}/${ACTIVITY_LIMITS.hospitals})`}
                     className="md:col-span-2"
                 >
                     <div className="flex gap-2">
-                        <input
-                            value={hospital}
-                            onChange={(e) => setHospital(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    addHospital();
-                                }
-                            }}
-                            maxLength={ACTIVITY_LIMITS.hospitalLength}
-                            placeholder="예) 강북삼성병원"
-                            aria-label="선호 병원 이름"
-                            className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/40 min-w-0 flex-1 rounded-lg border px-3.5 py-2.5 text-sm outline-none focus-visible:ring-[3px]"
-                        />
+                        <div className="relative min-w-0 flex-1">
+                            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                            <input
+                                value={hospital}
+                                onChange={(e) => setHospital(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        searchHospital();
+                                    }
+                                }}
+                                maxLength={ACTIVITY_LIMITS.hospitalLength}
+                                placeholder="병원 이름으로 검색 (예: 강북삼성병원)"
+                                aria-label="선호 병원 이름"
+                                className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/40 w-full rounded-lg border py-2.5 pr-3.5 pl-9 text-sm outline-none focus-visible:ring-[3px]"
+                            />
+                        </div>
                         <button
                             type="button"
-                            onClick={addHospital}
+                            onClick={searchHospital}
+                            disabled={hospitalSearching || !hospital.trim()}
+                            className="bg-brand text-brand-foreground hover:bg-brand/90 shrink-0 rounded-lg px-4 text-sm font-bold disabled:opacity-50"
+                        >
+                            {hospitalSearching ? "검색 중…" : "검색"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => addHospital()}
                             disabled={!hospital.trim()}
                             className="border-brand bg-background text-brand hover:bg-brand/5 inline-flex shrink-0 items-center gap-1 rounded-lg border px-3.5 text-sm font-bold transition-colors disabled:opacity-50"
                         >
                             <Plus className="size-4" />
-                            추가
+                            직접 추가
                         </button>
                     </div>
+                    {hospitalMessage && (
+                        <p
+                            role="alert"
+                            className="text-destructive mt-2 text-sm break-keep"
+                        >
+                            {hospitalMessage}
+                        </p>
+                    )}
+                    {hospitalResults !== null && (
+                        <div className="border-border mt-2 rounded-lg border">
+                            {hospitalResults.length === 0 ? (
+                                <p className="text-muted-foreground p-3 text-sm break-keep">
+                                    검색 결과가 없습니다. 이름이 맞다면
+                                    &ldquo;직접 추가&rdquo;로 등록해 주세요.
+                                </p>
+                            ) : (
+                                <ul className="divide-border max-h-60 divide-y overflow-y-auto">
+                                    {hospitalResults.map((h) => {
+                                        const added = value.hospitals.includes(
+                                            h.name,
+                                        );
+                                        return (
+                                            <li key={`${h.name}|${h.region}`}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        addHospital(h.name)
+                                                    }
+                                                    disabled={added}
+                                                    className="hover:bg-muted flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm disabled:opacity-50"
+                                                >
+                                                    <Building2 className="text-brand size-4 shrink-0" />
+                                                    <span className="min-w-0 flex-1">
+                                                        <span className="font-semibold">
+                                                            {h.name}
+                                                        </span>
+                                                        <span className="text-muted-foreground ml-1.5 text-xs">
+                                                            {[h.kind, h.region]
+                                                                .filter(Boolean)
+                                                                .join(" · ")}
+                                                        </span>
+                                                    </span>
+                                                    {added && (
+                                                        <span className="text-muted-foreground text-xs">
+                                                            추가됨
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            )}
+                        </div>
+                    )}
                     {value.hospitals.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-2">
                             {value.hospitals.map((h) => (

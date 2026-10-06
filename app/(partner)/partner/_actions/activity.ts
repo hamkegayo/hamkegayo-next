@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/utils/supabase/server";
 import {
+    searchHospitals,
+    type HospitalSearchResult,
+} from "@/lib/hospital-search.server";
+import {
     validateActivity,
     type ActivityRegion,
     type PartnerActivity,
@@ -127,4 +131,30 @@ export async function savePartnerActivity(
             message: "저장 요청에 실패했습니다. 다시 시도해 주세요.",
         };
     }
+}
+
+/**
+ * 선호 병원 검색 (#226). 로그인한 파트너만 쓴다 — 공개로 열면 공공 API 호출 한도를 외부에서 소진할 수 있다.
+ * 결과는 이름·종별·지역뿐이며, 저장은 지금처럼 병원 이름(문자열)으로 한다.
+ */
+export async function searchPreferredHospitals(
+    keyword: string,
+): Promise<HospitalSearchResult> {
+    if (typeof keyword !== "string")
+        return {
+            ok: false,
+            reason: "invalid",
+            message: "병원 이름을 입력해 주세요.",
+        };
+    const supabase = await createClient();
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+    if (!user || user.app_metadata?.role !== "PARTNER")
+        return {
+            ok: false,
+            reason: "unavailable",
+            message: "파트너 로그인이 필요합니다.",
+        };
+    return searchHospitals(keyword);
 }
