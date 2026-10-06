@@ -115,6 +115,10 @@ export const SUITES = [
         "파트너 생년월일 본인확인 · 즉시 파기 · 30일 자동 파기 (#226)",
         [sql("test-partner-identity.sql")],
     ],
+    [
+        "귀책 보상 포인트 지급 · 상한 100,000P · 회수 · 감사 기록 (#250)",
+        [sql("test-point-compensation.sql")],
+    ],
     ["정산 계좌 열람 통제 (#51)", [npm("test:payout")]],
     [
         "이메일 인증 연락처 변경 · 목적/대상/일회 소비 (#64)",
