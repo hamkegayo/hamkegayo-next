@@ -99,6 +99,9 @@ export async function createReservation(
         depart_address: v.departAddress,
         hospital_name: v.hospitalName,
         hospital_address: v.hospitalAddress,
+        // 도로명주소 검색으로 고른 주소의 법정동코드 — 파트너 활동 지역 매칭용 (#226)
+        depart_region_code: v.departRegionCode || null,
+        hospital_region_code: v.hospitalRegionCode || null,
 
         // 매뉴얼 1장 업무 시작 조건 (#77)
         notify_target: v.notifyTarget,

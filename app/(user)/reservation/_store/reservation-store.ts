@@ -42,8 +42,12 @@ export type ReservationData = {
     reserveTime: string;
     duration: string;
     departAddress: string;
+    /** 주소 검색으로 고른 출발지의 법정동코드. 직접 입력이면 "" (#226) */
+    departRegionCode: string;
     hospitalName: string;
     hospitalAddress: string;
+    /** 주소 검색으로 고른 병원의 법정동코드. 직접 입력이면 "" */
+    hospitalRegionCode: string;
     transportTo: string;
     transportHome: string;
     endMethod: string;
@@ -102,8 +106,10 @@ const initialData: ReservationData = {
     reserveTime: "",
     duration: "",
     departAddress: "",
+    departRegionCode: "",
     hospitalName: "",
     hospitalAddress: "",
+    hospitalRegionCode: "",
     transportTo: "",
     transportHome: "",
     endMethod: "",
