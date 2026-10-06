@@ -103,6 +103,10 @@ export const SUITES = [
         "파트너 활동 정보 · 값 검증 · 공개 동의 v2 (#226)",
         [sql("test-partner-activity.sql")],
     ],
+    [
+        "파트너 생년월일 본인확인 · 즉시 파기 · 30일 자동 파기 (#226)",
+        [sql("test-partner-identity.sql")],
+    ],
     ["정산 계좌 열람 통제 (#51)", [npm("test:payout")]],
     [
         "이메일 인증 연락처 변경 · 목적/대상/일회 소비 (#64)",
