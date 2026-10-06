@@ -39,6 +39,10 @@ jobs:
                   npm run test:migration-lint
                   npm run check:migrations
 
+            # Vitest 단위 테스트(#214). 서버와 같은 TZ=UTC 로 돌려 시간대 버그를 잡는다.
+            - name: 단위 테스트 (Vitest)
+              run: npm run test:unit
+
             # 돈을 계산하는 함수다. 구간 경계 하나가 틀리면 과다청구이거나 손실이다.
             - name: 요금 계산 단위 테스트 (#46 · #76)
               run: npm run test:pricing

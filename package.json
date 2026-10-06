@@ -8,6 +8,7 @@
         "start": "next start",
         "lint": "eslint",
         "typecheck": "tsc --noEmit",
+        "test:unit": "vitest run",
         "seed:dev": "node --env-file=.env.local scripts/seed-dev.mjs",
         "seed:admin": "node --env-file=.env.local scripts/seed-admin.mjs",
         "test:payments": "node --env-file=.env.local scripts/test-payment-flow.mjs",
@@ -69,7 +70,8 @@
         "prettier": "^3.9.4",
         "prettier-plugin-tailwindcss": "^0.8.0",
         "tailwindcss": "^4",
-        "typescript": "^6"
+        "typescript": "^6",
+        "vitest": "^3.2.7"
     },
     "lint-staged": {
         "*.{js,jsx,ts,tsx}": [
