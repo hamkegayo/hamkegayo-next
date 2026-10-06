@@ -76,6 +76,8 @@ export type PartnerMatchingView = {
     items: PartnerMatchingItem[];
     /** 활동 정보를 하나라도 설정했는지 — 아니면 "설정하면 먼저 보여 드려요" 안내 */
     activitySet: boolean;
+    /** 판정을 실제로 했는지. 판정 조회가 실패하면 false — 필터를 끄고 전체를 보여 준다 (#233 리뷰) */
+    matchingAvailable: boolean;
 };
 
 /** basic/plus → Basic/Plus (공용 헬퍼 래핑, 알 수 없는 값은 Basic) */
@@ -183,14 +185,15 @@ export async function getPartnerMatchingView(): Promise<PartnerMatchingView> {
                 activity.hospitals.length > 0 ||
                 Object.values(activity.times).some((t) => t !== null));
         if (!activitySet || rows.length === 0)
-            return { items: base, activitySet };
+            return { items: base, activitySet, matchingAvailable: true };
 
         const supabase = await createClient();
         const { data: serverRows, error } = await supabase.rpc(
             "partner_open_reservation_matches",
             { p_ids: rows.map((r) => r.id) },
         );
-        if (error) return { items: base, activitySet };
+        if (error)
+            return { items: base, activitySet, matchingAvailable: false };
         const server = new Map<string, ServerMatch>(
             (
                 serverRows as {
@@ -241,9 +244,13 @@ export async function getPartnerMatchingView(): Promise<PartnerMatchingView> {
             };
         });
         scored.sort((a, b) => b.score - a.score || a.order - b.order);
-        return { items: scored.map((s) => s.item), activitySet };
+        return {
+            items: scored.map((s) => s.item),
+            activitySet,
+            matchingAvailable: true,
+        };
     } catch {
-        return { items: [], activitySet: false };
+        return { items: [], activitySet: false, matchingAvailable: false };
     }
 }
 

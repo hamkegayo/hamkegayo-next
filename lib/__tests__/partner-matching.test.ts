@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { EMPTY_ACTIVITY, type PartnerActivity } from "@/lib/partner-activity";
 import {
     activityDayOf,
+    applyMineFilter,
     matchRequest,
     type RequestForMatch,
 } from "@/lib/partner-matching";
@@ -122,5 +123,46 @@ describe("수락 대기 요청 매칭", () => {
         });
         expect(withRegion.matched).toBe(true);
         expect(withRegion.score).toBeGreaterThan(regionOnly.score);
+    });
+});
+
+describe("내 조건만 보기 필터", () => {
+    const items = [
+        { id: "a", match: { matched: true, hits: [] } },
+        { id: "b", match: { matched: false, hits: [] } },
+    ];
+    const unjudged = [
+        { id: "a", match: null },
+        { id: "b", match: null },
+    ];
+
+    it("판정했으면 맞는 요청만 남긴다", () => {
+        expect(
+            applyMineFilter(items, {
+                activitySet: true,
+                matchingAvailable: true,
+                mine: true,
+            }).items.map((r) => r.id),
+        ).toEqual(["a"]);
+    });
+
+    it("판정 조회가 실패하면 필터를 끄고 전체를 보여 준다 (#233 리뷰)", () => {
+        expect(
+            applyMineFilter(unjudged, {
+                activitySet: true,
+                matchingAvailable: false,
+                mine: true,
+            }),
+        ).toEqual({ items: unjudged, mineOnly: false });
+    });
+
+    it("활동 정보가 없으면 필터를 적용하지 않는다", () => {
+        expect(
+            applyMineFilter(unjudged, {
+                activitySet: false,
+                matchingAvailable: true,
+                mine: true,
+            }).mineOnly,
+        ).toBe(false);
     });
 });

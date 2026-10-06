@@ -3,6 +3,7 @@ import { ChevronRight, Inbox, Sparkles } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { getPartnerMatchingView } from "../../_lib/requests.server";
+import { applyMineFilter } from "@/lib/partner-matching";
 import { AutoRefresh } from "../../_components/auto-refresh";
 
 function planBadge(plan: "Basic" | "Plus") {
@@ -16,11 +17,16 @@ export default async function PartnerRequests({
 }: {
     searchParams: Promise<{ mine?: string }>;
 }) {
-    const { items, activitySet } = await getPartnerMatchingView();
+    const { items, activitySet, matchingAvailable } =
+        await getPartnerMatchingView();
     // #226 — 내 조건에 맞는 요청만 보기. 기본은 전체(맞는 요청이 위).
-    const mineOnly = activitySet && (await searchParams).mine === "1";
+    // 판정 조회가 실패하면 필터를 적용하지 않는다 (#233 리뷰).
+    const { items: requests, mineOnly } = applyMineFilter(items, {
+        activitySet,
+        matchingAvailable,
+        mine: (await searchParams).mine === "1",
+    });
     const matchedCount = items.filter((r) => r.match?.matched).length;
-    const requests = mineOnly ? items.filter((r) => r.match?.matched) : items;
     const count = items.length;
 
     return (
@@ -45,7 +51,15 @@ export default async function PartnerRequests({
                 수 있어요.
             </p>
 
-            {activitySet ? (
+            {activitySet && !matchingAvailable ? (
+                <p
+                    role="status"
+                    className="bg-muted text-muted-foreground mt-5 rounded-xl px-4 py-3 text-sm break-keep"
+                >
+                    지금은 조건 판정을 불러오지 못해 전체 요청을 이용일 순으로
+                    보여 드려요. 잠시 후 새로고침해 주세요.
+                </p>
+            ) : activitySet ? (
                 count > 0 && (
                     <div className="mt-5 flex flex-wrap items-center gap-2">
                         <Link

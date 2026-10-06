@@ -16,6 +16,24 @@ import {
  *  - 맞지 않는 요청도 숨기지 않는다. 설정이 없으면 지금처럼 이용일 순이다.
  */
 
+/**
+ * 목록에 "내 조건만 보기"를 적용할지 (#233 리뷰).
+ * 판정 조회가 실패했으면 모든 요청의 match 가 null 이라 필터가 전부 숨기므로,
+ * 그때는 필터를 적용하지 않고 전체를 이용일 순으로 보여 준다.
+ */
+export function applyMineFilter<
+    T extends { match: { matched: boolean } | null },
+>(
+    items: T[],
+    state: { activitySet: boolean; matchingAvailable: boolean; mine: boolean },
+): { items: T[]; mineOnly: boolean } {
+    const mineOnly = state.activitySet && state.matchingAvailable && state.mine;
+    return {
+        items: mineOnly ? items.filter((r) => r.match?.matched) : items,
+        mineOnly,
+    };
+}
+
 export type MatchKey =
     "region" | "time" | "transport" | "mobility" | "hospital";
 
