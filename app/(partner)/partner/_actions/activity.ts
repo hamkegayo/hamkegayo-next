@@ -3,25 +3,98 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/utils/supabase/server";
-import { validateActivity, type PartnerActivity } from "@/lib/partner-activity";
+import {
+    validateActivity,
+    type ActivityRegion,
+    type PartnerActivity,
+} from "@/lib/partner-activity";
 
 export type ActivityResult = { ok: true } | { ok: false; message: string };
 
-/** 활동 정보 저장 (#226). 최종 검증은 save_partner_activity_profile RPC 가 한다. */
+type RegionRow = {
+    code: string;
+    level: ActivityRegion["level"];
+    name: string;
+    full_name: string;
+    ancestors: string[];
+};
+
+const REGION_COLUMNS = "code, level, name, full_name, ancestors";
+
+function toRegion(r: RegionRow): ActivityRegion {
+    return {
+        code: r.code,
+        level: r.level,
+        name: r.name,
+        fullName: r.full_name,
+        ancestors: r.ancestors,
+    };
+}
+
+/** 지역 팝업: parent 의 바로 아래 지역. parent 가 없으면 시·도 목록 */
+export async function listActivityRegions(
+    parent: string | null,
+): Promise<ActivityRegion[]> {
+    if (parent !== null && !/^\d{10}$/.test(parent)) return [];
+    const supabase = await createClient();
+    const query = supabase
+        .from("partner_activity_regions")
+        .select(REGION_COLUMNS)
+        .order("sort_order");
+    const { data } = await (
+        parent === null ? query.eq("level", 1) : query.eq("parent_code", parent)
+    ).returns<RegionRow[]>();
+    return (data ?? []).map(toRegion);
+}
+
+/** 지역 팝업 검색: "원주 단계", "장안구" 처럼 띄어 쓴 단어를 모두 포함하는 지역 */
+export async function searchActivityRegions(
+    keyword: string,
+): Promise<ActivityRegion[]> {
+    const words = keyword
+        .replace(/[%_\\]/g, "")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 4);
+    if (words.length === 0 || words.join("").length < 2) return [];
+    const supabase = await createClient();
+    let query = supabase
+        .from("partner_activity_regions")
+        .select(REGION_COLUMNS);
+    for (const w of words) query = query.ilike("full_name", `%${w}%`);
+    const { data } = await query
+        .order("level")
+        .order("sort_order")
+        .limit(30)
+        .returns<RegionRow[]>();
+    return (data ?? []).map(toRegion);
+}
+
+/** 저장된 코드의 지역 정보 (칩 표시용) */
+export async function getActivityRegionsByCode(
+    codes: string[],
+): Promise<ActivityRegion[]> {
+    const valid = codes.filter((c) => /^\d{10}$/.test(c));
+    if (valid.length === 0) return [];
+    const supabase = await createClient();
+    const { data } = await supabase
+        .from("partner_activity_regions")
+        .select(REGION_COLUMNS)
+        .in("code", valid)
+        .order("sort_order")
+        .returns<RegionRow[]>();
+    return (data ?? []).map(toRegion);
+}
+
+/** 활동 정보 저장 (#226). 최종 검증·하위 지역 정리는 save_partner_activity_profile RPC 가 한다. */
 export async function savePartnerActivity(
     input: PartnerActivity,
 ): Promise<ActivityResult> {
+    const message = validateActivity(input);
+    if (message) return { ok: false, message };
     try {
         const supabase = await createClient();
-        const { data: regions } = await supabase
-            .from("partner_activity_regions")
-            .select("key");
-        const message = validateActivity(
-            input,
-            new Set((regions ?? []).map((r: { key: string }) => r.key)),
-        );
-        if (message) return { ok: false, message };
-
         const { weekday, saturday, holiday } = input.times;
         const { error } = await supabase.rpc("save_partner_activity_profile", {
             p_regions: input.regions,

@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { Plus, Search, X } from "lucide-react";
+import { useState, useTransition } from "react";
+import { MapPin, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
@@ -13,7 +13,6 @@ import {
     MOBILITY_OPTIONS,
     TRANSPORT_OPTIONS,
     regionDisplayLabel,
-    shortRegionLabel,
     toMinutes,
     validateActivity,
     type ActivityDay,
@@ -22,6 +21,7 @@ import {
 } from "@/lib/partner-activity";
 import type { TransportCode } from "@/lib/handover";
 import { savePartnerActivity } from "../partner/_actions/activity";
+import { RegionPickerModal } from "./region-picker-modal";
 
 const DEFAULT_RANGE: [string, string] = ["09:00", "18:00"];
 
@@ -68,52 +68,35 @@ function sameActivity(a: PartnerActivity, b: PartnerActivity): boolean {
 export function ActivityEditor({
     value,
     saved,
-    regions,
+    regionInfo,
+    onRegionInfo,
     onChange,
     onSaved,
 }: {
     value: PartnerActivity;
     saved: PartnerActivity;
-    regions: ActivityRegion[];
+    /** 지금까지 본 지역 코드 → 지역 정보. 칩 이름 표시용이라 지우지 않고 쌓는다. */
+    regionInfo: Record<string, ActivityRegion>;
+    onRegionInfo: (regions: ActivityRegion[]) => void;
     onChange: (next: PartnerActivity) => void;
     onSaved: (next: PartnerActivity) => void;
 }) {
     const [pending, startTransition] = useTransition();
-    const [query, setQuery] = useState("");
     const [hospital, setHospital] = useState("");
+    const [pickerOpen, setPickerOpen] = useState(false);
 
-    const regionKeys = useMemo(
-        () => new Set(regions.map((r) => r.key)),
-        [regions],
-    );
-    const matches = useMemo(() => {
-        const q = query.replace(/\s+/g, "");
-        if (!q) return [];
-        return regions
-            .filter(
-                (r) =>
-                    !value.regions.includes(r.key) &&
-                    (r.key.replace(/\s+/g, "").includes(q) ||
-                        shortRegionLabel(r.key)
-                            .replace(/\s+/g, "")
-                            .includes(q)),
-            )
-            .slice(0, 8);
-    }, [query, regions, value.regions]);
+    const selectedRegions = value.regions
+        .map((code) => regionInfo[code])
+        .filter((r): r is ActivityRegion => Boolean(r));
 
     const dirty = !sameActivity(value, saved);
     const set = (patch: Partial<PartnerActivity>) =>
         onChange({ ...value, ...patch });
 
-    const addRegion = (key: string) => {
-        if (value.regions.length >= ACTIVITY_LIMITS.regions) {
-            toast.error(
-                `활동 지역은 ${ACTIVITY_LIMITS.regions}곳까지 선택할 수 있습니다.`,
-            );
-            return;
-        }
-        set({ regions: [...value.regions, key] });
-        setQuery("");
+    const applyRegions = (next: ActivityRegion[]) => {
+        onRegionInfo(next);
+        set({ regions: next.map((r) => r.code) });
+        setPickerOpen(false);
     };
 
     const setDay = (day: ActivityDay, next: [string, string] | null) =>
@@ -140,7 +123,7 @@ export function ActivityEditor({
     };
 
     const save = () => {
-        const message = validateActivity(value, regionKeys);
+        const message = validateActivity(value);
         if (message) {
             toast.error(message);
             return;
@@ -191,76 +174,36 @@ export function ActivityEditor({
             <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
                 <Panel
                     title="활동 지역"
-                    hint={`전국 시·군·구에서 검색해 선택합니다. 시·도 전체도 고를 수 있습니다. (${value.regions.length}/${ACTIVITY_LIMITS.regions})`}
+                    hint={`시·도, 시·군·구, 읍·면·동 어느 단계든 고를 수 있습니다. 넓은 지역을 고르면 그 안의 모든 동네가 포함됩니다. (${value.regions.length}/${ACTIVITY_LIMITS.regions})`}
                 >
-                    <div className="relative">
-                        <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-                        <input
-                            type="search"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter" && matches[0]) {
-                                    e.preventDefault();
-                                    addRegion(matches[0].key);
-                                }
-                            }}
-                            placeholder="예) 강남구, 성남, 부산"
-                            aria-label="활동 지역 검색"
-                            className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/40 w-full rounded-lg border py-2.5 pr-3.5 pl-9 text-sm outline-none focus-visible:ring-[3px]"
-                        />
-                        {matches.length > 0 && (
-                            <ul
-                                role="listbox"
-                                aria-label="검색된 지역"
-                                className="border-border bg-background absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border shadow-lg"
-                            >
-                                {matches.map((r) => (
-                                    <li
-                                        key={r.key}
-                                        role="option"
-                                        aria-selected={false}
-                                    >
-                                        <button
-                                            type="button"
-                                            onClick={() => addRegion(r.key)}
-                                            className="hover:bg-muted w-full px-3.5 py-2.5 text-left text-sm"
-                                        >
-                                            {r.sigungu ? (
-                                                r.key
-                                            ) : (
-                                                <>
-                                                    {r.key}{" "}
-                                                    <span className="text-muted-foreground">
-                                                        전체
-                                                    </span>
-                                                </>
-                                            )}
-                                        </button>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
-                    {value.regions.length === 0 ? (
+                    <button
+                        type="button"
+                        onClick={() => setPickerOpen(true)}
+                        className="border-brand bg-background text-brand hover:bg-brand/5 inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-bold transition-colors"
+                    >
+                        <MapPin className="size-4" />
+                        {value.regions.length === 0 ? "지역 선택" : "지역 변경"}
+                    </button>
+                    {selectedRegions.length === 0 ? (
                         <p className="text-muted-foreground mt-3 text-sm">
                             선택한 지역이 없습니다.
                         </p>
                     ) : (
                         <div className="mt-3 flex flex-wrap gap-2">
-                            {value.regions.map((key) => (
+                            {selectedRegions.map((r) => (
                                 <span
-                                    key={key}
+                                    key={r.code}
+                                    title={r.fullName}
                                     className="bg-brand/10 text-brand inline-flex items-center gap-1.5 rounded-full py-1.5 pr-2 pl-3 text-sm font-semibold"
                                 >
-                                    {regionDisplayLabel(key)}
+                                    {regionDisplayLabel(r.fullName, r.level)}
                                     <button
                                         type="button"
-                                        aria-label={`${key} 삭제`}
+                                        aria-label={`${r.fullName} 삭제`}
                                         onClick={() =>
                                             set({
                                                 regions: value.regions.filter(
-                                                    (r) => r !== key,
+                                                    (c) => c !== r.code,
                                                 ),
                                             })
                                         }
@@ -271,6 +214,13 @@ export function ActivityEditor({
                                 </span>
                             ))}
                         </div>
+                    )}
+                    {pickerOpen && (
+                        <RegionPickerModal
+                            initial={selectedRegions}
+                            onClose={() => setPickerOpen(false)}
+                            onApply={applyRegions}
+                        />
                     )}
                 </Panel>
 

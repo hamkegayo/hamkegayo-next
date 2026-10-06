@@ -6,6 +6,7 @@ import {
     type PartnerActivity,
 } from "@/lib/partner-activity";
 import type { TransportCode } from "@/lib/handover";
+import { getActivityRegionsByCode } from "../partner/_actions/activity";
 
 type Row = {
     regions: string[];
@@ -25,7 +26,7 @@ function range(start: string | null, end: string | null): ActivityRange {
     return start && end ? [start.slice(0, 5), end.slice(0, 5)] : null;
 }
 
-/** 로그인한 파트너의 활동 정보와 지역 선택지. 저장 전이면 빈 값이다. */
+/** 로그인한 파트너의 활동 정보와 고른 지역의 이름. 저장 전이면 빈 값이다. */
 export async function getMyPartnerActivity(): Promise<{
     activity: PartnerActivity;
     regions: ActivityRegion[];
@@ -36,20 +37,14 @@ export async function getMyPartnerActivity(): Promise<{
     } = await supabase.auth.getUser();
     if (!user) return { activity: EMPTY_ACTIVITY, regions: [] };
 
-    const [{ data: row }, { data: regions }] = await Promise.all([
-        supabase
-            .from("partner_activity_profiles")
-            .select(
-                "regions, weekday_start, weekday_end, saturday_start, saturday_end, holiday_start, holiday_end, transports, mobility_support, preferred_hospitals",
-            )
-            .eq("partner_id", user.id)
-            .maybeSingle<Row>(),
-        supabase
-            .from("partner_activity_regions")
-            .select("key, sido, sigungu")
-            .order("sort_order")
-            .returns<ActivityRegion[]>(),
-    ]);
+    const { data: row } = await supabase
+        .from("partner_activity_profiles")
+        .select(
+            "regions, weekday_start, weekday_end, saturday_start, saturday_end, holiday_start, holiday_end, transports, mobility_support, preferred_hospitals",
+        )
+        .eq("partner_id", user.id)
+        .maybeSingle<Row>();
+    const regions = row ? await getActivityRegionsByCode(row.regions) : [];
 
     return {
         activity: row
@@ -65,6 +60,6 @@ export async function getMyPartnerActivity(): Promise<{
                   hospitals: row.preferred_hospitals,
               }
             : EMPTY_ACTIVITY,
-        regions: regions ?? [],
+        regions,
     };
 }

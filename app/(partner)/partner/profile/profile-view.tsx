@@ -143,6 +143,14 @@ export function PartnerProfileView({
     const [activity, setActivity] = useState<PartnerActivity>(initialActivity);
     const [savedActivity, setSavedActivity] =
         useState<PartnerActivity>(initialActivity);
+    const [regionInfo, setRegionInfo] = useState<
+        Record<string, ActivityRegion>
+    >(() => Object.fromEntries(activityRegions.map((r) => [r.code, r])));
+    const addRegionInfo = (rows: ActivityRegion[]) =>
+        setRegionInfo((prev) => ({
+            ...prev,
+            ...Object.fromEntries(rows.map((r) => [r.code, r])),
+        }));
     const [quals, setQuals] = useState<QualItem[]>(initialQuals);
     const [qualPending, startQualTransition] = useTransition();
 
@@ -422,7 +430,8 @@ export function PartnerProfileView({
             <ActivityEditor
                 value={activity}
                 saved={savedActivity}
-                regions={activityRegions}
+                regionInfo={regionInfo}
+                onRegionInfo={addRegionInfo}
                 onChange={setActivity}
                 onSaved={setSavedActivity}
             />
@@ -520,7 +529,10 @@ export function PartnerProfileView({
                 name={initialBasicInfo.name}
                 roleLine={roleLine}
                 intro={intro}
-                regions={activity.regions.map(regionDisplayLabel)}
+                regions={activity.regions.flatMap((code) => {
+                    const r = regionInfo[code];
+                    return r ? [regionDisplayLabel(r.fullName, r.level)] : [];
+                })}
                 transports={activity.transports.map((t) => TRANSPORT_LABEL[t])}
                 mobility={activity.mobility}
                 times={activityTimeLabels(activity.times)}
