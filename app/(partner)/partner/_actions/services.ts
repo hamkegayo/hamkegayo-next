@@ -6,6 +6,7 @@ import { createClient } from "@/utils/supabase/server";
 import { createNotification } from "@/lib/notifications";
 import { issueExtensionCharge } from "@/lib/payments/extension";
 import { enqueueSettlementRefund } from "@/lib/payments/settlement-refund";
+import { earnReservationPoints } from "@/lib/points-earn.server";
 import {
     finalizeNoShowCharge,
     finalizeServiceCharge,
@@ -377,6 +378,8 @@ export async function completeService(
                 body: "동행이 안전하게 마무리됐어요. 이용 후기를 남겨주세요.",
                 link: "/review/write",
             });
+            // 결제 포인트 적립 (#249). 추가결제·환불이 남았으면 0 — cron 이 마무리한다.
+            await earnReservationPoints(owner.reservationId);
         }
     }
     return res;

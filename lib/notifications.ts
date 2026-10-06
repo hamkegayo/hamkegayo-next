@@ -15,7 +15,9 @@ export type NotificationType =
     | "QUALIFICATION_VERIFIED"
     | "QUALIFICATION_REVIEW_REQUIRED"
     /** 약관·방침이 개정되어 재동의가 필요하다 (#91) */
-    | "AGREEMENT_REVISED";
+    | "AGREEMENT_REVISED"
+    /** 결제 포인트 적립 (#249) — DB 함수 earn_reservation_points 가 보낸다 */
+    | "POINT_EARNED";
 
 export type NotificationView = {
     id: string;

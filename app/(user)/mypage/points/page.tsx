@@ -17,7 +17,7 @@ function PCoin({ className }: { className?: string }) {
 }
 
 export default async function MypagePoints() {
-    const { balance, expiring, entries } = await getMyPoints();
+    const { balance, entries } = await getMyPoints();
 
     return (
         <div>
@@ -44,15 +44,11 @@ export default async function MypagePoints() {
                 </div>
                 <div className="flex flex-col justify-center gap-3 sm:pl-8">
                     <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">
-                            소멸예정 포인트
-                        </span>
-                        <span className="text-foreground font-bold">
-                            {expiring.toLocaleString()} P
-                        </span>
+                        <span className="text-muted-foreground">유효기간</span>
+                        <span className="text-foreground font-bold">없음</span>
                     </div>
-                    <p className="text-description-foreground text-xs">
-                        30일 이내에 유효기간이 끝나는 포인트입니다.
+                    <p className="text-description-foreground text-xs break-keep">
+                        적립된 포인트는 기한 없이 사용할 수 있어요.
                     </p>
                 </div>
             </div>
@@ -119,9 +115,20 @@ export default async function MypagePoints() {
                                     <UserRound className="text-muted-foreground size-4" />
                                     적립방법
                                 </p>
-                                <ul className="text-description-foreground mt-2 space-y-1 pl-6 text-sm">
-                                    <li>서비스 이용 시 결제 금액의 1% 적립</li>
-                                    <li>이벤트 참여 시 추가 적립</li>
+                                {/* 지급기준 공개 — 약관 제19조 ④ "별도로 정하여 안내한다" (#249) */}
+                                <ul className="text-description-foreground mt-2 space-y-1 pl-6 text-sm break-keep">
+                                    <li>
+                                        서비스 이용이 끝나고 최종 정산이
+                                        완료되면 실제 결제 금액의 1%를 적립해요.
+                                    </li>
+                                    <li>
+                                        포인트로 결제한 금액과 할인 금액은 적립
+                                        기준에서 빠져요. 1P 미만은 버려요.
+                                    </li>
+                                    <li>
+                                        예약 취소, 노쇼, 서비스 제공 불가 건은
+                                        적립되지 않아요.
+                                    </li>
                                 </ul>
                             </div>
                             <div>
@@ -134,22 +141,6 @@ export default async function MypagePoints() {
                                     <li>1P = 1원으로 사용 가능</li>
                                 </ul>
                             </div>
-                        </div>
-                    </div>
-
-                    <div className="border-border bg-background rounded-2xl border p-6 md:p-7">
-                        <h2 className="text-foreground text-lg font-bold">
-                            소멸 예정 포인트
-                        </h2>
-                        <div className="mt-6 text-center">
-                            <p className="text-foreground font-bold">
-                                {expiring > 0
-                                    ? `${expiring.toLocaleString()} P 가 곧 소멸됩니다.`
-                                    : "소멸 예정 포인트가 없습니다."}
-                            </p>
-                            <p className="text-description-foreground mt-1 text-sm">
-                                유효기간이 지나면 포인트가 자동으로 소멸됩니다.
-                            </p>
                         </div>
                     </div>
                 </div>
