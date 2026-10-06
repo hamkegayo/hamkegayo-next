@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { getConsentedPartnerAvatars } from "@/lib/partner-avatars.server";
 import { kstStamp, toHhmm, weekdayOf } from "@/lib/format";
 import {
     planDisplay,
@@ -26,6 +27,8 @@ export type ReservationApplicant = {
     partnerId: string;
     name: string;
     appliedAtLabel: string;
+    /** 공개에 동의한 파트너의 프로필 사진 signed URL. 없으면 기본 아이콘 */
+    avatarUrl: string | null;
 };
 
 type ReservationRow = {
@@ -111,7 +114,7 @@ export async function getReservationApplicants(
         );
         if (error || !data) return [];
 
-        return (
+        const list = (
             data as {
                 partner_id: string;
                 partner_name: string;
@@ -121,6 +124,14 @@ export async function getReservationApplicants(
             partnerId: a.partner_id,
             name: a.partner_name,
             appliedAtLabel: formatAppliedAt(a.applied_at),
+        }));
+        // 공개에 동의한 파트너만 사진을 붙인다 (공개 고지 "사진", 매칭 중).
+        const avatars = await getConsentedPartnerAvatars(
+            list.map((a) => a.partnerId),
+        );
+        return list.map((a) => ({
+            ...a,
+            avatarUrl: avatars.get(a.partnerId) ?? null,
         }));
     } catch {
         return [];
