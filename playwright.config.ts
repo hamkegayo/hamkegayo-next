@@ -15,6 +15,8 @@ export const E2E_PAYMENT = {
 
 export default defineConfig({
     testDir: "./e2e",
+    // e2e/support/__tests__ 의 *.test.ts 는 Vitest 단위 테스트다. 스펙만 수집한다.
+    testMatch: "**/*.spec.ts",
     globalSetup: "./e2e/support/global-setup.ts",
     globalTeardown: "./e2e/support/global-teardown.ts",
     // 여러 역할이 같은 예약을 순서대로 다루므로 직렬로 실행한다.
