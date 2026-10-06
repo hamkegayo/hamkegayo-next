@@ -2,7 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import type { PartnerPublicProfile } from "@/lib/partner-details";
+import {
+    ACTIVITY_CONSENT_VERSION,
+    type PartnerPublicProfile,
+} from "@/lib/partner-details";
 import { PartnerEvidenceFiles } from "@/components/partner-evidence-files";
 import {
     deletePartnerWorkHistory,
@@ -84,15 +87,17 @@ export function PublicProfileEditor({
                 </div>
             ) : (
                 <>
-                    <div className="bg-muted mt-4 space-y-2 rounded-xl p-4 text-sm">
+                    <div className="bg-muted mt-4 space-y-2.5 rounded-xl p-5 text-sm leading-relaxed break-keep">
                         <p>
                             공개 대상: 내가 수락한 예약의 예약자. 목적: 파트너
                             선택 전 서비스 제공자 정보 확인.
                         </p>
                         <p>
                             공개 항목: 사진, 이름, 자기소개, 관리자 검증 근무
-                            병원·기간·부서·담당 업무, 인증된 자격 명칭·발급기관.
-                            평점과 마스킹된 공개 후기도 함께 표시합니다.
+                            병원·기간·부서·담당 업무, 인증된 자격 명칭·발급기관
+                            {profile.activityPublicEnabled &&
+                                ", 활동 지역·활동 가능 요일과 시간·이동 가능 수단·지원 가능한 보행 상태·선호 병원"}
+                            . 평점과 마스킹된 공개 후기도 함께 표시합니다.
                         </p>
                         <p>
                             조회 가능 기간: 해당 예약의 매칭 중.
@@ -125,6 +130,36 @@ export function PublicProfileEditor({
                             />
                             위 항목을 해당 예약자에게 공개하는 데 동의합니다.
                         </label>
+                        {/* 공개 고지 v2: 이미 동의한 파트너도 늘어난 항목에는 다시 동의해야 한다 (처리방침 제16조 ③) */}
+                        {profile.activityPublicEnabled &&
+                            profile.consent &&
+                            profile.consentVersion !==
+                                ACTIVITY_CONSENT_VERSION && (
+                                <div className="border-brand/40 bg-background mt-3 rounded-lg border p-3">
+                                    <p className="text-sm break-keep">
+                                        공개 항목에 활동 정보가 추가됐어요. 다시
+                                        동의하면 활동 지역·시간 등도 예약자에게
+                                        보입니다. 동의하지 않아도 기존 항목은
+                                        그대로 공개됩니다.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        disabled={pending}
+                                        onClick={() =>
+                                            run(
+                                                () =>
+                                                    setPartnerPublicConsent(
+                                                        true,
+                                                    ),
+                                                "추가 항목 공개에 동의했습니다.",
+                                            )
+                                        }
+                                        className="bg-brand text-brand-foreground hover:bg-brand/90 mt-2 rounded-lg px-3.5 py-2 text-sm font-bold disabled:opacity-50"
+                                    >
+                                        추가 항목까지 동의하기
+                                    </button>
+                                </div>
+                            )}
                         {!profile.publicEnabled && (
                             <p className="text-muted-foreground mt-2 text-sm">
                                 상세 정보 공개는 준비 중입니다. 현재 고객에게
@@ -132,12 +167,12 @@ export function PublicProfileEditor({
                             </p>
                         )}
                     </div>
-                    <h3 className="mt-6 font-bold">근무 병원·경력</h3>
+                    <h3 className="mt-8 font-bold">근무 병원·경력</h3>
                     <p className="text-muted-foreground mt-2 text-sm">
                         증빙은 아래 자격·경력 증빙 등록 화면에서 첨부해 주세요.
-                        담당자 김서현이 검증한 경력만 공개합니다. 환자 정보 등
-                        불필요한 개인정보는 제외해 주세요. 수정이 필요하면 삭제
-                        후 새로 등록하여 심사를 받아 주세요.
+                        담당자가 검증한 경력만 공개합니다. 환자 정보 등 불필요한
+                        개인정보는 제외해 주세요. 수정이 필요하면 삭제 후 새로
+                        등록하여 심사를 받아 주세요.
                     </p>
                     {profile.histories.length === 0 && (
                         <p className="text-muted-foreground mt-4 text-sm">
