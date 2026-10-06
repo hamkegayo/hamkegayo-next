@@ -10,7 +10,6 @@ import {
     Headphones,
     HeartPulse,
     IdCard,
-    Lock,
     Plus,
     ShieldCheck,
     Upload,
@@ -20,8 +19,17 @@ import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar } from "@/components/ui/avatar";
+import {
+    activityTimeLabels,
+    EMPTY_ACTIVITY,
+    regionDisplayLabel,
+    TRANSPORT_LABEL,
+    type ActivityRegion,
+    type PartnerActivity,
+} from "@/lib/partner-activity";
+import { ActivityEditor } from "../../_components/activity-editor";
+import type { ActivityLoad } from "../../_lib/activity-load";
 import {
     PARTNER_PROFILE,
     type Qualification,
@@ -42,7 +50,6 @@ import {
     uploadProfilePhoto,
 } from "../_actions/profile-photo";
 import { ProfilePhotoModal } from "../../_components/profile-photo-modal";
-import { SimpleAddModal } from "../../_components/simple-add-modal";
 import { VerifyChangeModal } from "../../_components/verify-change-modal";
 import { PhoneChangeModal } from "../../_components/phone-change-modal";
 import {
@@ -60,7 +67,6 @@ const QUAL_ICON: Record<QualificationIcon, LucideIcon> = {
     record: FileSearch,
 };
 
-type CheckItem = { label: string; checked: boolean };
 type QualItem = Qualification & { pending?: boolean };
 
 /* ---------- 재사용 UI ---------- */
@@ -114,41 +120,18 @@ function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
     );
 }
 
-function CheckList({
-    items,
-    onToggle,
-}: {
-    items: CheckItem[];
-    onToggle: (idx: number) => void;
-}) {
-    return (
-        <div className="space-y-3">
-            {items.map((it, idx) => (
-                <label
-                    key={it.label}
-                    className="text-foreground flex cursor-pointer items-center gap-2.5 text-sm"
-                >
-                    <Checkbox
-                        checked={it.checked}
-                        onCheckedChange={() => onToggle(idx)}
-                    />
-                    {it.label}
-                </label>
-            ))}
-        </div>
-    );
-}
-
 /* ---------- 페이지 ---------- */
 
 export function PartnerProfileView({
     initialQuals,
     initialPhotoUrl,
     initialBasicInfo,
+    activityLoad,
 }: {
     initialQuals: QualificationView[];
     initialPhotoUrl: string | null;
     initialBasicInfo: PartnerBasicInfo;
+    activityLoad: ActivityLoad;
 }) {
     const [email, setEmail] = useState(initialBasicInfo.email);
     const [phone, setPhone] = useState(initialBasicInfo.phone);
@@ -157,19 +140,22 @@ export function PartnerProfileView({
     const [savedIntro, setSavedIntro] = useState(initialBasicInfo.intro);
     const [basicInfoPending, startBasicInfoTransition] = useTransition();
 
-    const [regions, setRegions] = useState<CheckItem[]>(
-        PARTNER_PROFILE.regions,
-    );
-    const [times, setTimes] = useState<CheckItem[]>(PARTNER_PROFILE.times);
-    const [transports, setTransports] = useState<CheckItem[]>(
-        PARTNER_PROFILE.transports,
-    );
-    const [mobility, setMobility] = useState<CheckItem[]>(
-        PARTNER_PROFILE.mobilityAssist,
-    );
-    const [hospitals, setHospitals] = useState<string[]>(
-        PARTNER_PROFILE.preferredHospitals,
-    );
+    // 불러오기 실패면 편집기를 열지 않는다. 빈 값으로 보이면 저장 때 기존 값을 지운다 (#231 리뷰).
+    const initialActivity = activityLoad.ok
+        ? activityLoad.activity
+        : EMPTY_ACTIVITY;
+    const activityRegions = activityLoad.ok ? activityLoad.regions : [];
+    const [activity, setActivity] = useState<PartnerActivity>(initialActivity);
+    const [savedActivity, setSavedActivity] =
+        useState<PartnerActivity>(initialActivity);
+    const [regionInfo, setRegionInfo] = useState<
+        Record<string, ActivityRegion>
+    >(() => Object.fromEntries(activityRegions.map((r) => [r.code, r])));
+    const addRegionInfo = (rows: ActivityRegion[]) =>
+        setRegionInfo((prev) => ({
+            ...prev,
+            ...Object.fromEntries(rows.map((r) => [r.code, r])),
+        }));
     const [quals, setQuals] = useState<QualItem[]>(initialQuals);
     const [qualPending, startQualTransition] = useTransition();
 
@@ -180,28 +166,7 @@ export function PartnerProfileView({
     const [emailOpen, setEmailOpen] = useState(false);
     const [previewOpen, setPreviewOpen] = useState(false);
     const [photoOpen, setPhotoOpen] = useState(false);
-    const [regionAddOpen, setRegionAddOpen] = useState(false);
-    const [timeAddOpen, setTimeAddOpen] = useState(false);
-    const [hospitalAddOpen, setHospitalAddOpen] = useState(false);
     const [qualAddOpen, setQualAddOpen] = useState(false);
-
-    const toggle =
-        (setter: React.Dispatch<React.SetStateAction<CheckItem[]>>) =>
-        (idx: number) =>
-            setter((prev) =>
-                prev.map((it, i) =>
-                    i === idx ? { ...it, checked: !it.checked } : it,
-                ),
-            );
-
-    const addChecked =
-        (setter: React.Dispatch<React.SetStateAction<CheckItem[]>>) =>
-        (label: string) =>
-            setter((prev) =>
-                prev.some((it) => it.label === label)
-                    ? prev
-                    : [...prev, { label, checked: true }],
-            );
 
     const addQual = (v: QualificationInput, file: File) => {
         const fd = new FormData();
@@ -285,12 +250,9 @@ export function PartnerProfileView({
     };
 
     const roleLine = "병원 동행 파트너";
-    const verificationRows = quals
-        .filter((q) => !q.pending)
-        .map((q) => ({ label: "인증 자격", value: q.title }));
 
     return (
-        <div className="pb-24">
+        <div>
             {/* 헤더 */}
             <div className="flex items-start justify-between gap-4">
                 <div>
@@ -310,18 +272,10 @@ export function PartnerProfileView({
                         <Eye className="size-4" />
                         미리보기
                     </button>
-                    <button
-                        type="button"
-                        onClick={saveBasicInfo}
-                        disabled={basicInfoPending || intro === savedIntro}
-                        className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-5 py-2 text-sm font-bold transition-colors disabled:opacity-50"
-                    >
-                        {basicInfoPending ? "저장 중…" : "저장"}
-                    </button>
                 </div>
             </div>
 
-            {/* 상단: 프로필 사진 / 기본 정보 / 인증 정보 */}
+            {/* 상단: 프로필 사진 / 기본 정보 */}
             <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-12">
                 {/* 프로필 사진 + 고객센터 */}
                 <div className="space-y-5 lg:col-span-3">
@@ -368,7 +322,7 @@ export function PartnerProfileView({
                 </div>
 
                 {/* 기본 정보 */}
-                <div className="lg:col-span-5">
+                <div className="lg:col-span-9">
                     <Card
                         title="기본 정보"
                         hint="(수정 가능)"
@@ -402,7 +356,7 @@ export function PartnerProfileView({
                             <button
                                 type="button"
                                 onClick={() => setPhoneOpen(true)}
-                                className="border-border bg-muted text-muted-foreground shrink-0 rounded-lg border px-3.5 text-sm font-bold"
+                                className="border-brand bg-background text-brand hover:bg-brand/5 shrink-0 rounded-lg border px-3.5 text-sm font-bold transition-colors"
                             >
                                 이메일 인증 변경
                             </button>
@@ -445,144 +399,68 @@ export function PartnerProfileView({
                             maxLength={300}
                             className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/40 mt-1.5 min-h-28 w-full resize-y rounded-lg border px-3.5 py-2.5 text-sm outline-none focus-visible:ring-[3px]"
                         />
-                        <p className="text-muted-foreground mt-1 text-right text-xs">
-                            {intro.length} / 300
-                        </p>
-                    </Card>
-                </div>
-
-                {/* 인증 정보 */}
-                <div className="lg:col-span-4">
-                    <Card
-                        title="인증 정보"
-                        hint={
-                            <span className="inline-flex items-center gap-1">
-                                (수정 불가)
-                                <Lock className="size-3.5" />
-                            </span>
-                        }
-                        className="h-full"
-                    >
-                        <dl className="divide-border divide-y">
-                            {verificationRows.length === 0 && (
-                                <p className="text-muted-foreground text-sm">
-                                    인증 완료된 자격 없음
-                                </p>
-                            )}
-                            {verificationRows.map((row) => (
-                                <div
-                                    key={row.value}
-                                    className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
-                                >
-                                    <dt className="text-muted-foreground shrink-0 text-sm">
-                                        {row.label}
-                                    </dt>
-                                    <dd className="flex min-w-0 items-center gap-2">
-                                        <span className="text-foreground font-bold break-keep">
-                                            {row.value}
-                                        </span>
-                                        <VerifiedBadge />
-                                    </dd>
-                                </div>
-                            ))}
-                        </dl>
-                    </Card>
-                </div>
-            </div>
-
-            {/* 활동 정보 */}
-            <h2 className="text-foreground mt-8 text-xl font-extrabold">
-                활동 정보
-            </h2>
-
-            <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-3">
-                <Card
-                    title="활동 지역"
-                    hint="(수정 가능)"
-                    action={
-                        <AddButton
-                            label="지역 추가"
-                            onClick={() => setRegionAddOpen(true)}
-                        />
-                    }
-                >
-                    <CheckList items={regions} onToggle={toggle(setRegions)} />
-                </Card>
-
-                <Card
-                    title="활동 가능 시간"
-                    hint="(수정 가능)"
-                    action={
-                        <AddButton
-                            label="시간 추가"
-                            onClick={() => setTimeAddOpen(true)}
-                        />
-                    }
-                >
-                    <CheckList items={times} onToggle={toggle(setTimes)} />
-                </Card>
-
-                <Card title="활동 가능 이동수단" hint="(수정 가능)">
-                    <CheckList
-                        items={transports}
-                        onToggle={toggle(setTransports)}
-                    />
-                </Card>
-            </div>
-
-            <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3">
-                <Card title="휠체어/보행 보조 가능 여부" hint="(수정 가능)">
-                    <CheckList
-                        items={mobility}
-                        onToggle={toggle(setMobility)}
-                    />
-                </Card>
-
-                <Card
-                    title="선호 병원"
-                    hint="(수정 가능)"
-                    className="md:col-span-2"
-                >
-                    <div className="flex flex-wrap items-center gap-2">
-                        {hospitals.map((h) => (
-                            <span
-                                key={h}
-                                className="bg-brand/10 text-brand inline-flex items-center gap-1.5 rounded-full py-1.5 pr-2 pl-3 text-sm font-semibold"
-                            >
-                                {h}
+                        <div className="mt-1 flex items-center justify-between gap-3">
+                            <p className="text-muted-foreground text-xs">
+                                {intro.length} / 300
+                            </p>
+                            <div className="flex gap-2">
                                 <button
                                     type="button"
-                                    aria-label={`${h} 삭제`}
-                                    onClick={() =>
-                                        setHospitals((prev) =>
-                                            prev.filter((x) => x !== h),
-                                        )
+                                    onClick={cancelBasicInfo}
+                                    disabled={
+                                        basicInfoPending || intro === savedIntro
                                     }
-                                    className="hover:bg-brand/20 rounded-full p-0.5 transition-colors"
+                                    className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-4 py-2 text-sm font-bold transition-colors disabled:opacity-50"
                                 >
-                                    <X className="size-3.5" />
+                                    되돌리기
                                 </button>
-                            </span>
-                        ))}
-                        <button
-                            type="button"
-                            onClick={() => setHospitalAddOpen(true)}
-                            className="border-brand text-brand hover:bg-brand/5 inline-flex items-center gap-1 rounded-full border border-dashed px-3 py-1.5 text-sm font-bold transition-colors"
-                        >
-                            <Plus className="size-3.5" />
-                            병원 추가
-                        </button>
-                    </div>
-                    <p className="text-muted-foreground mt-3 text-xs">
-                        * 해당 병원에서의 동행 경험이 많아 더 빠르고 편안한
-                        서비스를 제공할 수 있습니다.
-                    </p>
-                </Card>
+                                <button
+                                    type="button"
+                                    onClick={saveBasicInfo}
+                                    disabled={
+                                        basicInfoPending || intro === savedIntro
+                                    }
+                                    className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-5 py-2 text-sm font-bold transition-colors disabled:opacity-50"
+                                >
+                                    {basicInfoPending
+                                        ? "저장 중…"
+                                        : "자기소개 저장"}
+                                </button>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
             </div>
 
-            <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
-                {/* 근무했던 병원 리스트 */}
+            {activityLoad.ok ? (
+                <ActivityEditor
+                    value={activity}
+                    saved={savedActivity}
+                    regionInfo={regionInfo}
+                    regionsUnavailable={
+                        activityLoad.ok && activityLoad.regionsUnavailable
+                    }
+                    onRegionInfo={addRegionInfo}
+                    onChange={setActivity}
+                    onSaved={setSavedActivity}
+                />
+            ) : (
+                <div
+                    role="alert"
+                    className="border-border bg-background mt-8 rounded-2xl border p-6"
+                >
+                    <h2 className="text-foreground text-xl font-extrabold">
+                        활동 정보
+                    </h2>
+                    <p className="text-destructive mt-2 text-sm break-keep">
+                        활동 정보를 불러오지 못했습니다. 저장된 정보를 지키기
+                        위해 수정을 잠시 막았습니다. 새로고침 후 다시 시도해
+                        주세요.
+                    </p>
+                </div>
+            )}
 
+            <div className="mt-8">
                 {/* 자격 및 보유 사항 */}
                 <Card
                     title="자격 및 보유 사항"
@@ -642,26 +520,6 @@ export function PartnerProfileView({
                 </Card>
             </div>
 
-            {/* 하단 액션 */}
-            <div className="mt-8 flex gap-3">
-                <button
-                    type="button"
-                    onClick={cancelBasicInfo}
-                    disabled={basicInfoPending || intro === savedIntro}
-                    className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-10 py-3.5 text-sm font-bold transition-colors disabled:opacity-50"
-                >
-                    취소
-                </button>
-                <button
-                    type="button"
-                    onClick={saveBasicInfo}
-                    disabled={basicInfoPending || intro === savedIntro}
-                    className="bg-brand text-brand-foreground hover:bg-brand/90 flex-1 rounded-lg px-4 py-3.5 text-sm font-bold transition-colors disabled:opacity-50"
-                >
-                    {basicInfoPending ? "저장 중…" : "저장"}
-                </button>
-            </div>
-
             {/* 모달 */}
             <PhoneChangeModal
                 open={phoneOpen}
@@ -672,37 +530,6 @@ export function PartnerProfileView({
                 open={emailOpen}
                 onClose={() => setEmailOpen(false)}
                 onVerified={saveVerifiedEmail}
-            />
-            <SimpleAddModal
-                open={regionAddOpen}
-                onClose={() => setRegionAddOpen(false)}
-                onAdd={addChecked(setRegions)}
-                title="활동 지역 추가"
-                description="새로 추가할 항목을 입력해주세요."
-                label="활동 지역"
-                placeholder="예) 용인시 수지구"
-            />
-            <SimpleAddModal
-                open={timeAddOpen}
-                onClose={() => setTimeAddOpen(false)}
-                onAdd={addChecked(setTimes)}
-                title="활동 가능 시간 추가"
-                description="새로 추가할 항목을 입력해주세요."
-                label="활동 가능 시간"
-                placeholder="예) 평일 새벽 (06:00 ~ 09:00)"
-            />
-            <SimpleAddModal
-                open={hospitalAddOpen}
-                onClose={() => setHospitalAddOpen(false)}
-                onAdd={(v) =>
-                    setHospitals((prev) =>
-                        prev.includes(v) ? prev : [...prev, v],
-                    )
-                }
-                title="선호 병원 추가"
-                description="동행 경험이 많은 병원을 추가해주세요."
-                label="병원명"
-                placeholder="예) 강북삼성병원"
             />
             <QualificationAddModal
                 pending={qualPending}
@@ -726,9 +553,14 @@ export function PartnerProfileView({
                 name={initialBasicInfo.name}
                 roleLine={roleLine}
                 intro={intro}
-                regions={[]}
-                times={[]}
-                preferredHospitals={[]}
+                regions={activity.regions.flatMap((code) => {
+                    const r = regionInfo[code];
+                    return r ? [regionDisplayLabel(r.fullName, r.level)] : [];
+                })}
+                transports={activity.transports.map((t) => TRANSPORT_LABEL[t])}
+                mobility={activity.mobility}
+                times={activityTimeLabels(activity.times)}
+                preferredHospitals={activity.hospitals}
             />
         </div>
     );

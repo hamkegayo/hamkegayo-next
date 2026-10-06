@@ -42,6 +42,8 @@ export function ProfilePreviewModal({
     regions,
     times,
     preferredHospitals,
+    transports = [],
+    mobility = [],
     photoUrl = null,
 }: {
     open: boolean;
@@ -52,6 +54,9 @@ export function ProfilePreviewModal({
     regions: string[];
     times: string[];
     preferredHospitals: string[];
+    transports?: string[];
+    /** 지원 가능한 보행 상태 */
+    mobility?: string[];
     /** 프로필 사진 URL (없으면 기본 아이콘) */
     photoUrl?: string | null;
 }) {
@@ -73,7 +78,11 @@ export function ProfilePreviewModal({
             <div className="max-h-[60vh] space-y-5 overflow-y-auto p-6">
                 <Section title="자기소개">
                     <p className="text-foreground text-sm leading-relaxed">
-                        {intro}
+                        {intro.trim() || (
+                            <span className="text-muted-foreground">
+                                등록된 자기소개가 없습니다.
+                            </span>
+                        )}
                     </p>
                 </Section>
                 {regions.length > 0 && (
@@ -84,6 +93,16 @@ export function ProfilePreviewModal({
                 {times.length > 0 && (
                     <Section title="활동 가능 시간">
                         <Chips items={times} />
+                    </Section>
+                )}
+                {transports.length > 0 && (
+                    <Section title="이동수단">
+                        <Chips items={transports} />
+                    </Section>
+                )}
+                {mobility.length > 0 && (
+                    <Section title="지원 가능한 보행 상태">
+                        <Chips items={mobility} />
                     </Section>
                 )}
                 {preferredHospitals.length > 0 && (
