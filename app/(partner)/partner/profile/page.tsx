@@ -35,7 +35,10 @@ export default async function PartnerProfile() {
                     evidenceEnabled={evidenceEnabled === true}
                 />
             </div>
-            <EvidenceRegister enabled={evidenceEnabled === true} />
+            {/* 카드끼리 붙어 보이지 않게 다른 섹션과 같은 간격을 둔다 */}
+            <div className="mt-8">
+                <EvidenceRegister enabled={evidenceEnabled === true} />
+            </div>
         </>
     );
 }
