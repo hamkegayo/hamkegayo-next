@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";
 
-// 단위 테스트(계층 1). DB·네트워크 없이 순수 함수만 검증한다 — docs/testing.md
+// 단위 테스트(계층 1). DB·네트워크 없이 순수 함수만 검증한다 — 테스트 가이드(Notion) https://app.notion.com/p/3f1169f76f9f819ca52ef036622c3fc1
 export default defineConfig({
     resolve: {
         alias: { "@": fileURLToPath(new URL("./", import.meta.url)) },
