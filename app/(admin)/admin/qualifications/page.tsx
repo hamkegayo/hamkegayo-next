@@ -164,6 +164,12 @@ export default async function QualificationsPage({
                 className="text-brand mt-3 inline-block underline"
             >
                 근무 경력 심사
+            </Link>{" "}
+            <Link
+                href="/admin/identity-checks"
+                className="text-brand mt-3 ml-3 inline-block underline"
+            >
+                생년월일 본인확인
             </Link>
             <p className="text-description-foreground mt-2 text-sm">
                 증빙을 확인한 뒤 사유와 함께 심사 결과를 저장해 주세요.

@@ -111,6 +111,10 @@ export const SUITES = [
         "수락 대기 요청 매칭 · 지역/이동수단 판정 · 주소 비노출 (#226)",
         [sql("test-partner-request-matches.sql")],
     ],
+    [
+        "파트너 생년월일 본인확인 · 즉시 파기 · 30일 자동 파기 (#226)",
+        [sql("test-partner-identity.sql")],
+    ],
     ["정산 계좌 열람 통제 (#51)", [npm("test:payout")]],
     [
         "이메일 인증 연락처 변경 · 목적/대상/일회 소비 (#64)",
