@@ -23,6 +23,7 @@ select pg_temp.assert(not public.can_read_partner_evidence('00000199-0000-4000-8
 select public.open_partner_evidence(id,'HISTORY','test evidence review') from public.partner_work_histories where partner_id='00000199-0000-4000-8000-000000000001';
 select pg_temp.assert(public.can_read_partner_evidence('00000199-0000-4000-8000-000000000001/evidence/one.pdf'),'audited file access');
 delete from public.partner_work_histories where partner_id='00000199-0000-4000-8000-000000000001';
-select pg_temp.assert(count(*)=2,'delete queues storage cleanup') from public.partner_evidence_deletions;
+-- 이 테스트가 만든 경로만 센다. 다른 테스트가 남긴 큐 행에 흔들리지 않게 (#214).
+select pg_temp.assert(count(*)=2,'delete queues storage cleanup') from public.partner_evidence_deletions where path like '00000199-0000-4000-8000-000000000001/%';
 select pg_temp.assert(not public.can_read_partner_evidence('00000199-0000-4000-8000-000000000001/evidence/one.pdf'),'deleted metadata revokes reviewer access');
 rollback;
