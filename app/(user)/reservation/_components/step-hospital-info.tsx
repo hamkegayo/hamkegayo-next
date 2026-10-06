@@ -26,7 +26,7 @@ import { StepBand, StepNav } from "./step-band";
 import { FieldError, FieldLabel, NativeSelect } from "./fields";
 import { AddressSearchModal } from "./address-search-modal";
 import { addressSearchEnabled } from "../_actions/address";
-import type { AddressResult } from "@/lib/juso.server";
+import type { SignedAddressResult } from "../_actions/address";
 
 type AddressTarget = "depart" | "hospital";
 
@@ -54,9 +54,13 @@ export function StepHospitalInfo() {
             duration: data.duration,
             departAddress: data.departAddress,
             departRegionCode: data.departRegionCode,
+            departRegionToken: data.departRegionToken,
+            departRegionBase: data.departRegionBase,
             hospitalName: data.hospitalName,
             hospitalAddress: data.hospitalAddress,
             hospitalRegionCode: data.hospitalRegionCode,
+            hospitalRegionToken: data.hospitalRegionToken,
+            hospitalRegionBase: data.hospitalRegionBase,
             transportTo: data.transportTo as never,
             transportHome: data.transportHome as never,
             endMethod: data.endMethod as never,
@@ -102,8 +106,8 @@ export function StepHospitalInfo() {
     );
     /** 검색으로 고른 주소(코드와 짝). 입력이 이 주소로 시작하지 않으면 코드를 비운다. */
     const [picked, setPicked] = useState<Record<AddressTarget, string>>({
-        depart: data.departRegionCode ? data.departAddress : "",
-        hospital: data.hospitalRegionCode ? data.hospitalAddress : "",
+        depart: data.departRegionCode ? data.departRegionBase : "",
+        hospital: data.hospitalRegionCode ? data.hospitalRegionBase : "",
     });
     useEffect(() => {
         let alive = true;
@@ -119,6 +123,15 @@ export function StepHospitalInfo() {
         depart: "departRegionCode",
         hospital: "hospitalRegionCode",
     } as const;
+    // 서버 서명과 서명한 기준 주소. 예약 저장 때 서버가 이것으로 주소·코드 결합을 검증한다 (#232 리뷰).
+    const tokenField = {
+        depart: "departRegionToken",
+        hospital: "hospitalRegionToken",
+    } as const;
+    const baseField = {
+        depart: "departRegionBase",
+        hospital: "hospitalRegionBase",
+    } as const;
     const addressField = {
         depart: "departAddress",
         hospital: "hospitalAddress",
@@ -129,15 +142,19 @@ export function StepHospitalInfo() {
         if (!base || !value.startsWith(base)) {
             if (base) setPicked((prev) => ({ ...prev, [target]: "" }));
             setValue(codeField[target], "");
+            setValue(tokenField[target], "");
+            setValue(baseField[target], "");
         }
     };
 
-    const applyAddress = (target: AddressTarget, a: AddressResult) => {
+    const applyAddress = (target: AddressTarget, a: SignedAddressResult) => {
         // 출발지는 동·호수를 이어 적을 수 있게 끝에 공백을 둔다.
         const value = target === "depart" ? a.roadAddr + " " : a.roadAddr;
         setPicked((prev) => ({ ...prev, [target]: a.roadAddr }));
         setValue(addressField[target], value);
-        setValue(codeField[target], a.regionCode);
+        setValue(codeField[target], a.token ? a.regionCode : "");
+        setValue(tokenField[target], a.token ?? "");
+        setValue(baseField[target], a.token ? a.roadAddr : "");
         clearErrors(addressField[target]);
         if (
             target === "hospital" &&

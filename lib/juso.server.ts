@@ -8,6 +8,9 @@
 
 const ENDPOINT = "https://business.juso.go.kr/addrlink/addrLinkApi.do";
 const TIMEOUT_MS = 5000;
+/** juso 는 페이지 크기 10, 최대 20페이지까지 본다. 그 뒤로는 "더 보기"를 내리지 않는다 (#232 리뷰). */
+export const ADDRESS_PAGE_SIZE = 10;
+export const ADDRESS_MAX_PAGE = 20;
 
 export type AddressResult = {
     roadAddr: string;
@@ -20,10 +23,18 @@ export type AddressResult = {
 };
 
 export type AddressSearchResult =
-    | { ok: true; results: AddressResult[]; total: number }
+    | {
+          ok: true;
+          results: AddressResult[];
+          total: number;
+          /** 실제로 조회한 페이지 */
+          page: number;
+          /** 다음 페이지가 있는지 (최대 20페이지) */
+          hasMore: boolean;
+      }
     | {
           ok: false;
-          reason: "disabled" | "invalid" | "error";
+          reason: "disabled" | "invalid" | "error" | "limited";
           message: string;
       };
 
@@ -71,12 +82,20 @@ export async function searchRoadAddress(
             reason: "invalid",
             message: "도로명, 건물명, 지번 중 하나를 2글자 이상 입력해 주세요.",
         };
+    if (!Number.isInteger(page) || page < 1 || page > ADDRESS_MAX_PAGE)
+        return {
+            ok: false,
+            reason: "invalid",
+            message:
+                "검색 결과가 너무 많습니다. 검색어를 더 자세히 입력해 주세요.",
+        };
+    const appliedPage = page;
 
     const url = new URL(ENDPOINT);
     url.search = new URLSearchParams({
         confmKey: key,
-        currentPage: String(Math.max(1, Math.min(page, 20))),
-        countPerPage: "10",
+        currentPage: String(appliedPage),
+        countPerPage: String(ADDRESS_PAGE_SIZE),
         keyword,
         resultType: "json",
     }).toString();
@@ -117,7 +136,16 @@ export async function searchRoadAddress(
                 regionCode: j.admCd!,
                 buildingName: j.bdNm ?? "",
             }));
-        return { ok: true, results, total: Number(common.totalCount ?? 0) };
+        const total = Number(common.totalCount ?? 0);
+        return {
+            ok: true,
+            results,
+            total,
+            page: appliedPage,
+            hasMore:
+                appliedPage < ADDRESS_MAX_PAGE &&
+                appliedPage * ADDRESS_PAGE_SIZE < total,
+        };
     } catch {
         return {
             ok: false,
