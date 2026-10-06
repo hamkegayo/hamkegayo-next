@@ -25,11 +25,13 @@ export async function submitPartnerBirthDate(
                 "partner_identity_release_pending",
             )
                 ? "본인확인 접수는 준비 중입니다."
-                : error.message.includes("already_verified")
-                  ? "이미 본인확인이 완료되었습니다."
-                  : error.message.includes("invalid_birth_date")
-                    ? "만 18세 이상의 올바른 생년월일을 입력해 주세요."
-                    : "제출하지 못했습니다. 다시 시도해 주세요.";
+                : error.message.includes("already_pending")
+                  ? "확인 중에는 다시 제출할 수 없습니다. 결과를 기다려 주세요."
+                  : error.message.includes("already_verified")
+                    ? "이미 본인확인이 완료되었습니다."
+                    : error.message.includes("invalid_birth_date")
+                      ? "만 18세 이상의 올바른 생년월일을 입력해 주세요."
+                      : "제출하지 못했습니다. 다시 시도해 주세요.";
             return { ok: false, message };
         }
         revalidatePath("/partner/profile");

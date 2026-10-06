@@ -82,7 +82,7 @@ export function BirthDateField({ initial }: { initial: IdentityCheckView }) {
             {(view.status === "REJECTED" || view.status === "EXPIRED") && (
                 <p className="text-destructive mb-1.5 text-xs">
                     {view.status === "REJECTED"
-                        ? "본인확인이 반려되었습니다. 다시 제출해 주세요."
+                        ? "본인확인이 반려되었습니다. 사유는 알림에서 확인하고 다시 제출해 주세요."
                         : "확인 기간이 지나 파기되었습니다. 다시 제출해 주세요."}
                 </p>
             )}

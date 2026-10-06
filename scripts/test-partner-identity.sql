@@ -58,7 +58,9 @@ select pg_temp.invalid($q$select public.submit_partner_birth_date('1899-12-31')$
 select pg_temp.denied($q$insert into public.partner_identity_checks(partner_id, birth_date, status) values (auth.uid(), '1990-03-15', 'VERIFIED')$q$, 'self verification denied');
 select public.submit_partner_birth_date('1990-03-15');
 select pg_temp.assert((select status = 'PENDING' and birth_date = '1990-03-15' and purge_after > now() + interval '29 days' from public.partner_identity_checks), 'pending with 30 day purge');
-select pg_temp.denied($q$select public.admin_decide_partner_identity(auth.uid(), true, '증빙 대조')$q$, 'partner cannot decide');
+select pg_temp.invalid($q$select public.submit_partner_birth_date('1991-01-01')$q$, 'second submission while pending rejected');
+select pg_temp.assert((select birth_date = '1990-03-15' from public.partner_identity_checks), 'pending value unchanged by resubmit attempt');
+select pg_temp.denied($q$select public.admin_decide_partner_identity(auth.uid(), now(), true, null)$q$, 'partner cannot decide');
 reset role;
 
 select set_config('request.jwt.claims', '{"sub":"00000226-0000-4000-8000-000000000302","role":"authenticated","aal":"aal1"}', true);
@@ -69,16 +71,36 @@ reset role;
 select set_config('request.jwt.claims', '{"sub":"00000226-0000-4000-8000-000000000303","role":"authenticated","aal":"aal1"}', true);
 set local role authenticated;
 select pg_temp.assert((select count(*) = 0 from public.partner_identity_checks), 'reviewer without MFA cannot read');
-select pg_temp.denied($q$select public.admin_decide_partner_identity('00000226-0000-4000-8000-000000000301', true, '증빙 대조')$q$, 'reviewer without MFA cannot decide');
+select pg_temp.denied($q$select public.admin_decide_partner_identity('00000226-0000-4000-8000-000000000301', now(), true, null)$q$, 'reviewer without MFA cannot decide');
 reset role;
 
 select set_config('request.jwt.claims', '{"sub":"00000226-0000-4000-8000-000000000303","role":"authenticated","aal":"aal2"}', true);
 set local role authenticated;
 select pg_temp.assert((select birth_date = '1990-03-15' from public.partner_identity_checks where partner_id = '00000226-0000-4000-8000-000000000301'), 'reviewer with MFA reads pending birth date');
-select public.admin_decide_partner_identity('00000226-0000-4000-8000-000000000301', true, '면허증 생년월일과 일치');
+-- 오래된 화면(다른 제출 시각)으로는 결정할 수 없다 (#235 리뷰)
+create temp table seen as select (select submitted_at from public.partner_identity_checks where partner_id = '00000226-0000-4000-8000-000000000301') as submitted_at;
+grant select on seen to authenticated;
+select pg_temp.assert((select count(*) = 1 from seen), 'reviewer snapshot');
+reset role;
+update public.partner_identity_checks set submitted_at = submitted_at + interval '1 second' where partner_id = '00000226-0000-4000-8000-000000000301';
+set local role authenticated;
+do $$ begin
+  begin
+    perform public.admin_decide_partner_identity('00000226-0000-4000-8000-000000000301', (select submitted_at from seen), true, null);
+    raise exception 'FAIL: stale reviewer screen rejected';
+  exception when no_data_found then raise notice 'PASS: stale reviewer screen rejected';
+  end;
+end $$;
+-- 반려 사유에 생년월일·번호를 쓰면 거부한다 (기록·알림에 남지 않게)
+select pg_temp.invalid($q$select public.admin_decide_partner_identity('00000226-0000-4000-8000-000000000301', (select submitted_at from public.partner_identity_checks where partner_id = '00000226-0000-4000-8000-000000000301'), false, '1990-03-15 불일치')$q$, 'reason with birth date rejected');
+select pg_temp.invalid($q$select public.admin_decide_partner_identity('00000226-0000-4000-8000-000000000301', (select submitted_at from public.partner_identity_checks where partner_id = '00000226-0000-4000-8000-000000000301'), false, '900315 확인 불가')$q$, 'reason with digit run rejected');
+select pg_temp.invalid($q$select public.admin_decide_partner_identity('00000226-0000-4000-8000-000000000301', (select submitted_at from public.partner_identity_checks where partner_id = '00000226-0000-4000-8000-000000000301'), false, null)$q$, 'rejection needs a reason');
+select public.admin_decide_partner_identity('00000226-0000-4000-8000-000000000301', (select submitted_at from public.partner_identity_checks where partner_id = '00000226-0000-4000-8000-000000000301'), true, '1990-03-15 일치');
 select pg_temp.assert((select status = 'VERIFIED' and birth_date is null and decided_by = '00000226-0000-4000-8000-000000000303' from public.partner_identity_checks where partner_id = '00000226-0000-4000-8000-000000000301'), 'decision purges birth date immediately');
 reset role;
 select pg_temp.assert(exists(select 1 from public.access_logs where action = 'PARTNER_IDENTITY_REVIEW' and target_id = '00000226-0000-4000-8000-000000000301'), 'decision audit log');
+select pg_temp.assert(not exists(select 1 from public.access_logs where action = 'PARTNER_IDENTITY_REVIEW' and target_id = '00000226-0000-4000-8000-000000000301' and reason ~ '1990'), 'verified log keeps no birth date even if typed');
+select pg_temp.assert(not exists(select 1 from public.notifications where recipient_id = '00000226-0000-4000-8000-000000000301' and body ~ '1990'), 'notification keeps no birth date');
 select pg_temp.assert(exists(select 1 from public.notifications where recipient_id = '00000226-0000-4000-8000-000000000301' and type = 'PARTNER_IDENTITY_REVIEW'), 'decision notification');
 
 select set_config('request.jwt.claims', '{"sub":"00000226-0000-4000-8000-000000000301","role":"authenticated","aal":"aal1"}', true);
