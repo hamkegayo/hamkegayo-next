@@ -15,7 +15,7 @@ const STEPS: { label: string; icon: LucideIcon }[] = [
 ];
 
 export default async function MypageHome() {
-    const [{ profile }, { current, recent }] = await Promise.all([
+    const [{ profile }, { matching, current, recent }] = await Promise.all([
         getSessionProfile(),
         getMyReservations(),
     ]);
@@ -36,6 +36,58 @@ export default async function MypageHome() {
 
             {/* 미결제 안내 — 있을 때만 뜬다 (#75 · 약관 제22조) */}
             <UnpaidCharges />
+
+            {/* 매칭 대기 중인 예약 — 매칭 화면을 떠나도 다시 찾을 수 있게 (#229) */}
+            {matching.length > 0 && (
+                <>
+                    <h2 className="text-foreground mt-10 text-lg font-bold">
+                        매칭 대기 중인 예약
+                        <span className="text-brand ml-2">
+                            {matching.length}
+                        </span>
+                    </h2>
+                    <p className="text-description-foreground mt-1 text-sm break-keep">
+                        파트너가 수락하면 예약 상세에서 파트너를 선택하고 결제해
+                        예약을 확정할 수 있어요. 매칭이 성사되지 않을 수도
+                        있어요.
+                    </p>
+                    <ul className="mt-4 space-y-3">
+                        {matching.map((m) => (
+                            <li key={m.id}>
+                                <Link
+                                    href={`/mypage/reservations/${m.id}`}
+                                    className="border-border bg-background hover:bg-muted/40 flex items-center gap-4 rounded-2xl border p-5 transition-colors"
+                                >
+                                    <div className="min-w-0 flex-1">
+                                        <span className="inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700 dark:bg-amber-500/15">
+                                            매칭 대기중
+                                        </span>
+                                        <p className="text-foreground mt-2 truncate font-bold">
+                                            {m.hospital}
+                                        </p>
+                                        <p className="text-muted-foreground mt-1 text-sm">
+                                            {m.datetimeLabel} · {m.planLabel}
+                                        </p>
+                                        <p
+                                            className={cn(
+                                                "mt-1 text-sm font-semibold",
+                                                m.applicantCount > 0
+                                                    ? "text-brand"
+                                                    : "text-muted-foreground",
+                                            )}
+                                        >
+                                            {m.applicantCount > 0
+                                                ? `지원한 파트너 ${m.applicantCount}명 · 선택하러 가기`
+                                                : "아직 지원한 파트너가 없어요"}
+                                        </p>
+                                    </div>
+                                    <ChevronRight className="text-muted-foreground size-5 shrink-0" />
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            )}
 
             {/* 현재 진행 중인 예약 */}
             <h2 className="text-foreground mt-10 text-lg font-bold">
