@@ -87,7 +87,7 @@ export function PublicProfileEditor({
                 </div>
             ) : (
                 <>
-                    <div className="bg-muted mt-4 space-y-2 rounded-xl p-4 text-sm">
+                    <div className="bg-muted mt-4 space-y-2.5 rounded-xl p-5 text-sm leading-relaxed break-keep">
                         <p>
                             공개 대상: 내가 수락한 예약의 예약자. 목적: 파트너
                             선택 전 서비스 제공자 정보 확인.
@@ -167,12 +167,12 @@ export function PublicProfileEditor({
                             </p>
                         )}
                     </div>
-                    <h3 className="mt-6 font-bold">근무 병원·경력</h3>
+                    <h3 className="mt-8 font-bold">근무 병원·경력</h3>
                     <p className="text-muted-foreground mt-2 text-sm">
                         증빙은 아래 자격·경력 증빙 등록 화면에서 첨부해 주세요.
-                        담당자 김서현이 검증한 경력만 공개합니다. 환자 정보 등
-                        불필요한 개인정보는 제외해 주세요. 수정이 필요하면 삭제
-                        후 새로 등록하여 심사를 받아 주세요.
+                        담당자가 검증한 경력만 공개합니다. 환자 정보 등 불필요한
+                        개인정보는 제외해 주세요. 수정이 필요하면 삭제 후 새로
+                        등록하여 심사를 받아 주세요.
                     </p>
                     {profile.histories.length === 0 && (
                         <p className="text-muted-foreground mt-4 text-sm">
