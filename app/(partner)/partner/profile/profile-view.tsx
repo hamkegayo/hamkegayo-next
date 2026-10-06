@@ -30,6 +30,8 @@ import {
 } from "@/lib/partner-activity";
 import { ActivityEditor } from "../../_components/activity-editor";
 import type { ActivityLoad } from "../../_lib/activity-load";
+import type { IdentityCheckView } from "../../_lib/identity.server";
+import { BirthDateField } from "../../_components/birth-date-field";
 import {
     PARTNER_PROFILE,
     type Qualification,
@@ -127,11 +129,13 @@ export function PartnerProfileView({
     initialPhotoUrl,
     initialBasicInfo,
     activityLoad,
+    identity,
 }: {
     initialQuals: QualificationView[];
     initialPhotoUrl: string | null;
     initialBasicInfo: PartnerBasicInfo;
     activityLoad: ActivityLoad;
+    identity: IdentityCheckView;
 }) {
     const [email, setEmail] = useState(initialBasicInfo.email);
     const [phone, setPhone] = useState(initialBasicInfo.phone);
@@ -340,7 +344,9 @@ export function PartnerProfileView({
                                 <dt className="text-muted-foreground">
                                     생년월일
                                 </dt>
-                                <dd>등록된 정보 없음</dd>
+                                <dd>
+                                    <BirthDateField initial={identity} />
+                                </dd>
                             </div>
                         </dl>
                         <label className="text-foreground text-sm font-bold">
