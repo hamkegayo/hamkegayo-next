@@ -22,12 +22,14 @@ import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import {
     activityTimeLabels,
+    EMPTY_ACTIVITY,
     regionDisplayLabel,
     TRANSPORT_LABEL,
     type ActivityRegion,
     type PartnerActivity,
 } from "@/lib/partner-activity";
 import { ActivityEditor } from "../../_components/activity-editor";
+import type { ActivityLoad } from "../../_lib/activity-load";
 import {
     PARTNER_PROFILE,
     type Qualification,
@@ -124,14 +126,12 @@ export function PartnerProfileView({
     initialQuals,
     initialPhotoUrl,
     initialBasicInfo,
-    initialActivity,
-    activityRegions,
+    activityLoad,
 }: {
     initialQuals: QualificationView[];
     initialPhotoUrl: string | null;
     initialBasicInfo: PartnerBasicInfo;
-    initialActivity: PartnerActivity;
-    activityRegions: ActivityRegion[];
+    activityLoad: ActivityLoad;
 }) {
     const [email, setEmail] = useState(initialBasicInfo.email);
     const [phone, setPhone] = useState(initialBasicInfo.phone);
@@ -140,6 +140,11 @@ export function PartnerProfileView({
     const [savedIntro, setSavedIntro] = useState(initialBasicInfo.intro);
     const [basicInfoPending, startBasicInfoTransition] = useTransition();
 
+    // 불러오기 실패면 편집기를 열지 않는다. 빈 값으로 보이면 저장 때 기존 값을 지운다 (#231 리뷰).
+    const initialActivity = activityLoad.ok
+        ? activityLoad.activity
+        : EMPTY_ACTIVITY;
+    const activityRegions = activityLoad.ok ? activityLoad.regions : [];
     const [activity, setActivity] = useState<PartnerActivity>(initialActivity);
     const [savedActivity, setSavedActivity] =
         useState<PartnerActivity>(initialActivity);
@@ -427,14 +432,33 @@ export function PartnerProfileView({
                 </div>
             </div>
 
-            <ActivityEditor
-                value={activity}
-                saved={savedActivity}
-                regionInfo={regionInfo}
-                onRegionInfo={addRegionInfo}
-                onChange={setActivity}
-                onSaved={setSavedActivity}
-            />
+            {activityLoad.ok ? (
+                <ActivityEditor
+                    value={activity}
+                    saved={savedActivity}
+                    regionInfo={regionInfo}
+                    regionsUnavailable={
+                        activityLoad.ok && activityLoad.regionsUnavailable
+                    }
+                    onRegionInfo={addRegionInfo}
+                    onChange={setActivity}
+                    onSaved={setSavedActivity}
+                />
+            ) : (
+                <div
+                    role="alert"
+                    className="border-border bg-background mt-8 rounded-2xl border p-6"
+                >
+                    <h2 className="text-foreground text-xl font-extrabold">
+                        활동 정보
+                    </h2>
+                    <p className="text-destructive mt-2 text-sm break-keep">
+                        활동 정보를 불러오지 못했습니다. 저장된 정보를 지키기
+                        위해 수정을 잠시 막았습니다. 새로고침 후 다시 시도해
+                        주세요.
+                    </p>
+                </div>
+            )}
 
             <div className="mt-8">
                 {/* 자격 및 보유 사항 */}

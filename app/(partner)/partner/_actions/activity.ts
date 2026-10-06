@@ -31,26 +31,28 @@ function toRegion(r: RegionRow): ActivityRegion {
     };
 }
 
+// 조회 실패는 null 로 돌려준다. 빈 배열과 구분해야 화면이 "없음"으로 오해하지 않는다 (#231 리뷰).
+
 /** 지역 팝업: parent 의 바로 아래 지역. parent 가 없으면 시·도 목록 */
 export async function listActivityRegions(
     parent: string | null,
-): Promise<ActivityRegion[]> {
+): Promise<ActivityRegion[] | null> {
     if (parent !== null && !/^\d{10}$/.test(parent)) return [];
     const supabase = await createClient();
     const query = supabase
         .from("partner_activity_regions")
         .select(REGION_COLUMNS)
         .order("sort_order");
-    const { data } = await (
+    const { data, error } = await (
         parent === null ? query.eq("level", 1) : query.eq("parent_code", parent)
     ).returns<RegionRow[]>();
-    return (data ?? []).map(toRegion);
+    return error ? null : (data ?? []).map(toRegion);
 }
 
 /** 지역 팝업 검색: "원주 단계", "장안구" 처럼 띄어 쓴 단어를 모두 포함하는 지역 */
 export async function searchActivityRegions(
     keyword: string,
-): Promise<ActivityRegion[]> {
+): Promise<ActivityRegion[] | null> {
     const words = keyword
         .replace(/[%_\\]/g, "")
         .trim()
@@ -63,28 +65,28 @@ export async function searchActivityRegions(
         .from("partner_activity_regions")
         .select(REGION_COLUMNS);
     for (const w of words) query = query.ilike("full_name", `%${w}%`);
-    const { data } = await query
+    const { data, error } = await query
         .order("level")
         .order("sort_order")
         .limit(30)
         .returns<RegionRow[]>();
-    return (data ?? []).map(toRegion);
+    return error ? null : (data ?? []).map(toRegion);
 }
 
 /** 저장된 코드의 지역 정보 (칩 표시용) */
 export async function getActivityRegionsByCode(
     codes: string[],
-): Promise<ActivityRegion[]> {
+): Promise<ActivityRegion[] | null> {
     const valid = codes.filter((c) => /^\d{10}$/.test(c));
     if (valid.length === 0) return [];
     const supabase = await createClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
         .from("partner_activity_regions")
         .select(REGION_COLUMNS)
         .in("code", valid)
         .order("sort_order")
         .returns<RegionRow[]>();
-    return (data ?? []).map(toRegion);
+    return error ? null : (data ?? []).map(toRegion);
 }
 
 /** 활동 정보 저장 (#226). 최종 검증·하위 지역 정리는 save_partner_activity_profile RPC 가 한다. */

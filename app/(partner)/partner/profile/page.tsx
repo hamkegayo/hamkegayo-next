@@ -27,8 +27,7 @@ export default async function PartnerProfile() {
                 initialQuals={initialQuals}
                 initialPhotoUrl={initialPhotoUrl}
                 initialBasicInfo={initialBasicInfo}
-                initialActivity={activity.activity}
-                activityRegions={activity.regions}
+                activityLoad={activity}
             />
             <div className="mt-8">
                 <PublicProfileEditor

@@ -12,6 +12,7 @@ import {
     ACTIVITY_TIME_OPTIONS,
     MOBILITY_OPTIONS,
     TRANSPORT_OPTIONS,
+    applyPickedRegions,
     regionDisplayLabel,
     toMinutes,
     validateActivity,
@@ -69,6 +70,7 @@ export function ActivityEditor({
     value,
     saved,
     regionInfo,
+    regionsUnavailable,
     onRegionInfo,
     onChange,
     onSaved,
@@ -77,6 +79,8 @@ export function ActivityEditor({
     saved: PartnerActivity;
     /** 지금까지 본 지역 코드 → 지역 정보. 칩 이름 표시용이라 지우지 않고 쌓는다. */
     regionInfo: Record<string, ActivityRegion>;
+    /** 저장된 지역 중 이름을 불러오지 못한 것이 있음 — 지역 변경을 막아 기존 코드를 지키지 않게 */
+    regionsUnavailable: boolean;
     onRegionInfo: (regions: ActivityRegion[]) => void;
     onChange: (next: PartnerActivity) => void;
     onSaved: (next: PartnerActivity) => void;
@@ -88,6 +92,8 @@ export function ActivityEditor({
     const selectedRegions = value.regions
         .map((code) => regionInfo[code])
         .filter((r): r is ActivityRegion => Boolean(r));
+    /** 이름을 모르는 저장 코드. 화면에 못 보여도 지우지 않는다 (#231 리뷰) */
+    const unknownRegionCodes = value.regions.filter((c) => !regionInfo[c]);
 
     const dirty = !sameActivity(value, saved);
     const set = (patch: Partial<PartnerActivity>) =>
@@ -95,7 +101,13 @@ export function ActivityEditor({
 
     const applyRegions = (next: ActivityRegion[]) => {
         onRegionInfo(next);
-        set({ regions: next.map((r) => r.code) });
+        set({
+            regions: applyPickedRegions(
+                next,
+                value.regions,
+                new Set(Object.keys(regionInfo)),
+            ),
+        });
         setPickerOpen(false);
     };
 
@@ -179,12 +191,23 @@ export function ActivityEditor({
                     <button
                         type="button"
                         onClick={() => setPickerOpen(true)}
-                        className="border-brand bg-background text-brand hover:bg-brand/5 inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-bold transition-colors"
+                        disabled={regionsUnavailable}
+                        className="border-brand bg-background text-brand hover:bg-brand/5 inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-bold transition-colors disabled:opacity-50"
                     >
                         <MapPin className="size-4" />
                         {value.regions.length === 0 ? "지역 선택" : "지역 변경"}
                     </button>
-                    {selectedRegions.length === 0 ? (
+                    {regionsUnavailable && (
+                        <p
+                            role="alert"
+                            className="text-destructive mt-3 text-sm break-keep"
+                        >
+                            저장된 지역 {unknownRegionCodes.length}곳의 정보를
+                            불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.
+                            다른 항목을 저장해도 기존 지역은 유지됩니다.
+                        </p>
+                    )}
+                    {value.regions.length === 0 ? (
                         <p className="text-muted-foreground mt-3 text-sm">
                             선택한 지역이 없습니다.
                         </p>

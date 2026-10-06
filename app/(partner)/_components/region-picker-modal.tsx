@@ -34,14 +34,15 @@ export function RegionPickerModal({
     // 열릴 때만 마운트된다(부모가 open 일 때만 그림). 그래서 초기값을 그대로 쓴다.
     const [draft, setDraft] = useState<ActivityRegion[]>(initial);
     const [path, setPath] = useState<ActivityRegion[]>([]);
-    /** 상위 코드("" 는 전국) → 바로 아래 지역 */
-    const [children, setChildren] = useState<Record<string, ActivityRegion[]>>(
-        {},
-    );
+    /** 상위 코드("" 는 전국) → 바로 아래 지역. null 은 조회 실패 */
+    const [children, setChildren] = useState<
+        Record<string, ActivityRegion[] | null>
+    >({});
     const [query, setQuery] = useState("");
     const [found, setFound] = useState<{
         keyword: string;
-        rows: ActivityRegion[];
+        /** null 은 조회 실패 */
+        rows: ActivityRegion[] | null;
     } | null>(null);
 
     const current = path.at(-1) ?? null;
@@ -49,10 +50,10 @@ export function RegionPickerModal({
     const items = children[parentKey];
     const keyword = query.trim();
     const searching = keyword.replace(/\s/g, "").length >= 2;
-    const results = searching && found?.keyword === keyword ? found.rows : null;
+    const searched = searching && found?.keyword === keyword ? found : null;
 
     useEffect(() => {
-        if (children[parentKey]) return;
+        if (parentKey in children) return;
         let alive = true;
         listActivityRegions(current?.code ?? null).then((rows) => {
             if (alive) setChildren((prev) => ({ ...prev, [parentKey]: rows }));
@@ -205,16 +206,24 @@ export function RegionPickerModal({
 
             <ul className="border-border mx-5 mt-3 min-h-40 flex-1 overflow-y-auto rounded-lg border">
                 {searching ? (
-                    results === null ? (
+                    searched === null ? (
                         <li className="text-muted-foreground p-4 text-sm">
                             검색 중…
                         </li>
-                    ) : results.length === 0 ? (
+                    ) : searched.rows === null ? (
+                        <li
+                            role="alert"
+                            className="text-destructive p-4 text-sm"
+                        >
+                            지역을 검색하지 못했습니다. 잠시 후 다시 검색해
+                            주세요.
+                        </li>
+                    ) : searched.rows.length === 0 ? (
                         <li className="text-muted-foreground p-4 text-sm">
                             검색된 지역이 없습니다.
                         </li>
                     ) : (
-                        results.map((r) =>
+                        searched.rows.map((r) =>
                             row(
                                 r,
                                 regionDisplayLabel(r.fullName, r.level),
@@ -225,6 +234,25 @@ export function RegionPickerModal({
                 ) : items === undefined ? (
                     <li className="text-muted-foreground p-4 text-sm">
                         불러오는 중…
+                    </li>
+                ) : items === null ? (
+                    <li role="alert" className="p-4 text-sm">
+                        <span className="text-destructive">
+                            지역 목록을 불러오지 못했습니다.
+                        </span>{" "}
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setChildren((prev) => {
+                                    const next = { ...prev };
+                                    delete next[parentKey];
+                                    return next;
+                                })
+                            }
+                            className="text-brand font-bold underline"
+                        >
+                            다시 시도
+                        </button>
                     </li>
                 ) : (
                     <>

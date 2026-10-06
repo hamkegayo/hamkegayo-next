@@ -67,6 +67,22 @@ export function addRegionSelection(
     ];
 }
 
+/**
+ * 팝업에서 고른 지역을 저장 값으로 바꾼다. 이름을 불러오지 못해 팝업에 보이지 않았던
+ * 기존 코드는 그대로 남긴다 — 조회 실패가 지역 삭제로 이어지지 않게 (#231 리뷰).
+ */
+export function applyPickedRegions(
+    picked: ActivityRegion[],
+    current: string[],
+    known: ReadonlySet<string>,
+): string[] {
+    const codes = picked.map((r) => r.code);
+    return [
+        ...codes,
+        ...current.filter((c) => !known.has(c) && !codes.includes(c)),
+    ];
+}
+
 /** 이미 상위 지역 전체가 선택돼 있어 따로 고를 필요가 없는지 */
 export function coveredBySelection(
     selected: ActivityRegion[],
