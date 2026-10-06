@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { ZoomProvider } from "@/components/providers/zoom-provider";
 import { getPartnerName } from "./_lib/partner";
+import { getMyProfilePhotoUrl } from "./_lib/profile-photo.server";
 import { getPartnerMatchingCount } from "./_lib/requests.server";
 import { getPartnerActiveCount } from "./_lib/services.server";
 import { getPartnerPendingReportCount } from "./_lib/reports.server";
@@ -22,14 +23,21 @@ export default async function PartnerLayout({
 }: {
     children: React.ReactNode;
 }) {
-    const [name, requestCount, managementCount, reportCount, unreadCount] =
-        await Promise.all([
-            getPartnerName(),
-            getPartnerMatchingCount(),
-            getPartnerActiveCount(),
-            getPartnerPendingReportCount(),
-            getUnreadCount(),
-        ]);
+    const [
+        name,
+        requestCount,
+        managementCount,
+        reportCount,
+        unreadCount,
+        photoUrl,
+    ] = await Promise.all([
+        getPartnerName(),
+        getPartnerMatchingCount(),
+        getPartnerActiveCount(),
+        getPartnerPendingReportCount(),
+        getUnreadCount(),
+        getMyProfilePhotoUrl(),
+    ]);
 
     return (
         <ZoomProvider>
@@ -50,7 +58,11 @@ export default async function PartnerLayout({
                         />
                     </Suspense>
                     {/* 공유 고정 요소: 헤더(상단) + 사이드바(좌측/모바일 드로워) */}
-                    <PartnerHeader name={name} unreadCount={unreadCount} />
+                    <PartnerHeader
+                        name={name}
+                        unreadCount={unreadCount}
+                        photoUrl={photoUrl}
+                    />
                     <PartnerSidebar
                         counts={{ requestCount, managementCount, reportCount }}
                     />

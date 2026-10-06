@@ -18,6 +18,7 @@ import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { ConfirmModal } from "@/components/ui/modal";
+import { Avatar } from "@/components/ui/avatar";
 import { useZoom } from "@/components/providers/zoom-provider";
 import { usePartnerNav } from "./partner-nav-context";
 import { useLogout } from "@/hooks/use-logout";
@@ -25,9 +26,12 @@ import { useLogout } from "@/hooks/use-logout";
 export function PartnerHeader({
     name,
     unreadCount = 0,
+    photoUrl = null,
 }: {
     name: string;
     unreadCount?: number;
+    /** 본인 프로필 사진 signed URL. 없으면 기본 아이콘 */
+    photoUrl?: string | null;
 }) {
     const { enlarged, toggle } = useZoom();
     const { setOpen } = usePartnerNav();
@@ -105,7 +109,12 @@ export function PartnerHeader({
 
                         <Menu.Root>
                             <Menu.Trigger className="text-foreground hover:bg-muted data-[popup-open]:bg-muted inline-flex items-center gap-2 rounded-full px-1.5 py-1 text-sm font-semibold transition-colors">
-                                <span className="bg-muted size-7 rounded-full" />
+                                <Avatar
+                                    src={photoUrl}
+                                    alt="내 프로필 사진"
+                                    className="bg-muted size-7"
+                                    iconClassName="text-muted-foreground"
+                                />
                                 <span className="hidden sm:inline">
                                     {name}님
                                 </span>

@@ -88,7 +88,7 @@ export async function uploadProfilePhoto(
         .from(PROFILE_PHOTO_BUCKET)
         .createSignedUrl(path, PROFILE_PHOTO_URL_TTL);
 
-    revalidatePath("/partner/profile");
+    revalidatePath("/partner", "layout");
     return { ok: true, url: signed?.signedUrl ?? "" };
 }
 
@@ -112,7 +112,7 @@ export async function deleteProfilePhoto(): Promise<DeleteProfilePhotoResult> {
 
     const path = row?.avatar_path ?? null;
     if (!path) {
-        revalidatePath("/partner/profile");
+        revalidatePath("/partner", "layout");
         return { ok: true };
     }
 
@@ -124,6 +124,6 @@ export async function deleteProfilePhoto(): Promise<DeleteProfilePhotoResult> {
 
     await supabase.storage.from(PROFILE_PHOTO_BUCKET).remove([path]);
 
-    revalidatePath("/partner/profile");
+    revalidatePath("/partner", "layout");
     return { ok: true };
 }
