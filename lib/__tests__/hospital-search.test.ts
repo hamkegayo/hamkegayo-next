@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+    cleanHospitalName,
     hiraItems,
     looksLikeHospital,
     sanitizeHospitalKeyword,
@@ -24,7 +25,7 @@ const HIRA_OK = {
             items: {
                 item: [
                     {
-                        yadmNm: "서울아산병원",
+                        yadmNm: "재단법인아산사회복지재단 서울아산병원",
                         clCdNm: "상급종합",
                         sidoCdNm: "서울",
                         sgguCdNm: "송파구",
@@ -95,6 +96,24 @@ describe("병원 검색어·건물명 판별", () => {
             }),
         ).toEqual([]);
         expect(hiraItems(HIRA_NOT_REGISTERED)).toBeNull();
+    });
+});
+
+describe("심평원 요양기관명 정리", () => {
+    it("앞의 법인명을 뗀다 (2026-10-06 실호출 값)", () => {
+        expect(cleanHospitalName("재단법인아산사회복지재단 서울아산병원")).toBe(
+            "서울아산병원",
+        );
+        expect(
+            cleanHospitalName("학교법인가톨릭학원가톨릭대학교서울성모병원"),
+        ).toBe("가톨릭대학교서울성모병원");
+        expect(
+            cleanHospitalName("사회복지법인 삼성생명공익재단 삼성서울병원"),
+        ).toBe("삼성서울병원");
+        expect(
+            cleanHospitalName("재단법인아산사회복지재단부속 보령아산병원"),
+        ).toBe("보령아산병원");
+        expect(cleanHospitalName("강북삼성병원")).toBe("강북삼성병원");
     });
 });
 

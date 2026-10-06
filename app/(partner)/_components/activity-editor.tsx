@@ -131,6 +131,9 @@ export function ActivityEditor({
             setHospitalResults(null);
             return;
         }
+        // 이전 검색 결과가 새 검색어의 결과처럼 보이지 않게 먼저 비운다.
+        setHospitalResults(null);
+        setHospitalMessage("");
         startHospitalSearch(async () => {
             const res = await searchPreferredHospitals(keyword);
             if (!res.ok) {

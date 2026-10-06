@@ -44,6 +44,24 @@ const MEDICAL_NAME =
 const NOT_MEDICAL =
     /(아파트|생활관|기숙사|연구동|연구센터|연구소|주차장|교수|사택|오피스텔|빌딩$)/;
 
+const CORPORATE_PREFIX =
+    /^(재단법인|학교법인|의료법인|사회복지법인|사단법인|종교법인)\s*\S*?(사회복지재단|복지재단|의료재단|재단|학원|법인|회)\s*/;
+
+/**
+ * 심평원 요양기관명 앞의 법인명을 뗀다.
+ * "재단법인아산사회복지재단 서울아산병원" → "서울아산병원",
+ * "학교법인가톨릭학원가톨릭대학교서울성모병원" → "가톨릭대학교서울성모병원" (2026-10-06 실호출 값).
+ */
+export function cleanHospitalName(name: string): string {
+    // "재단법인아산사회복지재단부속 보령아산병원" 처럼 법인명 뒤에 "부속"이 붙는 경우도 뗀다.
+    const cleaned = name
+        .trim()
+        .replace(CORPORATE_PREFIX, "")
+        .replace(/^(부속|산하)\s*/, "")
+        .trim();
+    return cleaned || name.trim();
+}
+
 /** 도로명주소 대체 검색 결과 중 의료기관으로 보이는 건물만 남긴다 */
 export function looksLikeHospital(buildingName: string): boolean {
     const name = buildingName.trim();
@@ -101,15 +119,23 @@ async function searchHira(keyword: string): Promise<HospitalResult[] | null> {
         if (!res.ok) return null;
         const items = hiraItems(await res.json());
         if (items === null) return null;
-        return items
-            .filter((i) => i.yadmNm)
-            .map((i) => ({
-                name: i.yadmNm!.trim(),
+        const seen = new Set<string>();
+        const out: HospitalResult[] = [];
+        for (const i of items) {
+            if (!i.yadmNm) continue;
+            const result = {
+                name: cleanHospitalName(i.yadmNm),
                 kind: i.clCdNm?.trim() ?? "",
                 region: [shortSido(i.sidoCdNm ?? ""), i.sgguCdNm ?? ""]
                     .filter(Boolean)
                     .join(" "),
-            }));
+            };
+            const key = `${result.name}|${result.region}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            out.push(result);
+        }
+        return out;
     } catch {
         return null;
     }
