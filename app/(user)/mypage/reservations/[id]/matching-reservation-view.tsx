@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Avatar } from "@/components/ui/avatar";
 import { useRouter } from "next/navigation";
 import {
     Building2,
@@ -170,9 +171,12 @@ export function MatchingReservationView({
                                         key={a.partnerId}
                                         className="border-border bg-background flex items-center gap-4 rounded-2xl border p-5"
                                     >
-                                        <div className="bg-muted flex size-12 shrink-0 items-center justify-center rounded-full">
-                                            <UserRound className="text-muted-foreground size-6" />
-                                        </div>
+                                        <Avatar
+                                            src={a.avatarUrl}
+                                            alt={`${a.name} 파트너 프로필 사진`}
+                                            className="bg-muted size-12 shrink-0"
+                                            iconClassName="text-muted-foreground"
+                                        />
                                         <div className="min-w-0 flex-1">
                                             <p className="text-foreground font-bold">
                                                 {a.name}

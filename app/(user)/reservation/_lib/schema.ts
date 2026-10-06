@@ -77,6 +77,20 @@ export const step2Schema = z.object({
     // 주소는 확정 후에만 제공되므로 이름을 따로 받는다.
     hospitalName: z.string().min(1, required),
     hospitalAddress: z.string().min(1, required),
+    // 주소 검색으로 고른 경우의 법정동코드 (#226). 직접 입력이면 빈 값이다.
+    departRegionCode: z
+        .string()
+        .regex(/^(\d{10})?$/)
+        .optional(),
+    hospitalRegionCode: z
+        .string()
+        .regex(/^(\d{10})?$/)
+        .optional(),
+    // 서버 서명과 서명한 기준 주소. 검증은 서버(createReservation)가 한다 (#232 리뷰).
+    departRegionToken: z.string().max(100).optional(),
+    departRegionBase: z.string().max(200).optional(),
+    hospitalRegionToken: z.string().max(100).optional(),
+    hospitalRegionBase: z.string().max(200).optional(),
 
     // 매뉴얼 1장 — 이동수단·귀가수단·종료방식이 없으면 업무를 시작할 수 없다.
     // 파트너 개인차량 운송과 대리운전은 선택지 자체에 없다(매뉴얼 2장).

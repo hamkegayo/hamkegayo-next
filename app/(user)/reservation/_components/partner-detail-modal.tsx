@@ -5,7 +5,16 @@ import { X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Avatar } from "@/components/ui/avatar";
 import { kstDateTime } from "@/lib/format";
-import type { PartnerDetail } from "@/lib/partner-details";
+import type {
+    PartnerActivityPublic,
+    PartnerDetail,
+} from "@/lib/partner-details";
+import {
+    activityTimeLabels,
+    shortRegionLabel,
+    TRANSPORT_LABEL,
+} from "@/lib/partner-activity";
+import type { TransportCode } from "@/lib/handover";
 import { getReservationPartnerDetail } from "../_actions/matching";
 
 export function PartnerDetailModal({
@@ -205,6 +214,12 @@ export function PartnerDetailModal({
                                     )}
                                 </ul>
                             </DetailSection>
+                            {/* #226 활동 정보 — 파트너가 공개 고지 v2에 동의하고 공개가 열린 경우에만 온다 */}
+                            {detail.activity && (
+                                <DetailSection title="활동 정보">
+                                    <ActivityRows activity={detail.activity} />
+                                </DetailSection>
+                            )}
                             <DetailSection title="공개 후기">
                                 <p className="text-muted-foreground mb-3 text-xs">
                                     최근 후기 최대 10개
@@ -265,5 +280,40 @@ function DetailSection({
             <h3 className="mb-2 font-bold">{title}</h3>
             {children}
         </section>
+    );
+}
+
+function ActivityRows({ activity }: { activity: PartnerActivityPublic }) {
+    const rows: [string, string[]][] = [
+        ["활동 지역", activity.regions.map(shortRegionLabel)],
+        ["활동 시간", activityTimeLabels(activity.times)],
+        [
+            "이동수단",
+            activity.transports.map(
+                (t) => TRANSPORT_LABEL[t as TransportCode] ?? t,
+            ),
+        ],
+        ["지원 가능한 보행 상태", activity.mobility],
+        ["선호 병원", activity.hospitals],
+    ];
+    const filled = rows.filter(([, values]) => values.length > 0);
+    if (filled.length === 0)
+        return (
+            <p className="text-muted-foreground text-sm">등록된 정보 없음</p>
+        );
+    return (
+        <dl className="space-y-2 text-sm">
+            {filled.map(([label, values]) => (
+                <div
+                    key={label}
+                    className="flex flex-col gap-1 sm:flex-row sm:gap-3"
+                >
+                    <dt className="text-muted-foreground w-36 shrink-0">
+                        {label}
+                    </dt>
+                    <dd className="break-keep">{values.join(", ")}</dd>
+                </div>
+            ))}
+        </dl>
     );
 }

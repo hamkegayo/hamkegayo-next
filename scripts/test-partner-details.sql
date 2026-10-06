@@ -2,6 +2,8 @@
 begin;
 -- Release 83 enables production; explicitly test the disabled gate in this rollback fixture.
 update public.partner_public_release set enabled=false;
+-- Release 91 opens activity details (consent v2). This suite checks v1 consent behavior, so keep it closed here.
+update public.partner_activity_release set enabled=false;
 create function pg_temp.assert(p_ok boolean, p_label text) returns void language plpgsql as $$
 begin
   if p_ok is distinct from true then raise exception 'FAIL: %', p_label; end if;
@@ -104,7 +106,7 @@ set local role authenticated;
 select pg_temp.assert(jsonb_array_length(public.get_reservation_partner_detail('00000173-0000-4000-8000-000000000005','00000173-0000-4000-8000-000000000003')->'workHistory') = 1, 'only verified history visible');
 select pg_temp.assert((public.get_reservation_partner_detail('00000173-0000-4000-8000-000000000005','00000173-0000-4000-8000-000000000003')->>'rating')::numeric = 4 and (public.get_reservation_partner_detail('00000173-0000-4000-8000-000000000005','00000173-0000-4000-8000-000000000003')->>'reviewCount')::integer = 1, 'actual rating and review count');
 select pg_temp.assert(public.get_reservation_partner_detail('00000173-0000-4000-8000-000000000005','00000173-0000-4000-8000-000000000003')->'reviews' = '[]'::jsonb, 'review without actual recipient consent is hidden');
-select pg_temp.assert((select array_agg(k order by k) from jsonb_object_keys(public.get_reservation_partner_detail('00000173-0000-4000-8000-000000000005','00000173-0000-4000-8000-000000000003')) k) = array['intro','name','partnerId','publicConsent','qualifications','rating','reviewCount','reviews','workHistory'], 'detail field allowlist');
+select pg_temp.assert((select array_agg(k order by k) from jsonb_object_keys(public.get_reservation_partner_detail('00000173-0000-4000-8000-000000000005','00000173-0000-4000-8000-000000000003')) k) = array['activity','intro','name','partnerId','publicConsent','qualifications','rating','reviewCount','reviews','workHistory'], 'detail field allowlist');
 select pg_temp.assert((select status = 'MATCHING' and confirmed_partner_id is null and payment_deadline is null from public.reservations where id = '00000173-0000-4000-8000-000000000005'), 'detail does not select or confirm');
 reset role;
 select set_config('request.jwt.claims', '{"sub":"00000173-0000-4000-8000-000000000003","role":"authenticated","aal":"aal1"}', true);

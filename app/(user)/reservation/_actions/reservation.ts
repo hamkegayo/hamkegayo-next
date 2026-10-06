@@ -1,6 +1,8 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
+import { verifiedRegionCode } from "@/lib/address-token.server";
 import { generateReservationCode } from "@/lib/reservation";
 import { reservationServerSchema } from "../_lib/schema";
 import { quoteReservation } from "../_lib/quote.server";
@@ -132,6 +134,7 @@ export async function createReservation(
             .single();
 
         if (!error && data) {
+            await recordRegionCodes(data.id, user.id, v);
             return { ok: true, code: data.code, id: data.id };
         }
         if (error?.code === "23505") continue; // 예약번호 중복 → 재생성
@@ -151,4 +154,55 @@ export async function createReservation(
         reason: "error",
         message: "예약 등록에 실패했습니다. 다시 시도해 주세요.",
     };
+}
+
+/**
+ * 주소 검색으로 고른 법정동코드를 서버 검증 후 기록한다 (#232 리뷰).
+ *
+ * 브라우저가 보낸 코드는 믿지 않는다. 서버가 서명한 "기준 주소 ↔ 코드" 토큰이 맞고
+ * 최종 입력 주소가 그 기준 주소로 시작할 때만 인정한다. 고객 권한으로는 DB 트리거가
+ * 코드를 무시하므로(마이그레이션 92) 서비스 권한으로 기록한다.
+ * 실패해도 예약은 그대로 두고, 매칭은 주소 글자로 대신 판정한다.
+ */
+async function recordRegionCodes(
+    reservationId: string,
+    customerId: string,
+    v: {
+        departAddress: string;
+        hospitalAddress: string;
+        departRegionCode?: string;
+        departRegionToken?: string;
+        departRegionBase?: string;
+        hospitalRegionCode?: string;
+        hospitalRegionToken?: string;
+        hospitalRegionBase?: string;
+    },
+): Promise<void> {
+    const depart = verifiedRegionCode({
+        address: v.departAddress,
+        base: v.departRegionBase,
+        code: v.departRegionCode,
+        token: v.departRegionToken,
+    });
+    const hospital = verifiedRegionCode({
+        address: v.hospitalAddress,
+        base: v.hospitalRegionBase,
+        code: v.hospitalRegionCode,
+        token: v.hospitalRegionToken,
+    });
+    if (!depart && !hospital) return;
+    try {
+        const { error } = await createAdminClient()
+            .from("reservations")
+            .update({
+                depart_region_code: depart,
+                hospital_region_code: hospital,
+            })
+            .eq("id", reservationId)
+            .eq("customer_id", customerId);
+        if (error)
+            console.error("[createReservation] 지역 코드 기록 실패:", error);
+    } catch (e) {
+        console.error("[createReservation] 지역 코드 기록 실패:", e);
+    }
 }

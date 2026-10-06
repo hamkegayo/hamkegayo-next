@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
+import { Search } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { Input } from "@/components/ui/input";
@@ -22,6 +24,11 @@ import {
 import { RELATION_OPTIONS } from "../_lib/options";
 import { StepBand, StepNav } from "./step-band";
 import { FieldError, FieldLabel, NativeSelect } from "./fields";
+import { AddressSearchModal } from "./address-search-modal";
+import { addressSearchEnabled } from "../_actions/address";
+import type { SignedAddressResult } from "../_actions/address";
+
+type AddressTarget = "depart" | "hospital";
 
 export function StepHospitalInfo() {
     const { data, patch, next, prev } = useReservationStore();
@@ -33,6 +40,8 @@ export function StepHospitalInfo() {
         control,
         setError,
         setValue,
+        setFocus,
+        getValues,
         formState: { errors },
     } = useForm<Step2Values>({
         resolver: zodResolver(step2Form),
@@ -44,8 +53,14 @@ export function StepHospitalInfo() {
             reserveTime: data.reserveTime,
             duration: data.duration,
             departAddress: data.departAddress,
+            departRegionCode: data.departRegionCode,
+            departRegionToken: data.departRegionToken,
+            departRegionBase: data.departRegionBase,
             hospitalName: data.hospitalName,
             hospitalAddress: data.hospitalAddress,
+            hospitalRegionCode: data.hospitalRegionCode,
+            hospitalRegionToken: data.hospitalRegionToken,
+            hospitalRegionBase: data.hospitalRegionBase,
             transportTo: data.transportTo as never,
             transportHome: data.transportHome as never,
             endMethod: data.endMethod as never,
@@ -79,6 +94,97 @@ export function StepHospitalInfo() {
             isServiceBooking(time, parseDurationMinutes(duration ?? "") ?? 120),
         );
     const needsHandover = endMethod === "ADULT_HANDOVER";
+
+    /*
+     * 도로명주소 검색 (#226). 고른 주소의 법정동코드는 파트너 활동 지역 매칭에 쓴다.
+     * 승인키가 없는 환경에서는 버튼을 숨기고 기존처럼 직접 입력만 받는다.
+     * 고른 주소를 지우거나 바꾸면 코드도 비워 주소와 코드가 어긋나지 않게 한다.
+     */
+    const [searchEnabled, setSearchEnabled] = useState(false);
+    const [searchTarget, setSearchTarget] = useState<AddressTarget | null>(
+        null,
+    );
+    /** 검색으로 고른 주소(코드와 짝). 입력이 이 주소로 시작하지 않으면 코드를 비운다. */
+    const [picked, setPicked] = useState<Record<AddressTarget, string>>({
+        depart: data.departRegionCode ? data.departRegionBase : "",
+        hospital: data.hospitalRegionCode ? data.hospitalRegionBase : "",
+    });
+    useEffect(() => {
+        let alive = true;
+        addressSearchEnabled().then((on) => {
+            if (alive) setSearchEnabled(on);
+        });
+        return () => {
+            alive = false;
+        };
+    }, []);
+
+    const codeField = {
+        depart: "departRegionCode",
+        hospital: "hospitalRegionCode",
+    } as const;
+    // 서버 서명과 서명한 기준 주소. 예약 저장 때 서버가 이것으로 주소·코드 결합을 검증한다 (#232 리뷰).
+    const tokenField = {
+        depart: "departRegionToken",
+        hospital: "hospitalRegionToken",
+    } as const;
+    const baseField = {
+        depart: "departRegionBase",
+        hospital: "hospitalRegionBase",
+    } as const;
+    const addressField = {
+        depart: "departAddress",
+        hospital: "hospitalAddress",
+    } as const;
+
+    const keepCodeOnlyIfPicked = (target: AddressTarget, value: string) => {
+        const base = picked[target];
+        if (!base || !value.startsWith(base)) {
+            if (base) setPicked((prev) => ({ ...prev, [target]: "" }));
+            setValue(codeField[target], "");
+            setValue(tokenField[target], "");
+            setValue(baseField[target], "");
+        }
+    };
+
+    const applyAddress = (target: AddressTarget, a: SignedAddressResult) => {
+        // 출발지는 동·호수를 이어 적을 수 있게 끝에 공백을 둔다.
+        const value = target === "depart" ? a.roadAddr + " " : a.roadAddr;
+        setPicked((prev) => ({ ...prev, [target]: a.roadAddr }));
+        setValue(addressField[target], value);
+        setValue(codeField[target], a.token ? a.regionCode : "");
+        setValue(tokenField[target], a.token ?? "");
+        setValue(baseField[target], a.token ? a.roadAddr : "");
+        clearErrors(addressField[target]);
+        if (
+            target === "hospital" &&
+            a.buildingName &&
+            !getValues("hospitalName")?.trim()
+        ) {
+            setValue("hospitalName", a.buildingName);
+            clearErrors("hospitalName");
+        }
+        setSearchTarget(null);
+        // 팝업이 닫힌 뒤에 포커스를 옮기고 커서를 끝에 둔다. 바로 이어 친 첫 글자가 팝업으로 가지 않게.
+        setTimeout(() => {
+            setFocus(addressField[target]);
+            const input = document.getElementById(addressField[target]);
+            if (input instanceof HTMLInputElement)
+                input.setSelectionRange(value.length, value.length);
+        }, 0);
+    };
+
+    const searchButton = (target: AddressTarget) =>
+        searchEnabled && (
+            <button
+                type="button"
+                onClick={() => setSearchTarget(target)}
+                className="border-brand bg-background text-brand hover:bg-brand/5 inline-flex shrink-0 items-center gap-1 rounded-lg border px-3.5 text-sm font-bold transition-colors"
+            >
+                <Search className="size-4" />
+                주소 검색
+            </button>
+        );
 
     const onSubmit = (v: Step2Values) => {
         if (!isAtLeastAgeOnDate(data.userBirth, v.useDate)) {
@@ -258,16 +364,33 @@ export function StepHospitalInfo() {
                                 <FieldLabel htmlFor="departAddress" required>
                                     출발지 주소 (자택, 터미널, 지하철 역 등)
                                 </FieldLabel>
-                                <Input
-                                    id="departAddress"
-                                    placeholder="서울특별시 청운동 108-14"
-                                    aria-invalid={!!errors.departAddress}
-                                    {...register("departAddress", {
-                                        onChange: () =>
-                                            errors.departAddress &&
-                                            clearErrors("departAddress"),
-                                    })}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        id="departAddress"
+                                        placeholder="서울특별시 청운동 108-14"
+                                        aria-invalid={!!errors.departAddress}
+                                        {...register("departAddress", {
+                                            onChange: (e) => {
+                                                keepCodeOnlyIfPicked(
+                                                    "depart",
+                                                    e.target.value,
+                                                );
+                                                if (errors.departAddress)
+                                                    clearErrors(
+                                                        "departAddress",
+                                                    );
+                                            },
+                                        })}
+                                    />
+                                    {searchButton("depart")}
+                                </div>
+                                {searchEnabled && (
+                                    <p className="text-description-foreground mt-1.5 text-xs leading-relaxed">
+                                        주소 검색으로 고르면 활동 지역이 맞는
+                                        파트너에게 먼저 안내됩니다. 고른 뒤
+                                        동·호수를 이어서 적어 주세요.
+                                    </p>
+                                )}
                                 <FieldError>
                                     {errors.departAddress?.message}
                                 </FieldError>
@@ -297,16 +420,26 @@ export function StepHospitalInfo() {
                                 <FieldLabel htmlFor="hospitalAddress" required>
                                     병원 주소
                                 </FieldLabel>
-                                <Input
-                                    id="hospitalAddress"
-                                    placeholder="서울특별시 연세로 1로"
-                                    aria-invalid={!!errors.hospitalAddress}
-                                    {...register("hospitalAddress", {
-                                        onChange: () =>
-                                            errors.hospitalAddress &&
-                                            clearErrors("hospitalAddress"),
-                                    })}
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        id="hospitalAddress"
+                                        placeholder="서울특별시 연세로 1로"
+                                        aria-invalid={!!errors.hospitalAddress}
+                                        {...register("hospitalAddress", {
+                                            onChange: (e) => {
+                                                keepCodeOnlyIfPicked(
+                                                    "hospital",
+                                                    e.target.value,
+                                                );
+                                                if (errors.hospitalAddress)
+                                                    clearErrors(
+                                                        "hospitalAddress",
+                                                    );
+                                            },
+                                        })}
+                                    />
+                                    {searchButton("hospital")}
+                                </div>
                                 <FieldError>
                                     {errors.hospitalAddress?.message}
                                 </FieldError>
@@ -586,6 +719,17 @@ export function StepHospitalInfo() {
                     )}
 
                     <StepNav onPrev={prev} />
+                    {searchTarget && (
+                        <AddressSearchModal
+                            title={
+                                searchTarget === "depart"
+                                    ? "출발지 주소 검색"
+                                    : "병원 주소 검색"
+                            }
+                            onClose={() => setSearchTarget(null)}
+                            onSelect={(a) => applyAddress(searchTarget, a)}
+                        />
+                    )}
                 </form>
             </Section>
         </>

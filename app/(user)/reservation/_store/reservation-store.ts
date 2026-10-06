@@ -42,8 +42,17 @@ export type ReservationData = {
     reserveTime: string;
     duration: string;
     departAddress: string;
+    /** 주소 검색으로 고른 출발지의 법정동코드. 직접 입력이면 "" (#226) */
+    departRegionCode: string;
+    /** 서버가 서명한 "기준 주소 ↔ 코드" 토큰과 그 기준 주소 (#232 리뷰) */
+    departRegionToken: string;
+    departRegionBase: string;
     hospitalName: string;
     hospitalAddress: string;
+    /** 주소 검색으로 고른 병원의 법정동코드. 직접 입력이면 "" */
+    hospitalRegionCode: string;
+    hospitalRegionToken: string;
+    hospitalRegionBase: string;
     transportTo: string;
     transportHome: string;
     endMethod: string;
@@ -102,8 +111,14 @@ const initialData: ReservationData = {
     reserveTime: "",
     duration: "",
     departAddress: "",
+    departRegionCode: "",
+    departRegionToken: "",
+    departRegionBase: "",
     hospitalName: "",
     hospitalAddress: "",
+    hospitalRegionCode: "",
+    hospitalRegionToken: "",
+    hospitalRegionBase: "",
     transportTo: "",
     transportHome: "",
     endMethod: "",
