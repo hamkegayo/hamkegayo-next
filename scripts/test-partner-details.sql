@@ -2,6 +2,8 @@
 begin;
 -- Release 83 enables production; explicitly test the disabled gate in this rollback fixture.
 update public.partner_public_release set enabled=false;
+-- Release 91 opens activity details (consent v2). This suite checks v1 consent behavior, so keep it closed here.
+update public.partner_activity_release set enabled=false;
 create function pg_temp.assert(p_ok boolean, p_label text) returns void language plpgsql as $$
 begin
   if p_ok is distinct from true then raise exception 'FAIL: %', p_label; end if;
