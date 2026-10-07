@@ -65,8 +65,9 @@ export function NotificationSettings({
                         새 요청을 이메일로도 받기
                     </span>
                     <span className="text-muted-foreground block">
-                        가입한 이메일로 일시·상품·병원 지역만 보내요. 이용자
-                        개인정보는 담지 않아요.
+                        가입한 이메일로 새 요청이 왔다는 사실과 목록 링크만
+                        보내요. 일시·병원 등 요청 내용과 이용자
+                        이름·연락처·주소· 진료정보는 메일에 담지 않아요.
                     </span>
                 </span>
             </label>

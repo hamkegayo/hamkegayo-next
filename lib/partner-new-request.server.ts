@@ -2,6 +2,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { getEmailSender } from "@/lib/email";
 import { isPublicHoliday } from "@/lib/holidays";
 import { formatUseDate, toHhmm } from "@/lib/format";
+import { buildNewRequestEmail } from "@/lib/partner-new-request-email";
 
 type DayKind = "WEEKDAY" | "SATURDAY" | "HOLIDAY";
 
@@ -26,19 +27,13 @@ function siteBase(): string {
     );
 }
 
-function escapeHtml(s: string): string {
-    return s
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-}
-
 /**
  * 새 매칭 요청을 활동 지역·가능 시간이 맞는 파트너에게 알린다 (#255-4).
  * 대상 판정·인앱 알림·중복 방지는 DB 함수 notify_partners_new_request 가 하고,
  * 여기서는 요일 구분을 넘기고 이메일 수신 파트너에게 메일을 보낸다.
- * 문구에는 이용자 개인정보를 넣지 않는다 — 일시·상품·병원 시·군·구만(단계 1 목록 수준).
+ * 인앱 알림에는 일시·상품·병원 시·군·구만 넣는다(단계 1 목록 수준, 이용자 개인정보 없음).
+ * 메일에는 예약 내용을 넣지 않는다 — 새 요청이 왔다는 사실과 목록 링크만 보낸다.
+ * 처리방침 제6조의 Resend 위탁 항목이 "이메일 주소, 인증 정보"뿐이기 때문이다 (#269 리뷰).
  * 예약 신청 응답을 막지 않도록 after() 에서 부른다. 실패는 기록만 하고 삼킨다.
  */
 export async function notifyPartnersOfNewRequest(input: {
@@ -76,18 +71,13 @@ export async function notifyPartnersOfNewRequest(input: {
         }[];
         if (recipients.length === 0) return;
 
-        const link = `${siteBase()}/partner/requests/${input.reservationId}`;
-        const html = `
-<p>활동 지역·시간에 맞는 새 병원동행 요청이 도착했어요.</p>
-<p><strong>${escapeHtml(body)}</strong></p>
-<p><a href="${link}">요청 확인하기</a></p>
-<p style="color:#888;font-size:12px">알림 메일은 파트너 화면의 알림 &gt; 알림 설정에서 끌 수 있어요.</p>`;
+        const mail = buildNewRequestEmail(siteBase());
 
         const sender = getEmailSender();
         await Promise.all(
             recipients.map((r) =>
                 sender
-                    .send(r.email, `[함께가요] ${title}`, html)
+                    .send(r.email, mail.subject, mail.html)
                     .catch((e: unknown) =>
                         console.error(
                             "[new-request] 메일 발송 실패:",
