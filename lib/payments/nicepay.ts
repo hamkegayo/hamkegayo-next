@@ -321,6 +321,26 @@ function loopbackOrigin(value: string | undefined): string | null {
 
 let gateway: PaymentGateway | null = null;
 
+const NICEPAY_KEY_NAMES = [
+    "NEXT_PUBLIC_NICEPAY_CLIENT_KEY",
+    "NICEPAY_SECRET_KEY",
+] as const;
+
+/**
+ * 비어 있는 NICEPAY 키의 **이름**만 돌려준다(값은 다루지 않는다, #259).
+ * 키 없이 결제창을 열면 결제창에서야 "키가 올바르지 않다"고 떠서 원인을 찾기 어렵다.
+ * 결제 준비 전에 이걸로 먼저 막는다.
+ */
+export function missingNicepayKeys(
+    env: Record<string, string | undefined> = {
+        NEXT_PUBLIC_NICEPAY_CLIENT_KEY:
+            process.env.NEXT_PUBLIC_NICEPAY_CLIENT_KEY,
+        NICEPAY_SECRET_KEY: process.env.NICEPAY_SECRET_KEY,
+    },
+): string[] {
+    return NICEPAY_KEY_NAMES.filter((name) => !env[name]?.trim());
+}
+
 /**
  * PG 어댑터를 반환한다. 키가 없으면 던진다 —
  * 결제는 Mock 으로 대체할 수 있는 성질의 기능이 아니다.

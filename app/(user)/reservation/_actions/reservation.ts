@@ -1,11 +1,14 @@
 "use server";
 
+import { after } from "next/server";
+
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { verifiedRegionCode } from "@/lib/address-token.server";
 import { generateReservationCode } from "@/lib/reservation";
 import { reservationServerSchema } from "../_lib/schema";
 import { quoteReservation } from "../_lib/quote.server";
+import { notifyPartnersOfNewRequest } from "@/lib/partner-new-request.server";
 
 export type CreateReservationResult =
     | { ok: true; code: string; id: string }
@@ -135,6 +138,16 @@ export async function createReservation(
 
         if (!error && data) {
             await recordRegionCodes(data.id, user.id, v);
+            // 활동 지역·시간이 맞는 파트너에게 새 요청 알림 (#255). 응답을 막지 않게 응답 후 처리한다.
+            after(() =>
+                notifyPartnersOfNewRequest({
+                    reservationId: data.id,
+                    useDate: v.useDate,
+                    arriveTime: v.arriveTime,
+                    plan: v.plan,
+                    hospitalAddress: v.hospitalAddress,
+                }),
+            );
             return { ok: true, code: data.code, id: data.id };
         }
         if (error?.code === "23505") continue; // 예약번호 중복 → 재생성

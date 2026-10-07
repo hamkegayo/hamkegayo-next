@@ -14,7 +14,6 @@ import {
     UserRound,
     ZoomIn,
 } from "lucide-react";
-import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { ConfirmModal } from "@/components/ui/modal";
@@ -38,8 +37,6 @@ export function PartnerHeader({
     const router = useRouter();
     const [confirmOpen, setConfirmOpen] = useState(false);
     const { logout: onLogout, pending } = useLogout();
-
-    const notReady = () => toast.info("준비 중인 기능입니다.");
 
     return (
         <>
@@ -137,7 +134,9 @@ export function PartnerHeader({
                                             프로필 수정
                                         </Menu.Item>
                                         <Menu.Item
-                                            onClick={notReady}
+                                            onClick={() =>
+                                                router.push("/partner/status")
+                                            }
                                             className="text-foreground data-[highlighted]:bg-muted flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm outline-none select-none"
                                         >
                                             <BadgeCheck className="size-4" />

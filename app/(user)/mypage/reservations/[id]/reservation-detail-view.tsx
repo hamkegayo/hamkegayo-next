@@ -23,6 +23,7 @@ import {
 } from "../../_actions/matching";
 import type { RefundPreview } from "@/lib/payments/refund";
 import { CancelRefundNotice } from "./cancel-refund-notice";
+import { ReportSection } from "./report-section";
 
 const STEPS: { label: string; icon: LucideIcon }[] = [
     { label: "파트너 확정", icon: UserRound },
@@ -188,6 +189,14 @@ export function ReservationDetailView({ r }: { r: ReservationDetailView }) {
                             </div>
                         )}
                     </Card>
+
+                    {/* 보호자 리포트 — 서비스 완료 후 (#253) */}
+                    {(r.status === "COMPLETED" ||
+                        r.serviceState === "COMPLETED") && (
+                        <Card title="보호자 리포트">
+                            <ReportSection reservationId={r.id} />
+                        </Card>
+                    )}
 
                     {/* 예약 정보 */}
                     <Card title="예약 정보">

@@ -47,16 +47,24 @@ async function verifyService(
     supabase: SupabaseClient,
     serviceId: string,
     uid: string,
+    statuses: string[] = ["COMPLETED"],
 ) {
     const { data } = await supabase
         .from("services")
         .select("id")
         .eq("id", serviceId)
         .eq("partner_id", uid)
-        .eq("status", "COMPLETED")
+        .in("status", statuses)
         .maybeSingle();
     return data;
 }
+
+/**
+ * 첨부는 서비스 진행 중 메모 단계에서도 올린다 (#255-2). 별도 저장소를 두지 않고
+ * 리포트 첨부에 바로 쌓아, 리포트 작성 화면에 그대로 이어지게 한다.
+ * 열람 제한(처리방침 제5조 ② [단계 2]·제9조 ④)은 리포트·첨부 RLS 가 그대로 건다.
+ */
+const ATTACHABLE_STATUSES = ["IN_PROGRESS", "ENDED", "COMPLETED"];
 
 /** 서비스의 리포트 행을 가져오거나(없으면) DRAFT 로 생성 */
 async function ensureReport(
@@ -122,16 +130,20 @@ export async function saveReport(
     if (submit) {
         const { data: svc } = await supabase
             .from("services")
-            .select("reservations!inner(customer_id)")
+            .select("reservation_id, reservations!inner(customer_id)")
             .eq("id", serviceId)
-            .maybeSingle<{ reservations: { customer_id: string } | null }>();
+            .maybeSingle<{
+                reservation_id: string;
+                reservations: { customer_id: string } | null;
+            }>();
         const customerId = svc?.reservations?.customer_id;
         if (customerId) {
             await createNotification(customerId, {
                 type: "REPORT_READY",
                 title: "보호자 리포트가 도착했어요",
                 body: "완료된 동행의 보호자 리포트를 확인해 주세요.",
-                link: "/mypage",
+                // 리포트는 예약 상세에서 본다 (#253)
+                link: `/mypage/reservations/${svc.reservation_id}`,
             });
         }
     }
@@ -152,8 +164,17 @@ export async function uploadReportAttachment(
     } = await supabase.auth.getUser();
     if (!user) return { ok: false, message: "로그인이 필요합니다." };
 
-    const service = await verifyService(supabase, serviceId, user.id);
-    if (!service) return { ok: false, message: "완료된 서비스가 아닙니다." };
+    const service = await verifyService(
+        supabase,
+        serviceId,
+        user.id,
+        ATTACHABLE_STATUSES,
+    );
+    if (!service)
+        return {
+            ok: false,
+            message: "서비스를 시작한 뒤에 첨부할 수 있습니다.",
+        };
 
     const file = formData.get("file");
     const kind = (formData.get("kind") as string | null)?.trim() || "첨부";
@@ -210,6 +231,7 @@ export async function uploadReportAttachment(
     }
 
     revalidatePath(`/partner/reports/${serviceId}`);
+    revalidatePath(`/partner/management/${serviceId}`);
     return {
         ok: true,
         attachment: {
