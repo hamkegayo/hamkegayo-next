@@ -102,8 +102,6 @@ export function RequestDetailView({ r }: { r: PartnerRequestDetail }) {
     const c = r.plan_conditions;
     // 대응카드 01 — 셋 중 하나라도 비면 수락하지 않고 운영센터에 확인한다.
     const missingCondition = !c.transportTo || !c.transportHome || !c.endMethod;
-    const notReady = () => toast.info("준비 중인 기능입니다.");
-
     const onAccept = () => {
         startTransition(async () => {
             const res = await acceptRequest(r.id);
@@ -153,14 +151,13 @@ export function RequestDetailView({ r }: { r: PartnerRequestDetail }) {
                         <List className="size-4" />
                         수락 대기 목록
                     </Link>
-                    <button
-                        type="button"
-                        onClick={notReady}
+                    <Link
+                        href="/partner/notifications#settings"
                         className="border-border bg-background text-foreground hover:bg-muted inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-bold transition-colors"
                     >
                         <Bell className="size-4" />
                         알림 설정
-                    </button>
+                    </Link>
                 </div>
             </div>
 
