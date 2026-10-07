@@ -14,9 +14,14 @@
 --
 --  반환 범위
 --   - 예약 소유자(customer_id = auth.uid()) 만. 제출(SUBMITTED) 리포트만. DRAFT 는 없는 것과 같다.
---   - 항상 : 수행 지원 내용(supports), 보호자 전달사항(guardian_note), 제출 시각
---   - 진료내용 전달 동의(share_medical_info) 또는 본인 예약(relation = '본인')일 때만 :
---       검사 진행 내용(exam), 첨부 목록(처방전·영수증·검사예약증·사진 등)
+--   - 항상 : 제출 시각, 동의 여부, 파기 여부 (본문 없음)
+--   - 진료내용 전달 동의(share_medical_info)가 있을 때만 리포트 본문 전체 :
+--       수행 지원 내용(supports), 검사 진행 내용(exam), 보호자 전달사항(guardian_note),
+--       첨부 목록(처방전·영수증·검사예약증·사진 등)
+--     보호자 전달사항은 자유기재라 진료 내용이 섞일 수 있고, 수행 지원 내용도 서비스 기록이다
+--     (처리방침 제10조 ④ "진료·검사 내용, 사진 또는 서비스 기록 등"). 동의 없이는 내보내지 않는다.
+--   - 예약 관계(relation = '본인')로 동의를 대신하지 않는다. 예약자가 직접 고르는 값이라
+--     실제 이용자와 계정 주체가 같은지 검증되지 않는다(약관 제2조 · 제5조, PR #264 리뷰).
 --   - 파기된 리포트는 purged = true 와 빈 본문만.
 --   - 첨부 실파일은 서버가 짧은 서명 URL 로 내준다(경로만 반환).
 --   - 조회할 때마다 접근 기록(REPORT_VIEW_CUSTOMER)을 남긴다(사용자 결정 2026-10-07).
@@ -56,8 +61,8 @@ begin
     return null;
   end if;
 
-  -- 약관 제8조 · 처리방침 제10조 ④ — 본인 예약이면 예약자가 곧 이용자다.
-  v_shared := coalesce(v_res.share_medical_info, false) or v_res.relation = '본인';
+  -- 약관 제8조 · 처리방침 제10조 ④ — 명시적 동의만 인정한다.
+  v_shared := coalesce(v_res.share_medical_info, false);
   v_purged := v_report.sensitive_data_purged_at is not null;
 
   if v_shared and not v_purged then
@@ -77,8 +82,8 @@ begin
     'submitted_at',   v_report.submitted_at,
     'purged',         v_purged,
     'medical_shared', v_shared,
-    'supports',       case when v_purged then '[]'::jsonb else to_jsonb(v_report.supports) end,
-    'guardian_note',  case when v_purged then null else v_report.guardian_note end,
+    'supports',       case when v_purged or not v_shared then '[]'::jsonb else to_jsonb(v_report.supports) end,
+    'guardian_note',  case when v_purged or not v_shared then null else v_report.guardian_note end,
     'exam',           case when v_purged or not v_shared then null else v_report.exam end,
     'attachments',    v_files
   );
@@ -86,7 +91,7 @@ end;
 $$;
 
 comment on function public.get_own_report(uuid) is
-  '예약 소유자에게 제출된 보호자 리포트를 반환한다. 진료 메모·첨부는 진료내용 전달 동의(또는 본인 예약) 시에만. 조회마다 접근 기록. (#253)';
+  '예약 소유자에게 제출된 보호자 리포트를 반환한다. 본문·첨부는 진료내용 전달 동의 시에만(본인 예약도 동의 필요). 조회마다 접근 기록. (#253)';
 
 revoke all on function public.get_own_report(uuid) from public, anon;
 grant execute on function public.get_own_report(uuid) to authenticated;

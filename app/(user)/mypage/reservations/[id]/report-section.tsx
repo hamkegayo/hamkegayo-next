@@ -13,7 +13,7 @@ function formatSize(bytes: number): string {
 
 /**
  * 보호자 리포트 (#253). 처리방침 제1조 3호 — 서비스 수행기록 및 리포트 제공.
- * 진료 메모·첨부는 진료내용 전달 동의(또는 본인 예약) 시에만 온다 — 약관 제8조 · 처리방침 제10조 ④.
+ * 리포트 본문·첨부는 진료내용 전달에 동의한 경우에만 온다 — 약관 제8조 · 처리방침 제10조 ④.
  */
 export function ReportSection({ reservationId }: { reservationId: string }) {
     const [report, setReport] = useState<CustomerReport | null>(null);
@@ -60,6 +60,15 @@ export function ReportSection({ reservationId }: { reservationId: string }) {
         );
     }
 
+    if (!report.medicalShared) {
+        return (
+            <p className="text-description-foreground text-sm break-keep">
+                이용자가 진료 내용 전달에 동의하지 않아 리포트 내용을 보여 드릴
+                수 없어요. 서비스 진행 상태와 시각은 위에서 확인할 수 있어요.
+            </p>
+        );
+    }
+
     return (
         <div className="space-y-5 text-sm">
             <div className="flex items-center justify-between gap-3">
@@ -93,15 +102,9 @@ export function ReportSection({ reservationId }: { reservationId: string }) {
 
             <div>
                 <p className="text-foreground font-bold">진료·검사 메모</p>
-                {report.medicalShared ? (
-                    <p className="text-description-foreground mt-2 whitespace-pre-wrap">
-                        {report.exam || "-"}
-                    </p>
-                ) : (
-                    <p className="text-muted-foreground mt-2">
-                        이용자가 진료 내용 전달에 동의하지 않았어요.
-                    </p>
-                )}
+                <p className="text-description-foreground mt-2 whitespace-pre-wrap">
+                    {report.exam || "-"}
+                </p>
             </div>
 
             <div>
@@ -111,7 +114,7 @@ export function ReportSection({ reservationId }: { reservationId: string }) {
                 </p>
             </div>
 
-            {report.medicalShared && report.attachments.length > 0 && (
+            {report.attachments.length > 0 && (
                 <div>
                     <p className="text-foreground font-bold">첨부</p>
                     <ul className="mt-2 space-y-2">

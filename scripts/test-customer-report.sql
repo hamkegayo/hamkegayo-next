@@ -1,4 +1,4 @@
--- 고객 보호자 리포트 열람 (#253) — 소유자만, 제출분만, 진료 메모·첨부는 동의 시만, 파기 표시, 접근 기록.
+-- 고객 보호자 리포트 열람 (#253) — 소유자만, 제출분만, 본문·첨부는 동의 시만(본인 관계로 대체 불가), 파기 표시, 접근 기록.
 begin;
 create function pg_temp.assert(p_ok boolean, p_label text) returns void language plpgsql as $$
 begin
@@ -49,7 +49,7 @@ $$;
 
 select pg_temp.fixture(1, '자녀', false);               -- 동의 없음
 select pg_temp.fixture(2, '자녀', true);                -- 동의
-select pg_temp.fixture(3, '본인', false);               -- 본인 예약
+select pg_temp.fixture(3, '본인', false);               -- 관계 '본인' + 동의 없음 (동의 대체 불가)
 select pg_temp.fixture(4, '자녀', true, 'DRAFT');       -- 작성 중
 select pg_temp.fixture(5, '자녀', true, 'SUBMITTED', true);  -- 파기
 
@@ -83,18 +83,23 @@ select pg_temp.assert((select v from t_out where k='partner') is null, 'partner 
 select pg_temp.assert((select v from t_out where k='draft') is null, 'draft report not visible');
 select pg_temp.assert((select v from t_out where k='missing') is null, 'unknown reservation returns null');
 
-select pg_temp.assert((select v->>'guardian_note' from t_out where k='noconsent') = '다음 진료는 2주 뒤'
-                      and (select jsonb_array_length(v->'supports') from t_out where k='noconsent') = 2,
-                      'no consent: supports and guardian note shown');
-select pg_temp.assert((select v->'exam' from t_out where k='noconsent') = 'null'::jsonb
+select pg_temp.assert((select v->'guardian_note' from t_out where k='noconsent') = 'null'::jsonb
+                      and (select jsonb_array_length(v->'supports') from t_out where k='noconsent') = 0
+                      and (select v->'exam' from t_out where k='noconsent') = 'null'::jsonb
                       and (select jsonb_array_length(v->'attachments') from t_out where k='noconsent') = 0
                       and (select (v->>'medical_shared')::boolean from t_out where k='noconsent') = false,
-                      'no consent: exam and attachments withheld');
+                      'no consent: no body at all (supports, guardian note, exam, attachments)');
 
 select pg_temp.assert((select v->>'exam' from t_out where k='consent') = '혈액검사 진행'
+                      and (select v->>'guardian_note' from t_out where k='consent') = '다음 진료는 2주 뒤'
+                      and (select jsonb_array_length(v->'supports') from t_out where k='consent') = 2
                       and (select jsonb_array_length(v->'attachments') from t_out where k='consent') = 1,
-                      'consent: exam and attachments returned');
-select pg_temp.assert((select v->>'exam' from t_out where k='self') = '혈액검사 진행', 'self reservation: exam returned');
+                      'consent: full body and attachments returned');
+select pg_temp.assert((select v->'exam' from t_out where k='self') = 'null'::jsonb
+                      and (select v->'guardian_note' from t_out where k='self') = 'null'::jsonb
+                      and (select jsonb_array_length(v->'attachments') from t_out where k='self') = 0
+                      and (select (v->>'medical_shared')::boolean from t_out where k='self') = false,
+                      'relation self without consent: nothing returned (no bypass)');
 
 select pg_temp.assert((select (v->>'purged')::boolean from t_out where k='purged')
                       and (select v->'exam' from t_out where k='purged') = 'null'::jsonb

@@ -19,7 +19,7 @@ export type CustomerReport = {
     submittedAtLabel: string | null;
     /** 보유기간(3년)이 지나 본문이 파기됨 — 처리방침 제4조 */
     purged: boolean;
-    /** 진료내용 전달 동의(또는 본인 예약) — 약관 제8조 · 처리방침 제10조 ④ */
+    /** 진료내용 전달 동의 — 없으면 본문·첨부가 오지 않는다(약관 제8조 · 처리방침 제10조 ④) */
     medicalShared: boolean;
     supports: string[];
     guardianNote: string | null;
