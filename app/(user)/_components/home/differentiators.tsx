@@ -24,7 +24,7 @@ const ITEMS: { icon: LucideIcon; title: string; desc: string; tag: string }[] =
             // 실제로 나가는 알림으로 바꿨다.
             icon: Bell,
             title: "단계마다 알림",
-            desc: "파트너 도착부터 완료·리포트까지 알려드려요.",
+            desc: "파트너 도착부터 완료·리포트까지 예약하신 계정으로 알려드려요.",
             tag: "진행 상황 확인 가능",
         },
     ];

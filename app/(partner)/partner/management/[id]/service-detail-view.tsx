@@ -196,7 +196,10 @@ export function ServiceDetailView({
             const res = await arriveService(service.id);
             if (res.ok) {
                 setArrived(true);
-                toast.success("도착이 기록되고 보호자에게 안내되었습니다.");
+                // 자동 알림은 예약자 계정 인앱뿐이다. 통보대상 연락은 파트너가 직접 한다(매뉴얼 4단계, #254).
+                toast.success(
+                    "도착이 기록되고 예약자에게 앱 알림이 갔습니다. 통보대상에게는 직접 연락해 주세요.",
+                );
                 router.refresh();
             } else {
                 toast.error(res.message);
@@ -826,8 +829,8 @@ export function ServiceDetailView({
                         ) : (
                             <>
                                 <p className="text-muted-foreground text-sm">
-                                    약속 장소에 도착하면 눌러주세요. 보호자에게
-                                    도착이 안내되고, 이 시각부터 이용시간이
+                                    약속 장소에 도착하면 눌러주세요. 예약자에게
+                                    도착 알림이 가고, 이 시각부터 이용시간이
                                     계산됩니다.
                                 </p>
                                 <button
