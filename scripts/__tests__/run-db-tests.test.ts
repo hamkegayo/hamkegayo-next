@@ -29,7 +29,7 @@ describe("test:db 인자 해석", () => {
         expect(parseArgs(argv)).toEqual({ error });
     });
 
-    it("CI 목록 29개 묶음을 유지한다 (#268 서비스 메모 저장 추가)", () => {
-        expect(SUITES).toHaveLength(29);
+    it("CI 목록 31개 묶음을 유지한다 (#268 서비스 메모 저장 추가)", () => {
+        expect(SUITES).toHaveLength(31);
     });
 });

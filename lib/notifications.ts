@@ -19,7 +19,9 @@ export type NotificationType =
     /** 결제 포인트 적립 (#249) — DB 함수 earn_reservation_points 가 보낸다 */
     | "POINT_EARNED"
     /** 귀책 보상 포인트 지급·정정 (#250) — DB 함수 admin_grant/revoke_compensation 이 보낸다 */
-    | "POINT_COMPENSATED";
+    | "POINT_COMPENSATED"
+    /** 파트너 새 요청 (#255) — DB 함수 notify_partners_new_request 가 보낸다 */
+    | "NEW_REQUEST";
 
 export type NotificationView = {
     id: string;

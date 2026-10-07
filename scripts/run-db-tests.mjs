@@ -128,6 +128,14 @@ export const SUITES = [
         [sql("test-customer-report.sql")],
     ],
     [
+        "파트너 교육 이수 기록 · 미이수 수락 차단 스위치 (#255)",
+        [sql("test-partner-training.sql")],
+    ],
+    [
+        "파트너 새 요청 알림 · 지역·시간 일치 · 이메일 설정 (#255)",
+        [sql("test-partner-new-request-alerts.sql")],
+    ],
+    [
         "서비스 메모 임시 저장 · 담당 파트너·열람 기간 (#268)",
         [sql("test-service-memo.sql")],
     ],

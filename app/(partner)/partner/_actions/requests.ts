@@ -68,6 +68,14 @@ async function applyToReservation(
         if (error.code === "23505") {
             return { ok: false, message: "이미 처리한 요청입니다." };
         }
+        // 매뉴얼 10장 — 교육 이수가 확인되지 않으면 수락하지 않는다 (#255, 마이그레이션 99)
+        if (error.message.includes("training_required")) {
+            return {
+                ok: false,
+                message:
+                    "교육 이수가 확인되지 않아 요청을 수락할 수 없어요. 인증/교육 상태에서 확인하고 운영센터에 이수 확인을 요청해 주세요.",
+            };
+        }
         console.error("[applyToReservation] insert 실패:", error);
         return {
             ok: false,
