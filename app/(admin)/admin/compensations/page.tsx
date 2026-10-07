@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { kstDateTime } from "@/lib/format";
 import { CompensationGrantForm, RevokeButton } from "./compensation-console";
-import { KIND_LABEL } from "./kinds";
+import { COMPENSATION_ENABLED, KIND_LABEL } from "./kinds";
 
 type Row = {
     id: string;
@@ -26,6 +27,7 @@ type Row = {
  * 약관 제16조 ⑧(파트너 직전 취소·20분 이상 지각·노쇼), 제19조 ③(귀책 미제공).
  */
 export default async function CompensationsPage() {
+    if (!COMPENSATION_ENABLED) notFound();
     const { data, error } = await (
         await createClient()
     ).rpc("admin_list_compensations", { p_limit: 100 });

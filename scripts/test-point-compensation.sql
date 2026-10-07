@@ -1,4 +1,6 @@
 -- 귀책 보상 포인트 관리자 지급 (#250) — 권한·MFA·상한·중복 확인·회수·감사 기록.
+-- 2026-10-07 운영 보류(마이그레이션 97): 먼저 아무도 실행할 수 없음을 확인하고,
+-- 이 트랜잭션 안에서만 권한을 되돌려 함수 동작을 검증한다(rollback 으로 원복).
 begin;
 create function pg_temp.assert(p_ok boolean, p_label text) returns void language plpgsql as $$
 begin
@@ -17,6 +19,20 @@ begin
   raise exception 'FAIL: % — expected denied', p_label;
 end;
 $$;
+
+-- 보류: anon·authenticated 모두 관리자 보상 함수를 실행할 수 없다
+select pg_temp.assert(
+  not has_function_privilege('authenticated','public.admin_compensation_target(text)','execute')
+  and not has_function_privilege('authenticated','public.admin_grant_compensation(uuid,text,integer,text,text,boolean)','execute')
+  and not has_function_privilege('authenticated','public.admin_revoke_compensation(uuid,text)','execute')
+  and not has_function_privilege('authenticated','public.admin_list_compensations(integer)','execute')
+  and not has_function_privilege('anon','public.admin_grant_compensation(uuid,text,integer,text,text,boolean)','execute'),
+  'on hold: compensation functions not executable by clients');
+
+grant execute on function public.admin_compensation_target(text) to authenticated;
+grant execute on function public.admin_grant_compensation(uuid,text,integer,text,text,boolean) to authenticated;
+grant execute on function public.admin_revoke_compensation(uuid,text) to authenticated;
+grant execute on function public.admin_list_compensations(integer) to authenticated;
 
 insert into auth.users(id,email) values
   ('00000250-0000-4000-8000-000000000001','comp-admin@example.invalid'),

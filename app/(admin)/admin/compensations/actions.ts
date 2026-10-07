@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
+import { COMPENSATION_ENABLED } from "./kinds";
 
 /**
  * 귀책 보상 포인트 지급·회수 (#250, 약관 제16조 ⑧ · 제19조 ③).
@@ -26,6 +27,7 @@ type Result<T = undefined> =
     | { ok: false; message: string };
 
 const MESSAGE: Record<string, string> = {
+    on_hold: "귀책 보상 지급은 현재 운영 보류 중입니다.",
     forbidden: "전체/정산 권한과 2단계 인증이 필요합니다.",
     reservation_not_found: "예약번호를 찾을 수 없습니다.",
     not_eligible: "매칭 중인 예약에는 지급할 수 없습니다.",
@@ -49,6 +51,7 @@ function toMessage(error: { message: string }): string {
 export async function findCompensationTarget(
     code: string,
 ): Promise<Result<CompensationTarget>> {
+    if (!COMPENSATION_ENABLED) return { ok: false, message: MESSAGE.on_hold };
     if (!code.trim())
         return { ok: false, message: "예약번호를 입력해 주세요." };
     const supabase = await createClient();
@@ -83,6 +86,7 @@ export async function grantCompensation(input: {
     evidenceRef: string;
     allowDuplicate: boolean;
 }): Promise<Result> {
+    if (!COMPENSATION_ENABLED) return { ok: false, message: MESSAGE.on_hold };
     const supabase = await createClient();
     const { error } = await supabase.rpc("admin_grant_compensation", {
         p_reservation_id: input.reservationId,
@@ -101,6 +105,7 @@ export async function revokeCompensation(input: {
     id: string;
     reason: string;
 }): Promise<Result<number>> {
+    if (!COMPENSATION_ENABLED) return { ok: false, message: MESSAGE.on_hold };
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("admin_revoke_compensation", {
         p_id: input.id,
