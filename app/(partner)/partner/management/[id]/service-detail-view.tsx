@@ -338,7 +338,7 @@ export function ServiceDetailView({
             <div className="mt-3 flex items-start justify-between gap-4">
                 <div>
                     <p className="text-muted-foreground text-sm font-semibold">
-                        진행관리 &gt; 수락한 서비스 목록 &gt;{" "}
+                        진행 관리 &gt; 수락한 서비스 목록 &gt;{" "}
                         <span className="text-brand">세부 진행</span>
                     </p>
                     <h1 className="text-foreground mt-2 text-2xl font-extrabold md:text-3xl">

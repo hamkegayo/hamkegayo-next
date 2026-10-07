@@ -65,16 +65,26 @@ export function SettlementDashboardView({
     return (
         <div>
             {/* 헤더 */}
-            <div className="flex items-start justify-between gap-4">
-                <h1 className="text-2xl font-extrabold md:text-3xl">
-                    <span className="text-foreground">My</span>
-                    <span className="text-brand">/정산</span>
-                </h1>
+            {/* 다른 파트너 화면과 같은 형식 — 위치 표시 · 제목 · 설명 (#272) */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <p className="text-muted-foreground text-sm font-semibold">
+                        정산 관리 &gt;{" "}
+                        <span className="text-brand">정산 현황</span>
+                    </p>
+                    <h1 className="text-foreground mt-2 text-2xl font-extrabold md:text-3xl">
+                        정산 현황
+                    </h1>
+                    <p className="text-muted-foreground mt-2">
+                        예상 정산 금액과 다음 정산일, 정산 계좌를 확인할 수
+                        있습니다.
+                    </p>
+                </div>
                 <Link
                     href={HISTORY}
-                    className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-5 py-2.5 text-sm font-bold transition-colors"
+                    className="bg-brand text-brand-foreground hover:bg-brand/90 shrink-0 self-start rounded-lg px-5 py-2.5 text-sm font-bold transition-colors"
                 >
-                    이번 달 정산
+                    정산 내역 보기
                 </Link>
             </div>
 
