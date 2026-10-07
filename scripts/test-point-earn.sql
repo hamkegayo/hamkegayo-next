@@ -11,8 +11,8 @@ $$;
 select pg_temp.assert(
   not has_function_privilege('authenticated','public.earn_reservation_points(uuid)','execute')
   and not has_function_privilege('anon','public.earn_reservation_points(uuid)','execute')
-  and not has_function_privilege('authenticated','public.sweep_earn_points()','execute')
-  and not has_function_privilege('anon','public.sweep_earn_points()','execute'),
+  and not has_function_privilege('authenticated','public.sweep_earn_points(integer)','execute')
+  and not has_function_privilege('anon','public.sweep_earn_points(integer)','execute'),
   'earn/sweep not executable by clients');
 select pg_temp.assert(has_function_privilege('service_role','public.earn_reservation_points(uuid)','execute'), 'server can earn');
 select pg_temp.assert(exists(select 1 from cron.job where jobname='point-earn-sweep'), 'sweep cron scheduled');
@@ -144,6 +144,27 @@ begin
   perform pg_temp.assert((select amount from public.points where reservation_id=v_res and reason='EARN_PAYMENT') = 500, 'F: sweep earns settled reservation');
   perform public.sweep_earn_points();
   perform pg_temp.assert((select count(*) from public.points where reservation_id=v_res and reason='EARN_PAYMENT') = 1, 'F: repeated sweep does not duplicate');
+end;
+$$;
+
+-- H. 미결·적립액 0 예약이 배치 앞자리를 막지 않는다 (PR #258 리뷰)
+--    오래된 순으로 처리하므로, 거르지 않으면 1건 한도에서 H3·H2 가 먼저 잡힌다.
+do $$
+declare
+  v_start timestamptz := (select started_at from public.point_earn_policy where id);
+  v_h1 uuid; v_h2 uuid; v_h3 uuid;
+begin
+  v_h3 := pg_temp.fixture('H3', 'COMPLETED', p_ended => v_start + interval '1 millisecond');
+  perform pg_temp.pay(v_h3, 'BASE', 'PAID', 40000, 40000);            -- 현금 0 → 영영 적립 없음
+  v_h2 := pg_temp.fixture('H2', 'COMPLETED', p_ended => v_start + interval '2 milliseconds');
+  perform pg_temp.pay(v_h2, 'BASE', 'PAID', 40000);
+  perform pg_temp.pay(v_h2, 'EXTENSION', 'PENDING', 10000);          -- 추가결제 대기
+  v_h1 := pg_temp.fixture('H1', 'COMPLETED', p_ended => v_start + interval '3 milliseconds');
+  perform pg_temp.pay(v_h1, 'BASE', 'PAID', 30000);
+
+  perform pg_temp.assert(public.sweep_earn_points(1) = 1, 'H: limit 1 still earns one');
+  perform pg_temp.assert((select amount from public.points where reservation_id=v_h1 and reason='EARN_PAYMENT') = 300, 'H: settled older reservation not starved by pending/zero-cash');
+  perform pg_temp.assert(not exists(select 1 from public.points where reservation_id in (v_h2, v_h3) and reason='EARN_PAYMENT'), 'H: pending and zero-cash still not earned');
 end;
 $$;
 
