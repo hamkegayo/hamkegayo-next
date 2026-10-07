@@ -45,7 +45,11 @@ export default async function TrainingsPage() {
             </p>
             <p className="mt-3 text-sm font-semibold">
                 3종 이수 {complete}명 / 전체 {rows.length}명 · 미이수 수락 차단{" "}
-                {required.data === true ? "켜짐" : "꺼짐(기록 입력 기간)"}
+                {required.error
+                    ? "확인 실패 — 새로고침해 주세요"
+                    : required.data === true
+                      ? "켜짐"
+                      : "꺼짐(기록 입력 기간)"}
             </p>
             <ul className="mt-6 space-y-4">
                 {rows.map((r) => (

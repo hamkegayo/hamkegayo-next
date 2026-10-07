@@ -115,7 +115,16 @@ export default async function PartnerStatusPage() {
                     첫 업무를 수락하기 전에 세 가지 교육 이수가 확인되어야 해요.
                     이수 확인은 운영센터가 기록합니다.
                 </p>
-                {training?.required && doneCourses < 3 && (
+                {training?.required === null && (
+                    <p
+                        role="alert"
+                        className="text-destructive mt-2 text-sm break-keep"
+                    >
+                        수락 제한 여부를 확인하지 못했어요. 이수가 모두 확인되지
+                        않았다면 요청 수락이 막힐 수 있어요.
+                    </p>
+                )}
+                {training?.required === true && doneCourses < 3 && (
                     <p className="text-destructive mt-2 text-sm font-semibold break-keep">
                         이수가 모두 확인되기 전에는 요청을 수락할 수 없어요.
                     </p>
