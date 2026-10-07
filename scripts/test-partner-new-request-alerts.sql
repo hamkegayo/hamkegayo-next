@@ -21,6 +21,8 @@ $$;
 select pg_temp.assert(not has_function_privilege('authenticated','public.notify_partners_new_request(uuid,text,text,text)','execute')
                       and not has_function_privilege('anon','public.notify_partners_new_request(uuid,text,text,text)','execute'),
                       'notify is server-only');
+select pg_temp.assert(has_function_privilege('service_role','public.notify_partners_new_request(uuid,text,text,text)','execute'),
+                      'server (service_role) can notify');
 
 -- 파트너: P1 강남구·평일 09-18 / P2 종로구 / P3 강남구지만 정지 / P4 강남구·평일 시간 미설정 / P5 지역 미설정
 insert into auth.users(id,email) values
