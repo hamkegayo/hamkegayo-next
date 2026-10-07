@@ -127,6 +127,10 @@ export const SUITES = [
         "고객 보호자 리포트 열람 · 동의 범위 · 파기 · 접근 기록 (#253)",
         [sql("test-customer-report.sql")],
     ],
+    [
+        "서비스 메모 임시 저장 · 담당 파트너·열람 기간 (#268)",
+        [sql("test-service-memo.sql")],
+    ],
     ["정산 계좌 열람 통제 (#51)", [npm("test:payout")]],
     [
         "이메일 인증 연락처 변경 · 목적/대상/일회 소비 (#64)",

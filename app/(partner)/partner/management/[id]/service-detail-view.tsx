@@ -38,6 +38,7 @@ import {
     endService,
     endServiceNoShow,
     recordServiceTime,
+    saveServiceMemo,
     startService,
 } from "../../_actions/services";
 // 값은 서버 액션 파일이 아니라 평범한 모듈에서 가져온다 — "use server" 는
@@ -1068,10 +1069,23 @@ export function ServiceDetailView({
 
                     <button
                         type="button"
-                        onClick={() => toast.success("임시 저장되었습니다.")}
-                        className="bg-brand text-brand-foreground hover:bg-brand/90 mt-4 w-full rounded-lg px-4 py-3 text-sm font-bold transition-colors"
+                        disabled={pending}
+                        onClick={() =>
+                            // 실제로 저장한다 (#268). 실패하면 성공 토스트를 띄우지 않는다.
+                            startTransition(async () => {
+                                const res = await saveServiceMemo(
+                                    service.id,
+                                    memoTab === "start" ? "START" : "END",
+                                    memoTab === "start" ? startMemo : endMemo,
+                                );
+                                if (res.ok)
+                                    toast.success("메모를 저장했습니다.");
+                                else toast.error(res.message);
+                            })
+                        }
+                        className="bg-brand text-brand-foreground hover:bg-brand/90 mt-4 w-full rounded-lg px-4 py-3 text-sm font-bold transition-colors disabled:opacity-60"
                     >
-                        임시 저장
+                        {pending ? "저장 중…" : "임시 저장"}
                     </button>
 
                     {/* 메모 요약 */}
