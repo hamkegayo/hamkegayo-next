@@ -16,6 +16,8 @@ export type NotificationType =
     | "QUALIFICATION_REVIEW_REQUIRED"
     /** 약관·방침이 개정되어 재동의가 필요하다 (#91) */
     | "AGREEMENT_REVISED"
+    /** 결제 포인트 적립 (#249) — DB 함수 earn_reservation_points 가 보낸다 */
+    | "POINT_EARNED"
     /** 귀책 보상 포인트 지급·정정 (#250) — DB 함수 admin_grant/revoke_compensation 이 보낸다 */
     | "POINT_COMPENSATED";
 

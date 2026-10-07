@@ -116,6 +116,10 @@ export const SUITES = [
         [sql("test-partner-identity.sql")],
     ],
     [
+        "결제 포인트 1% 적립 · 정산 완료 후 1회 · 소급 없음 (#249)",
+        [sql("test-point-earn.sql")],
+    ],
+    [
         "귀책 보상 포인트 지급 · 상한 100,000P · 회수 · 감사 기록 (#250)",
         [sql("test-point-compensation.sql")],
     ],
@@ -132,7 +136,7 @@ export const SUITES = [
     // 개정 고지는 약관 제4조 ③ · 처리방침 제16조 ② 가 요구하는 절차다.
     ["약관 재동의 안내·중복 방지 (#91)", [npm("test:reconsent")]],
     // ⚠️ test:nicepay · test:payapi 는 넣지 않는다. NICEPAY 샌드박스 실호출이라
-    //    외부 장애가 CI 실패로 둔갑한다 (docs/testing.md 3. 외부 연동).
+    //    외부 장애가 CI 실패로 둔갑한다 (테스트 가이드 3. 외부 연동 — https://app.notion.com/p/3f1169f76f9f819ca52ef036622c3fc1).
 ];
 
 const isWin = process.platform === "win32";

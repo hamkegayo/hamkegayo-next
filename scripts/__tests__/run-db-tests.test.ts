@@ -29,7 +29,7 @@ describe("test:db 인자 해석", () => {
         expect(parseArgs(argv)).toEqual({ error });
     });
 
-    it("CI 목록 26개 묶음을 유지한다 (#250 귀책 보상 포인트 지급 추가)", () => {
-        expect(SUITES).toHaveLength(26);
+    it("CI 목록 27개 묶음을 유지한다 (#250 귀책 보상 포인트 지급 추가)", () => {
+        expect(SUITES).toHaveLength(27);
     });
 });

@@ -33,13 +33,13 @@
 
 ## 설계 판단
 
-주요 설계 판단과 근거는 [docs/design-decisions.md](docs/design-decisions.md)에 기록합니다.
+주요 설계 판단과 근거는 Notion [설계 판단 기록](https://app.notion.com/p/3f1169f76f9f81a9afb1d57e668826ad)에 기록합니다. 테스트·운영·릴리스 문서는 Notion [저장소 docs 보관소](https://app.notion.com/p/3f1169f76f9f81df9cf7ffc6fcf32f1a)에 있습니다.
 
-1. [전환 추적을 민감정보가 새지 않는 구조로](docs/design-decisions.md#1-전환-추적을-민감정보가-새지-않는-구조로) — 동의 이중 확인, 운영 호스트 기준 로드
-2. [결제 승인 라우트](docs/design-decisions.md#2-결제-승인-라우트--청구-지점-앞뒤의-실패를-전부-분류) — 청구 지점 앞뒤의 실패를 사고 유형으로 분류하고 망취소
-3. [실제 사고를 lint·CI 규칙으로](docs/design-decisions.md#3-실제-사고를-개인의-주의가-아니라-lintci-규칙으로) — 시간대·링크 404·권한 우회를 코드 단계에서 차단
-4. ["무엇이 안 되는가"를 검증하는 CI](docs/design-decisions.md#4-무엇이-안-되는가를-검증하는-ci) — 로컬 Supabase 위 RLS·권한 경계 테스트
-5. [약관·개인정보처리방침을 DB 정책으로 강제](docs/design-decisions.md#5-약관개인정보처리방침을-db-정책으로-강제) — 개인정보 단계별 노출, 개정 감지
+1. [전환 추적을 민감정보가 새지 않는 구조로](https://app.notion.com/p/3f1169f76f9f81a9afb1d57e668826ad) — 동의 이중 확인, 운영 호스트 기준 로드
+2. [결제 승인 라우트](https://app.notion.com/p/3f1169f76f9f81a9afb1d57e668826ad) — 청구 지점 앞뒤의 실패를 사고 유형으로 분류하고 망취소
+3. [실제 사고를 lint·CI 규칙으로](https://app.notion.com/p/3f1169f76f9f81a9afb1d57e668826ad) — 시간대·링크 404·권한 우회를 코드 단계에서 차단
+4. ["무엇이 안 되는가"를 검증하는 CI](https://app.notion.com/p/3f1169f76f9f81a9afb1d57e668826ad) — 로컬 Supabase 위 RLS·권한 경계 테스트
+5. [약관·개인정보처리방침을 DB 정책으로 강제](https://app.notion.com/p/3f1169f76f9f81a9afb1d57e668826ad) — 개인정보 단계별 노출, 개정 감지
 
 ---
 
@@ -90,7 +90,7 @@ npm run dev                    # http://localhost:3000
 
 > ⚠️ `SUPABASE_SERVICE_ROLE_KEY`, `NICEPAY_SECRET_KEY`, `OPENING_EVENT_EMAIL_HMAC_KEY`에는 **절대 `NEXT_PUBLIC_` 접두사를 붙이지 마세요.** 클라이언트 번들에 포함되어 누구나 읽을 수 있게 됩니다.
 
-카카오·네이버 로그인 제공자 설정은 [docs/social-login.md](docs/social-login.md)를 참고하세요.
+카카오·네이버 로그인 제공자 설정은 Notion [소셜 로그인 설정](https://app.notion.com/p/3f1169f76f9f8121ab52c9b3e8c0b245)을 참고하세요.
 
 ## 테스트
 
@@ -101,7 +101,7 @@ npm run dev                    # http://localhost:3000
 | 브라우저 E2E | `npm run test:e2e` (Playwright, 모의 PG)                               | 릴리즈 PR   |
 | 외부 연동    | `npm run test:nicepay` (샌드박스 키 필요)                              | 제외 (수동) |
 
-계층별 전체 명령과 새 테스트 작성 원칙은 [docs/testing.md](docs/testing.md)에 있습니다.
+계층별 전체 명령과 새 테스트 작성 원칙은 Notion [테스트 가이드](https://app.notion.com/p/3f1169f76f9f819ca52ef036622c3fc1)에 있습니다.
 
 ---
 
@@ -127,7 +127,6 @@ lib/                 # 도메인 로직 (pricing · payments · legal · analyti
 utils/supabase/      # client / server / admin / middleware
 supabase/migrations/ # 스키마 마이그레이션
 scripts/             # 시드 · 통합 테스트 · 검사기
-docs/                # 설계 기록 · 테스트 · 릴리즈·운영 절차
 ```
 
 **폴더 규칙** — `_actions/`는 Server Action, `_lib/`의 서버 전용 조회는 `*.server.ts`, `_components/`는 해당 라우트 전용입니다.
