@@ -4,6 +4,7 @@ import {
     getPartnerService,
     getServiceNotices,
 } from "../../../_lib/services.server";
+import { getServiceAttachments } from "../../../_lib/reports.server";
 import { ServiceDetailView } from "./service-detail-view";
 
 export default async function PartnerManagementDetail({
@@ -30,7 +31,16 @@ export default async function PartnerManagementDetail({
         );
     }
 
-    const notices = await getServiceNotices(id);
+    const [notices, attachments] = await Promise.all([
+        getServiceNotices(id),
+        getServiceAttachments(id),
+    ]);
 
-    return <ServiceDetailView service={service} notices={notices} />;
+    return (
+        <ServiceDetailView
+            service={service}
+            notices={notices}
+            attachments={attachments}
+        />
+    );
 }
