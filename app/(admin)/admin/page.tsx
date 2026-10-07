@@ -218,6 +218,12 @@ export default async function AdminHome() {
                 >
                     미달분 환불 승인
                 </Link>
+                <Link
+                    href="/admin/compensations"
+                    className="text-brand text-sm underline"
+                >
+                    귀책 보상 포인트
+                </Link>
                 <LogoutButton />
             </div>
         </div>

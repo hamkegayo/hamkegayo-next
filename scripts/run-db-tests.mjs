@@ -119,6 +119,10 @@ export const SUITES = [
         "결제 포인트 1% 적립 · 정산 완료 후 1회 · 소급 없음 (#249)",
         [sql("test-point-earn.sql")],
     ],
+    [
+        "귀책 보상 포인트 지급 · 상한 100,000P · 회수 · 감사 기록 (#250)",
+        [sql("test-point-compensation.sql")],
+    ],
     ["정산 계좌 열람 통제 (#51)", [npm("test:payout")]],
     [
         "이메일 인증 연락처 변경 · 목적/대상/일회 소비 (#64)",

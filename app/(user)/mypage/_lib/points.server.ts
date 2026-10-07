@@ -95,7 +95,11 @@ export async function getMyPoints(): Promise<PointSummary> {
             entries: data.map((r) => ({
                 id: r.id,
                 amount: r.amount,
-                label: REASON_LABEL[r.reason] ?? r.reason,
+                // 보상 회수(#250)는 같은 사유의 음수 행이다.
+                label:
+                    r.reason === "COMPENSATION" && r.amount < 0
+                        ? "보상 회수"
+                        : (REASON_LABEL[r.reason] ?? r.reason),
                 dateLabel: formatDate(r.created_at),
                 expiresLabel: r.expires_at
                     ? `${formatDate(r.expires_at)} 소멸`
