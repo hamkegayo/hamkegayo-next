@@ -9,6 +9,7 @@ import {
 } from "../../_lib/training.server";
 import { getPartnerPublicProfile } from "../_actions/public-profile";
 import { getMyPayoutAccount } from "../_actions/payout-account";
+import { TRAINING_MATERIALS_READY } from "@/lib/partner-training";
 
 type Tone = "done" | "pending" | "todo";
 
@@ -80,7 +81,7 @@ export default async function PartnerStatusPage() {
             getPartnerQualifications(),
             getPartnerPublicProfile(),
             getMyPayoutAccount(),
-            getMyTrainingStatus(),
+            TRAINING_MATERIALS_READY ? getMyTrainingStatus() : null,
         ]);
 
     const identityStatus = identity.ok ? identity.status : null;
@@ -109,52 +110,60 @@ export default async function PartnerStatusPage() {
                 업무 수락 전에 확인이 필요한 항목을 모아 보여 드려요.
             </p>
 
-            <section className="border-border bg-background mt-6 rounded-2xl border p-6 md:p-7">
-                <h2 className="text-foreground text-lg font-bold">교육 이수</h2>
-                <p className="text-muted-foreground mt-1 text-sm break-keep">
-                    첫 업무를 수락하기 전에 세 가지 교육 이수가 확인되어야 해요.
-                    이수 확인은 운영센터가 기록합니다.
-                </p>
-                {training?.required === null && (
-                    <p
-                        role="alert"
-                        className="text-destructive mt-2 text-sm break-keep"
-                    >
-                        수락 제한 여부를 확인하지 못했어요. 이수가 모두 확인되지
-                        않았다면 요청 수락이 막힐 수 있어요.
+            {/* 교육 자료 준비 전에는 숨긴다 (lib/partner-training.ts) */}
+            {TRAINING_MATERIALS_READY && (
+                <section className="border-border bg-background mt-6 rounded-2xl border p-6 md:p-7">
+                    <h2 className="text-foreground text-lg font-bold">
+                        교육 이수
+                    </h2>
+                    <p className="text-muted-foreground mt-1 text-sm break-keep">
+                        첫 업무를 수락하기 전에 세 가지 교육 이수가 확인되어야
+                        해요. 이수 확인은 운영센터가 기록합니다.
                     </p>
-                )}
-                {training?.required === true && doneCourses < 3 && (
-                    <p className="text-destructive mt-2 text-sm font-semibold break-keep">
-                        이수가 모두 확인되기 전에는 요청을 수락할 수 없어요.
-                    </p>
-                )}
-                {training === null ? (
-                    <p role="alert" className="text-destructive mt-4 text-sm">
-                        교육 기록을 불러오지 못했어요. 잠시 후 다시 시도해
-                        주세요.
-                    </p>
-                ) : (
-                    <ul className="divide-border mt-2 divide-y">
-                        {TRAINING_COURSES.map((c) => {
-                            const on = training.completed[c.code];
-                            return (
-                                <Item
-                                    key={c.code}
-                                    title={c.label}
-                                    desc={
-                                        on
-                                            ? `${on} 이수 확인`
-                                            : "운영센터에 이수 확인을 요청해 주세요."
-                                    }
-                                    tone={on ? "done" : "todo"}
-                                    label={on ? "이수" : "미확인"}
-                                />
-                            );
-                        })}
-                    </ul>
-                )}
-            </section>
+                    {training?.required === null && (
+                        <p
+                            role="alert"
+                            className="text-destructive mt-2 text-sm break-keep"
+                        >
+                            수락 제한 여부를 확인하지 못했어요. 이수가 모두
+                            확인되지 않았다면 요청 수락이 막힐 수 있어요.
+                        </p>
+                    )}
+                    {training?.required === true && doneCourses < 3 && (
+                        <p className="text-destructive mt-2 text-sm font-semibold break-keep">
+                            이수가 모두 확인되기 전에는 요청을 수락할 수 없어요.
+                        </p>
+                    )}
+                    {training === null ? (
+                        <p
+                            role="alert"
+                            className="text-destructive mt-4 text-sm"
+                        >
+                            교육 기록을 불러오지 못했어요. 잠시 후 다시 시도해
+                            주세요.
+                        </p>
+                    ) : (
+                        <ul className="divide-border mt-2 divide-y">
+                            {TRAINING_COURSES.map((c) => {
+                                const on = training.completed[c.code];
+                                return (
+                                    <Item
+                                        key={c.code}
+                                        title={c.label}
+                                        desc={
+                                            on
+                                                ? `${on} 이수 확인`
+                                                : "운영센터에 이수 확인을 요청해 주세요."
+                                        }
+                                        tone={on ? "done" : "todo"}
+                                        label={on ? "이수" : "미확인"}
+                                    />
+                                );
+                            })}
+                        </ul>
+                    )}
+                </section>
+            )}
 
             <section className="border-border bg-background mt-5 rounded-2xl border p-6 md:p-7">
                 <h2 className="text-foreground text-lg font-bold">인증</h2>

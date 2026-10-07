@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { TRAINING_MATERIALS_READY } from "@/lib/partner-training";
 import { createClient } from "@/utils/supabase/server";
 import { TrainingRow, type CourseRecord } from "./training-row";
 
@@ -16,6 +18,8 @@ type Row = {
  * 수락 차단 스위치(partner_training_enforcement)를 켜기 전에 기존 파트너 기록을 먼저 입력한다.
  */
 export default async function TrainingsPage() {
+    // 교육 자료 준비 전에는 기록 화면을 닫는다 (lib/partner-training.ts)
+    if (!TRAINING_MATERIALS_READY) notFound();
     const supabase = await createClient();
     const [list, required] = await Promise.all([
         supabase.rpc("admin_list_partner_trainings"),
