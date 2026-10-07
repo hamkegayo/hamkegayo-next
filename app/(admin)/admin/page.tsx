@@ -201,6 +201,12 @@ export default async function AdminHome() {
                 파트너 자격 심사
             </Link>
             <Link
+                href="/admin/trainings"
+                className="text-brand mt-6 ml-4 inline-block font-semibold underline"
+            >
+                파트너 교육 이수
+            </Link>
+            <Link
                 href="/admin/review-publications"
                 className="text-brand ml-5 font-semibold underline"
             >

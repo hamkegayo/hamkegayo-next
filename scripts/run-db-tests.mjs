@@ -123,6 +123,10 @@ export const SUITES = [
         "귀책 보상 포인트 지급 · 상한 100,000P · 회수 · 감사 기록 (#250)",
         [sql("test-point-compensation.sql")],
     ],
+    [
+        "파트너 교육 이수 기록 · 미이수 수락 차단 스위치 (#255)",
+        [sql("test-partner-training.sql")],
+    ],
     ["정산 계좌 열람 통제 (#51)", [npm("test:payout")]],
     [
         "이메일 인증 연락처 변경 · 목적/대상/일회 소비 (#64)",
