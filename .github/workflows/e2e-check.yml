@@ -4,7 +4,7 @@
 #
 # 릴리즈(dev → main) PR 에서만 돈다. 빌드와 브라우저 실행으로 수 분이 걸려 모든 작업 PR 에
 # 붙이지 않는다. 결제는 모의 PG(e2e/support/mock-nicepay.mjs)로 처리하고 실제 NICEPAY·메일은
-# 호출하지 않는다 — docs/testing.md
+# 호출하지 않는다 — 테스트 가이드(Notion) https://app.notion.com/p/3f1169f76f9f819ca52ef036622c3fc1
 name: E2E Check
 
 on:

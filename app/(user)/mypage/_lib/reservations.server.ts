@@ -20,6 +20,19 @@ export type CurrentReservationView = {
     stepIndex: number;
 };
 
+/** 매칭 대기 중(MATCHING) 예약 — 파트너 수락 대기·선택 대기 (#229) */
+export type MatchingReservationView = {
+    id: string;
+    hospital: string;
+    datetimeLabel: string;
+    planLabel: string;
+    /**
+     * 수락한(지원한) 파트너 수. 0명이어도 카드를 보여 준다.
+     * null = 조회 실패 — "지원자 없음"으로 보이지 않게 구분한다.
+     */
+    applicantCount: number | null;
+};
+
 /** 최근 예약 내역(완료/취소) */
 export type RecentReservationView = {
     id: string;
@@ -64,11 +77,15 @@ function planLabel(plan: string): string {
 
 /**
  * 로그인 고객의 예약현황.
- *  - current: 진행 중(MATCHING/CONFIRMED) 최신 1건
+ *  - matching: 매칭 대기(MATCHING) 전부 — 매칭 화면을 떠나도 다시 찾을 수 있게 (#229)
+ *  - current: 진행 중(CONFIRMED/COMPLETED) 최신 1건
  *  - recent: 완료/취소(COMPLETED/CANCELLED) 최신순
+ * 만료 정리(runExpirySweep)를 먼저 돌린 뒤의 서버 상태를 그대로 쓰므로,
+ * 취소·만료된 예약은 matching 에서 빠지고 recent 로 넘어간다.
  * 비로그인/조회 실패 시 빈 값.
  */
 export async function getMyReservations(): Promise<{
+    matching: MatchingReservationView[];
     current: CurrentReservationView | null;
     recent: RecentReservationView[];
 }> {
@@ -77,7 +94,7 @@ export async function getMyReservations(): Promise<{
         const {
             data: { user },
         } = await supabase.auth.getUser();
-        if (!user) return { current: null, recent: [] };
+        if (!user) return { matching: [], current: null, recent: [] };
 
         // 진료일시가 지난 미확정(MATCHING) 예약을 먼저 만료 처리(lazy)
         await runExpirySweep();
@@ -91,10 +108,31 @@ export async function getMyReservations(): Promise<{
             .order("created_at", { ascending: false })
             .returns<Row[]>();
 
-        if (error || !data) return { current: null, recent: [] };
+        if (error || !data) return { matching: [], current: null, recent: [] };
+
+        // 매칭 대기 — 지원자 수는 본인 예약만 허용하는 get_reservation_applicants 로 센다.
+        const matchingRows = data.filter((r) => r.status === "MATCHING");
+        const applicantCounts = await Promise.all(
+            matchingRows.map(async (r) => {
+                const { data: applicants, error: applicantsError } =
+                    await supabase.rpc("get_reservation_applicants", {
+                        p_reservation_id: r.id,
+                    });
+                if (applicantsError || !Array.isArray(applicants)) return null;
+                return applicants.length;
+            }),
+        );
+        const matching: MatchingReservationView[] = matchingRows.map(
+            (r, i) => ({
+                id: r.id,
+                hospital: r.hospital_address,
+                datetimeLabel: formatDateTime(r.use_date, r.reserve_time),
+                planLabel: planLabel(r.plan),
+                applicantCount: applicantCounts[i],
+            }),
+        );
 
         // '현재 진행 중'에는 확정~완료(CONFIRMED/COMPLETED) 최신 1건을 노출.
-        // 매칭 대기(MATCHING)는 예약 플로우에서 선택하며 목록에는 띄우지 않는다.
         const activeRow = data.find(
             (r) => r.status === "CONFIRMED" || r.status === "COMPLETED",
         );
@@ -152,8 +190,8 @@ export async function getMyReservations(): Promise<{
                 statusLabel: RESERVATION_STATUS_LABEL[r.status] ?? r.status,
             }));
 
-        return { current, recent };
+        return { matching, current, recent };
     } catch {
-        return { current: null, recent: [] };
+        return { matching: [], current: null, recent: [] };
     }
 }

@@ -46,9 +46,13 @@ yarn-error.log*
 next-env.d.ts
 plan*
 
-# 에이전트 로컬 설정
-.claude/
-.agents/
+# 에이전트 설정 — 공용 하네스(AGENTS.md, 공용 스킬)는 커밋하고 개인 설정만 제외한다 (#242)
+.claude/*
+!.claude/skills/
+.agents/*
+!.agents/skills/
+*.local.json
+CLAUDE.local.md
 
 # Playwright E2E (#214)
 /test-results/
