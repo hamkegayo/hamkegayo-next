@@ -169,6 +169,8 @@ export function StepPayment() {
 
             if (!res.ok) {
                 toast.error(body.error ?? "결제를 시작할 수 없습니다.");
+                // 결제창이 열리지 않았으니 다시 시도·이전 단계 이동이 가능해야 한다 (#259)
+                setSubmitting(false);
                 // 선택이 풀렸거나 기한이 지난 경우 → 파트너 재선택으로
                 if (
                     body.code === "PAYMENT_EXPIRED" ||
@@ -186,6 +188,7 @@ export function StepPayment() {
                 toast.error(
                     "결제 모듈을 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.",
                 );
+                setSubmitting(false);
                 return;
             }
 
