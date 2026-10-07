@@ -70,6 +70,9 @@ export type PlanDetail = {
     shareMedicalInfo: boolean;
     handover: HandoverPerson | null;
     backupHandover: HandoverPerson | null;
+    /** 요청사항·동행 시 주의사항 — 처리방침 제5조 ② [단계 2] 표 (#255) */
+    otherRequests: string | null;
+    cautions: string | null;
 };
 
 export type HandoverPerson = {
@@ -127,6 +130,8 @@ type ServiceRow = {
         backup_handover_name: string | null;
         backup_handover_relation: string | null;
         backup_handover_phone: string | null;
+        other_requests: string | null;
+        cautions: string | null;
     } | null;
 };
 
@@ -159,7 +164,9 @@ const SELECT =
     // 인계자는 이용자 본인이 아닌 제3자의 개인정보다.
     "transport_to, transport_home, end_method, notify_target, share_medical_info, " +
     "handover_name, handover_relation, handover_phone, " +
-    "backup_handover_name, backup_handover_relation, backup_handover_phone)";
+    "backup_handover_name, backup_handover_relation, backup_handover_phone, " +
+    // 요청사항·동행 시 주의사항도 단계 2 항목이다 (처리방침 제5조 ② 표, #255).
+    "other_requests, cautions)";
 
 function toView(r: ServiceRow): PartnerServiceView {
     const res = r.reservations;
@@ -253,6 +260,8 @@ function toView(r: ServiceRow): PartnerServiceView {
                 res?.backup_handover_relation,
                 res?.backup_handover_phone,
             ),
+            otherRequests: res?.other_requests?.trim() || null,
+            cautions: res?.cautions?.trim() || null,
         },
     };
 }
