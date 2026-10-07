@@ -49,6 +49,7 @@ import {
     type ServiceTimeField,
 } from "../../../_lib/service-times";
 import { EndServiceModal } from "../../../_components/end-service-modal";
+import { RequestInfoModal } from "./request-info-modal";
 import { ServiceFeedbackModal } from "../../../_components/service-feedback-modal";
 import {
     ServiceNoticeModal,
@@ -75,6 +76,7 @@ export function ServiceDetailView({
     // 신고 모달 — 열려 있는 종류가 곧 상태다. 닫으면 컴포넌트가 사라져
     // 입력값도 함께 사라진다(useEffect 로 되돌리지 않는다).
     const [noticeKind, setNoticeKind] = useState<NoticeKind | null>(null);
+    const [infoOpen, setInfoOpen] = useState(false);
 
     // 초기 진행 상태를 서비스 상태(state)로부터 파생
     const initial = useMemo(() => {
@@ -344,9 +346,7 @@ export function ServiceDetailView({
                 {ended && (
                     <button
                         type="button"
-                        onClick={() =>
-                            toast.info("예약/요청 정보는 준비 중입니다.")
-                        }
+                        onClick={() => setInfoOpen(true)}
                         className="border-border bg-background text-foreground hover:bg-muted inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-bold transition-colors"
                     >
                         <FileText className="size-4" />
@@ -1117,6 +1117,12 @@ export function ServiceDetailView({
                     </div>
                 </div>
             </div>
+
+            <RequestInfoModal
+                open={infoOpen}
+                onClose={() => setInfoOpen(false)}
+                service={service}
+            />
 
             <EndServiceModal
                 open={endOpen}

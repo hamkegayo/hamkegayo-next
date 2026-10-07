@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { missingNicepayKeys } from "@/lib/payments/nicepay";
 import { calcPaymentAmounts, generateOrderId } from "@/lib/payments/order";
 import { PAYMENT_DEADLINE_MIN } from "@/lib/pricing";
 import type { PlanCode } from "@/lib/reservation";
@@ -43,6 +44,21 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
             { error: "로그인이 필요합니다." },
             { status: 401 },
+        );
+    }
+
+    // 키가 없으면 주문을 만들거나 결제기한을 늘리기 전에 멈춘다 (#259).
+    const missingKeys = missingNicepayKeys();
+    if (missingKeys.length > 0) {
+        console.error(
+            `[payments/prepare] NICEPAY 키 누락: ${missingKeys.join(", ")}`,
+        );
+        return NextResponse.json(
+            {
+                error: "지금은 결제를 준비할 수 없어요. 잠시 후 다시 시도하거나 고객센터로 문의해 주세요.",
+                code: "PAYMENT_UNAVAILABLE",
+            },
+            { status: 503 },
         );
     }
 

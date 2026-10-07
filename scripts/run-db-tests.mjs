@@ -124,6 +124,10 @@ export const SUITES = [
         [sql("test-point-compensation.sql")],
     ],
     [
+        "고객 보호자 리포트 열람 · 동의 범위 · 파기 · 접근 기록 (#253)",
+        [sql("test-customer-report.sql")],
+    ],
+    [
         "파트너 교육 이수 기록 · 미이수 수락 차단 스위치 (#255)",
         [sql("test-partner-training.sql")],
     ],
