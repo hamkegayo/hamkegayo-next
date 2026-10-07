@@ -11,7 +11,6 @@
 --   - 금액은 건별 입력, 1회 상한 100,000P. 유효기간 없음.
 --   - 권한: 전체/정산 담당자 + MFA (can_manage_settlements).
 --   - 잘못 지급하면 같은 원장에 음수 행으로 회수한다. 이미 사용된 만큼은 회수하지 않는다.
---     지급 이후 사용분은 그 보상분에서 먼저 쓴 것으로 본다 — 기존 적립·다른 보상은 줄이지 않는다.
 --   - 지급·회수 시 고객 인앱 알림.
 --
 --  보상은 회사 부담이다. 결제·환불·파트너 정산 금액을 바꾸지 않는다.
@@ -199,7 +198,7 @@ grant execute on function public.admin_grant_compensation(uuid, text, integer, t
   to authenticated;
 
 -- ---------- 회수 ----------
--- 이미 사용된 만큼은 회수하지 않는다: min(지급액 - 지급 이후 사용액, 현재 잔액), 0 미만이면 0.
+-- 이미 사용된 만큼은 회수하지 않는다: min(지급액, 현재 잔액).
 create or replace function public.admin_revoke_compensation(p_id uuid, p_reason text)
 returns integer
 language plpgsql
@@ -209,7 +208,6 @@ as $$
 declare
   v_c       public.point_compensations;
   v_balance integer;
-  v_used    integer;
   v_amount  integer;
   v_point   uuid;
 begin
@@ -229,17 +227,8 @@ begin
   end if;
 
   perform pg_advisory_xact_lock(hashtextextended(v_c.customer_id::text, 0));
-  -- 원장은 잔액 합계라 어느 지급분이 쓰였는지 기록이 없다.
-  -- 지급 이후의 사용(USE)은 이 보상분에서 먼저 쓴 것으로 본다 → 기존 적립분·다른 보상분은 회수되지 않는다.
-  -- 사용 취소(USE_CANCEL) 복원은 되돌려 넣지 않는다(고객 유리 쪽으로 둔다).
-  select coalesce(-sum(p.amount), 0)::integer into v_used
-    from public.points p
-    join public.points g on g.id = v_c.point_id
-   where p.user_id = v_c.customer_id
-     and p.reason = 'USE'::public.point_reason
-     and p.created_at > g.created_at;
   v_balance := greatest(public.point_balance(v_c.customer_id), 0);
-  v_amount := least(greatest(v_c.amount - v_used, 0), v_balance);
+  v_amount := least(v_c.amount, v_balance);
 
   if v_amount > 0 then
     insert into public.points (user_id, amount, reason, reservation_id, memo)
