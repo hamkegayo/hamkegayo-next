@@ -50,6 +50,7 @@ import {
 import { EndServiceModal } from "../../../_components/end-service-modal";
 import { ServiceAttachments } from "../../../_components/service-attachments";
 import type { ReportAttachmentView } from "../../../_lib/reports.server";
+import { RequestInfoModal } from "./request-info-modal";
 import { ServiceFeedbackModal } from "../../../_components/service-feedback-modal";
 import {
     ServiceNoticeModal,
@@ -79,6 +80,7 @@ export function ServiceDetailView({
     // 신고 모달 — 열려 있는 종류가 곧 상태다. 닫으면 컴포넌트가 사라져
     // 입력값도 함께 사라진다(useEffect 로 되돌리지 않는다).
     const [noticeKind, setNoticeKind] = useState<NoticeKind | null>(null);
+    const [infoOpen, setInfoOpen] = useState(false);
 
     // 초기 진행 상태를 서비스 상태(state)로부터 파생
     const initial = useMemo(() => {
@@ -200,7 +202,10 @@ export function ServiceDetailView({
             const res = await arriveService(service.id);
             if (res.ok) {
                 setArrived(true);
-                toast.success("도착이 기록되고 보호자에게 안내되었습니다.");
+                // 자동 알림은 예약자 계정 인앱뿐이다. 통보대상 연락은 파트너가 직접 한다(매뉴얼 4단계, #254).
+                toast.success(
+                    "도착이 기록되고 예약자에게 앱 알림이 갔습니다. 통보대상에게는 직접 연락해 주세요.",
+                );
                 router.refresh();
             } else {
                 toast.error(res.message);
@@ -345,9 +350,7 @@ export function ServiceDetailView({
                 {ended && (
                     <button
                         type="button"
-                        onClick={() =>
-                            toast.info("예약/요청 정보는 준비 중입니다.")
-                        }
+                        onClick={() => setInfoOpen(true)}
                         className="border-border bg-background text-foreground hover:bg-muted inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-bold transition-colors"
                     >
                         <FileText className="size-4" />
@@ -830,8 +833,8 @@ export function ServiceDetailView({
                         ) : (
                             <>
                                 <p className="text-muted-foreground text-sm">
-                                    약속 장소에 도착하면 눌러주세요. 보호자에게
-                                    도착이 안내되고, 이 시각부터 이용시간이
+                                    약속 장소에 도착하면 눌러주세요. 예약자에게
+                                    도착 알림이 가고, 이 시각부터 이용시간이
                                     계산됩니다.
                                 </p>
                                 <button
@@ -1109,6 +1112,12 @@ export function ServiceDetailView({
                     </div>
                 </div>
             </div>
+
+            <RequestInfoModal
+                open={infoOpen}
+                onClose={() => setInfoOpen(false)}
+                service={service}
+            />
 
             <EndServiceModal
                 open={endOpen}

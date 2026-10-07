@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
 import { ExtensionPayView } from "./extension-pay-view";
 import { COMPANY } from "@/lib/legal/company";
+import { missingNicepayKeys } from "@/lib/payments/nicepay";
 import { PayShell } from "../_components/pay-shell";
 
 /**
@@ -89,6 +90,18 @@ export default async function ExtensionPayPage({
             <Notice
                 title="결제 기한이 지났어요"
                 body="링크가 만료되었습니다. 고객센터로 연락 주시면 다시 안내해 드리겠습니다."
+            />
+        );
+    }
+
+    // 키가 없으면 결제창 대신 안내를 보여 준다 (#259).
+    const missingKeys = missingNicepayKeys();
+    if (missingKeys.length > 0) {
+        console.error(`[pay] NICEPAY 키 누락: ${missingKeys.join(", ")}`);
+        return (
+            <Notice
+                title="지금은 결제할 수 없어요"
+                body="결제 준비에 문제가 있어요. 잠시 후 다시 시도하거나 고객센터로 연락 주세요."
             />
         );
     }

@@ -130,16 +130,20 @@ export async function saveReport(
     if (submit) {
         const { data: svc } = await supabase
             .from("services")
-            .select("reservations!inner(customer_id)")
+            .select("reservation_id, reservations!inner(customer_id)")
             .eq("id", serviceId)
-            .maybeSingle<{ reservations: { customer_id: string } | null }>();
+            .maybeSingle<{
+                reservation_id: string;
+                reservations: { customer_id: string } | null;
+            }>();
         const customerId = svc?.reservations?.customer_id;
         if (customerId) {
             await createNotification(customerId, {
                 type: "REPORT_READY",
                 title: "보호자 리포트가 도착했어요",
                 body: "완료된 동행의 보호자 리포트를 확인해 주세요.",
-                link: "/mypage",
+                // 리포트는 예약 상세에서 본다 (#253)
+                link: `/mypage/reservations/${svc.reservation_id}`,
             });
         }
     }

@@ -385,6 +385,12 @@ export function StepUserInfo() {
                                 <FieldError>
                                     {errors.notifyTarget?.message}
                                 </FieldError>
+                                {/* 자동 발송이 아니다 — 앱 알림은 예약자 계정으로만 간다 (#254) */}
+                                <p className="text-description-foreground mt-1.5 text-xs leading-relaxed">
+                                    파트너가 현장에서 이 분께 직접 연락드려요.
+                                    앱 알림은 지금 예약을 진행하는 분의 앱으로
+                                    가요.
+                                </p>
                             </div>
 
                             {/*
