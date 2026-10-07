@@ -13,7 +13,6 @@ import {
     MapPin,
     Play,
     Square,
-    Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -49,6 +48,8 @@ import {
     type ServiceTimeField,
 } from "../../../_lib/service-times";
 import { EndServiceModal } from "../../../_components/end-service-modal";
+import { ServiceAttachments } from "../../../_components/service-attachments";
+import type { ReportAttachmentView } from "../../../_lib/reports.server";
 import { ServiceFeedbackModal } from "../../../_components/service-feedback-modal";
 import {
     ServiceNoticeModal,
@@ -65,9 +66,12 @@ const NOTICE_LABEL: Record<NoticeKind, string> = {
 export function ServiceDetailView({
     service,
     notices,
+    attachments,
 }: {
     service: PartnerServiceView;
     notices: ServiceNoticeView[];
+    /** 메모 단계 첨부 = 리포트 첨부 (#255-2) */
+    attachments: ReportAttachmentView[];
 }) {
     const router = useRouter();
     const item = service;
@@ -1054,19 +1058,10 @@ export function ServiceDetailView({
                             (선택)
                         </span>
                     </p>
-                    <button
-                        type="button"
-                        onClick={() => toast.info("파일 첨부는 준비 중입니다.")}
-                        className="border-border bg-muted/30 hover:bg-muted/50 mt-2 flex w-full flex-col items-center gap-1.5 rounded-xl border border-dashed px-4 py-6 text-center transition-colors"
-                    >
-                        <Upload className="text-muted-foreground size-5" />
-                        <span className="text-foreground text-sm font-bold">
-                            사진 또는 파일을 선택하세요
-                        </span>
-                        <span className="text-muted-foreground text-xs">
-                            JPG, PNG, PDF (최대 10MB)
-                        </span>
-                    </button>
+                    <ServiceAttachments
+                        serviceId={service.id}
+                        initial={attachments}
+                    />
 
                     <button
                         type="button"

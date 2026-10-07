@@ -141,6 +141,37 @@ export async function getPartnerReports(): Promise<ReportListItem[]> {
  * 리포트 작성 뱃지용 카운트 — 완료된 서비스 중 아직 제출되지 않은 리포트 수.
  * 목록과 동일 기준(getPartnerReports)을 재사용한다.
  */
+/**
+ * 서비스 메모 단계에서 올린 첨부 목록 (#255-2). 리포트 첨부와 같은 저장소다.
+ * RLS 가 열람 제한 기간 안의 본인 리포트 첨부만 돌려준다.
+ */
+export async function getServiceAttachments(
+    serviceId: string,
+): Promise<ReportAttachmentView[]> {
+    try {
+        const supabase = await createClient();
+        const { data: report } = await supabase
+            .from("reports")
+            .select("id")
+            .eq("service_id", serviceId)
+            .maybeSingle();
+        if (!report) return [];
+        const { data: atts } = await supabase
+            .from("report_attachments")
+            .select("id, kind, filename, size")
+            .eq("report_id", report.id)
+            .order("created_at", { ascending: true });
+        return (atts ?? []).map((a) => ({
+            id: a.id,
+            kind: a.kind,
+            filename: a.filename,
+            size: a.size,
+        }));
+    } catch {
+        return [];
+    }
+}
+
 export async function getPartnerPendingReportCount(): Promise<number> {
     const list = await getPartnerReports();
     return list.filter((r) => r.status === "pending").length;
