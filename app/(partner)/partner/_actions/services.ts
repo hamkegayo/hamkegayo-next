@@ -27,6 +27,8 @@ const ERROR_MESSAGE: Record<string, string> = {
     invalid_kind: "신고할 수 없는 종류입니다.",
     // 대응카드 26 — "실제 시각" 은 이미 지난 일이다.
     future_time: "아직 오지 않은 시각은 적을 수 없습니다.",
+    memo_too_long: "메모는 1000자까지 저장할 수 있습니다.",
+    access_expired: "열람 기간이 지나 메모를 저장할 수 없습니다.",
 };
 
 /**
@@ -65,7 +67,8 @@ async function callRpc(
         | "arrive_service"
         | "record_service_time"
         | "end_service_no_show"
-        | "report_service_notice",
+        | "report_service_notice"
+        | "save_service_memo",
     args: Record<string, unknown>,
     serviceId: string,
 ): Promise<ServiceActionResult> {
@@ -284,6 +287,24 @@ export async function startService(
     return callRpc(
         "start_service",
         { p_service_id: serviceId, p_memo: memo?.trim() || null },
+        serviceId,
+    );
+}
+
+/**
+ * 메모 임시 저장 (#268). 시각·상태는 바꾸지 않고 메모 열만 갱신한다.
+ * 담당 파트너·열람 제한 기간 확인은 save_service_memo 가 한다.
+ */
+export async function saveServiceMemo(
+    serviceId: string,
+    kind: "START" | "END",
+    memo: string,
+): Promise<ServiceActionResult> {
+    if (kind !== "START" && kind !== "END")
+        return { ok: false, message: "저장할 수 없는 메모입니다." };
+    return callRpc(
+        "save_service_memo",
+        { p_service_id: serviceId, p_kind: kind, p_memo: memo },
         serviceId,
     );
 }

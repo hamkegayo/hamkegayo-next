@@ -135,6 +135,10 @@ export const SUITES = [
         "파트너 새 요청 알림 · 지역·시간 일치 · 이메일 설정 (#255)",
         [sql("test-partner-new-request-alerts.sql")],
     ],
+    [
+        "서비스 메모 임시 저장 · 담당 파트너·열람 기간 (#268)",
+        [sql("test-service-memo.sql")],
+    ],
     ["정산 계좌 열람 통제 (#51)", [npm("test:payout")]],
     [
         "이메일 인증 연락처 변경 · 목적/대상/일회 소비 (#64)",
