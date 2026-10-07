@@ -254,8 +254,9 @@ export function RevokeButton({ id }: { id: string }) {
     return (
         <div className="mt-3 space-y-2">
             <label className="block text-sm">
-                회수 사유 (5-500자) · 고객이 이미 사용한 만큼은 회수하지
-                않습니다.
+                회수 사유 (5-500자) · 지급 이후 고객이 사용한 포인트는 이
+                보상분에서 쓴 것으로 보고 회수하지 않습니다. 기존 적립분과 다른
+                보상분은 줄지 않습니다.
                 <input
                     className={input}
                     value={reason}

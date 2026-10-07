@@ -80,19 +80,48 @@ select pg_temp.assert((select count(*) from public.notifications where recipient
 select pg_temp.assert((select count(*) from public.access_logs where actor_id='00000250-0000-4000-8000-000000000001' and action='COMPENSATION_GRANT') = 2, 'grant audited');
 select pg_temp.assert(not exists(select 1 from public.settlements s join public.services sv on sv.id=s.service_id where sv.reservation_id='00000250-0000-4000-8000-000000000010'), 'partner settlement untouched');
 
--- 고객이 일부를 사용한 뒤 회수 → 남은 잔액만큼만
-insert into public.points(user_id, amount, reason, memo) values ('00000250-0000-4000-8000-000000000002', -101000, 'USE', 'test use');
-select pg_temp.assert(public.point_balance('00000250-0000-4000-8000-000000000002') = 2000, 'balance after use');
+-- 회수 (#252 리뷰) — 지급 이후 사용분은 그 보상분에서 먼저 쓴 것으로 본다.
+-- 기존 적립 10,000P 는 어떤 회수에서도 줄지 않아야 한다.
+-- 한 트랜잭션이라 now() 가 같으므로 created_at 을 직접 지정해 순서를 만든다.
+insert into public.points(user_id, amount, reason, memo, created_at)
+values ('00000250-0000-4000-8000-000000000002', 10000, 'EARN_PAYMENT', 'test earn', now() - interval '1 hour');
+insert into public.points(user_id, amount, reason, memo, created_at)
+values ('00000250-0000-4000-8000-000000000002', -98000, 'USE', 'test use', now() + interval '1 minute');
+select pg_temp.assert(public.point_balance('00000250-0000-4000-8000-000000000002') = 15000, 'balance after use');
 
 select set_config('request.jwt.claims','{"sub":"00000250-0000-4000-8000-000000000001","role":"authenticated","aal":"aal2"}',true);
 set local role authenticated;
-select pg_temp.assert(public.admin_revoke_compensation((select id from t_ids where seq=1), '잘못 지급되어 회수') = 2000, 'revoke only remaining balance');
+select pg_temp.assert(public.admin_revoke_compensation((select id from t_ids where seq=1), '잘못 지급되어 회수') = 2000, 'revoke only unused part of this grant (100,000 - 98,000)');
 select pg_temp.denied($q$select public.admin_revoke_compensation((select id from t_ids where seq=1), '잘못 지급되어 회수')$q$, 'cannot revoke twice');
-select pg_temp.assert(public.admin_revoke_compensation((select id from t_ids where seq=2), '잘못 지급되어 회수') = 0, 'nothing left to revoke records zero');
+select pg_temp.assert(public.admin_revoke_compensation((select id from t_ids where seq=2), '잘못 지급되어 회수') = 0, 'used grant records zero, other grant balance not taken');
 reset role;
+select pg_temp.assert(public.point_balance('00000250-0000-4000-8000-000000000002') = 13000, 'earned and other grant points untouched');
 
-select pg_temp.assert(public.point_balance('00000250-0000-4000-8000-000000000002') = 0, 'balance never negative after revoke');
-select pg_temp.assert((select count(*) from public.point_compensations where customer_id='00000250-0000-4000-8000-000000000002' and revoked_at is not null) = 2, 'both marked revoked');
-select pg_temp.assert((select count(*) from public.access_logs where actor_id='00000250-0000-4000-8000-000000000001' and action='COMPENSATION_REVOKE') = 2, 'revoke audited');
+-- 사용 이후에 지급된 보상은 전액 회수된다
+set local role authenticated;
+insert into t_ids(id) select public.admin_grant_compensation('00000250-0000-4000-8000-000000000010','NOT_PROVIDED',5000,'서비스 미제공 보상','CS-003', true);
+reset role;
+update public.points set created_at = now() + interval '5 minutes'
+ where id = (select point_id from public.point_compensations where id = (select id from t_ids where seq=3));
+set local role authenticated;
+select pg_temp.assert(public.admin_revoke_compensation((select id from t_ids where seq=3), '잘못 지급되어 회수') = 5000, 'grant after earlier use fully revocable');
+reset role;
+select pg_temp.assert(public.point_balance('00000250-0000-4000-8000-000000000002') = 13000, 'balance back to before grant');
+
+-- 리뷰 사례: 적립분이 있는 상태에서 보상 5,000P 지급 → 5,000P 사용 → 회수 0P, 적립분 유지
+set local role authenticated;
+insert into t_ids(id) select public.admin_grant_compensation('00000250-0000-4000-8000-000000000010','PARTNER_LATE',5000,'지각 보상 지급','CS-004', true);
+reset role;
+update public.points set created_at = now() + interval '10 minutes'
+ where id = (select point_id from public.point_compensations where id = (select id from t_ids where seq=4));
+insert into public.points(user_id, amount, reason, memo, created_at)
+values ('00000250-0000-4000-8000-000000000002', -5000, 'USE', 'test use', now() + interval '11 minutes');
+set local role authenticated;
+select pg_temp.assert(public.admin_revoke_compensation((select id from t_ids where seq=4), '잘못 지급되어 회수') = 0, 'grant spent after issue is not revoked');
+reset role;
+select pg_temp.assert(public.point_balance('00000250-0000-4000-8000-000000000002') = 13000, 'earned points not reduced by revoke');
+
+select pg_temp.assert((select count(*) from public.point_compensations where customer_id='00000250-0000-4000-8000-000000000002' and revoked_at is not null) = 4, 'all marked revoked');
+select pg_temp.assert((select count(*) from public.access_logs where actor_id='00000250-0000-4000-8000-000000000001' and action='COMPENSATION_REVOKE') = 4, 'revoke audited');
 
 rollback;
