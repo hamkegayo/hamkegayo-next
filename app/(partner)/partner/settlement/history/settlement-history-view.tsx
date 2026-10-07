@@ -1,24 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { kstToday } from "@/lib/format";
 import {
+    SETTLEMENT_PERIODS,
+    filterSettlementsByPeriod,
+    settlementPeriodRange,
+    summarizeSettlements,
     type Settlement,
+    type SettlementPeriod,
     type SettlementStatus,
-    type SettlementSummary,
 } from "../../../_lib/settlement";
 import { SettlementDetailModal } from "../../../_components/settlement-detail-modal";
 
 type Tab = "all" | SettlementStatus;
 
-const PERIODS = ["오늘", "7일", "30일", "전체"] as const;
-
-// 조회 기간은 UI 전용(정적 표시)
-const PERIOD_FROM = "2025.05.01";
-const PERIOD_TO = "2025.05.31";
+/** YYYY-MM-DD → YYYY.MM.DD */
+const dot = (iso: string) => iso.replaceAll("-", ".");
 
 function StatCol({
     label,
@@ -49,26 +51,30 @@ function StatCol({
 
 export function SettlementHistoryView({
     settlements,
-    summary,
 }: {
     settlements: Settlement[];
-    summary: SettlementSummary;
 }) {
-    const s = summary;
     const [tab, setTab] = useState<Tab>("all");
-    const [period, setPeriod] = useState<(typeof PERIODS)[number]>("30일");
+    const [period, setPeriod] = useState<SettlementPeriod>("30일");
     const [selected, setSelected] = useState<Settlement | null>(null);
 
+    // 조회 기간 — 서비스 일자 기준으로 목록·탭 건수·요약을 함께 거른다 (#272)
+    const today = useMemo(() => kstToday(), []);
+    const inPeriod = useMemo(
+        () => filterSettlementsByPeriod(settlements, period, today),
+        [settlements, period, today],
+    );
+    const range = settlementPeriodRange(period, today, settlements);
+    const s = summarizeSettlements(inPeriod);
+
     const counts = {
-        all: settlements.length,
-        paid: settlements.filter((x) => x.status === "paid").length,
-        pending: settlements.filter((x) => x.status === "pending").length,
+        all: inPeriod.length,
+        paid: inPeriod.filter((x) => x.status === "paid").length,
+        pending: inPeriod.filter((x) => x.status === "pending").length,
     };
 
     const list =
-        tab === "all"
-            ? settlements
-            : settlements.filter((x) => x.status === tab);
+        tab === "all" ? inPeriod : inPeriod.filter((x) => x.status === tab);
 
     return (
         <div>
@@ -76,23 +82,24 @@ export function SettlementHistoryView({
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <p className="text-muted-foreground text-sm font-semibold">
+                        정산 관리 &gt;{" "}
                         <Link
                             href="/partner/settlement"
                             className="hover:text-foreground"
                         >
-                            My/정산
+                            정산 현황
                         </Link>{" "}
-                        &gt; <span className="text-brand">최근 정산 내역</span>
+                        &gt; <span className="text-brand">정산 내역</span>
                     </p>
                     <h1 className="text-foreground mt-2 text-2xl font-extrabold md:text-3xl">
-                        최근 정산 내역
+                        정산 내역
                     </h1>
                     <p className="text-muted-foreground mt-2">
                         정산 상세 내역과 상태를 확인할 수 있습니다.
                     </p>
                 </div>
 
-                {/* 조회 기간 (UI 전용) */}
+                {/* 조회 기간 — 서비스 일자 기준 (#272) */}
                 <div className="flex flex-wrap items-center gap-3">
                     <span className="text-muted-foreground text-sm font-semibold">
                         조회 기간
@@ -100,19 +107,20 @@ export function SettlementHistoryView({
                     <div className="border-border bg-background flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
                         <CalendarDays className="text-muted-foreground size-4" />
                         <span className="text-foreground font-semibold">
-                            {PERIOD_FROM}
+                            {range ? dot(range.from) : "-"}
                         </span>
                         <span className="text-muted-foreground">-</span>
                         <CalendarDays className="text-muted-foreground size-4" />
                         <span className="text-foreground font-semibold">
-                            {PERIOD_TO}
+                            {range ? dot(range.to) : "-"}
                         </span>
                     </div>
                     <div className="border-border flex overflow-hidden rounded-lg border">
-                        {PERIODS.map((p) => (
+                        {SETTLEMENT_PERIODS.map((p) => (
                             <button
                                 key={p}
                                 type="button"
+                                aria-pressed={period === p}
                                 onClick={() => setPeriod(p)}
                                 className={cn(
                                     "px-3.5 py-2 text-sm font-bold transition-colors",
@@ -136,7 +144,7 @@ export function SettlementHistoryView({
                     sub={`${s.serviceCount}건`}
                     valueClass="text-brand"
                 />
-                <StatCol label="정산 완료 건수" value={`${s.serviceCount}건`} />
+                <StatCol label="정산 완료 건수" value={`${s.paidCount}건`} />
                 <StatCol label="진행 중 건수" value={`${s.pendingCount}건`} />
             </div>
 

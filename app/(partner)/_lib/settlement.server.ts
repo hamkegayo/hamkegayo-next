@@ -48,6 +48,7 @@ function toView(r: SettlementRow): Settlement {
     return {
         id: displayId(r.id, useDate),
         serviceDate: useDate ? formatDate(useDate) : "",
+        useDate,
         // 병원명·주소는 종료 후 접근이 차단되므로 예약번호로 대신한다 (제9조 ④)
         hospital: r.code,
         plan: planDisplay(planCode),

@@ -17,7 +17,7 @@ export default async function PartnerManagement() {
     return (
         <div>
             <p className="text-muted-foreground text-sm font-semibold">
-                진행관리 &gt;{" "}
+                진행 관리 &gt;{" "}
                 <span className="text-brand">수락한 서비스 목록</span>
             </p>
             <h1 className="text-foreground mt-2 text-2xl font-extrabold md:text-3xl">
