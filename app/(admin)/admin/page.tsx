@@ -11,6 +11,7 @@ import { getAdminOverview } from "./_lib/admin.server";
 import { LogoutButton } from "./logout-button";
 import { COMPENSATION_ENABLED } from "./compensations/kinds";
 import { kstDateTime } from "@/lib/format";
+import { TRAINING_MATERIALS_READY } from "@/lib/partner-training";
 
 export const metadata: Metadata = {
     title: "관리자",
@@ -200,6 +201,14 @@ export default async function AdminHome() {
             >
                 파트너 자격 심사
             </Link>
+            {TRAINING_MATERIALS_READY && (
+                <Link
+                    href="/admin/trainings"
+                    className="text-brand mt-6 ml-4 inline-block font-semibold underline"
+                >
+                    파트너 교육 이수
+                </Link>
+            )}
             <Link
                 href="/admin/review-publications"
                 className="text-brand ml-5 font-semibold underline"
