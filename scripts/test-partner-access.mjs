@@ -331,7 +331,7 @@ async function main() {
             !String(row?.hospital_region).includes("반포대로"),
     );
     check(
-        "거동·인지 상태는 제공됨 (제5조 ④)",
+        "거동·인지 상태는 제공됨 (처리방침 제5조 ② [단계 1]·④)",
         row?.mobility_status === "부축 필요" &&
             row?.cognitive_status === "의사소통 원활",
     );

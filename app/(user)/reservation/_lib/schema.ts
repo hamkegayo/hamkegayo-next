@@ -35,7 +35,7 @@ export const step1Schema = z.object({
     relation: z.string().min(1, "관계를 선택해 주세요."),
     treatment: z.string().min(1, required),
     purpose: z.string().min(1, required),
-    // 거동·인지 상태는 매칭 전 파트너에게 제공되는 민감정보다 (처리방침 제5조 ④).
+    // 거동·인지 상태는 별도 동의로 매칭 전에 제공된다 (처리방침 제5조 ② [단계 1]·④).
     // 파트너가 수행 가능 여부를 판단하는 근거라 필수로 받는다.
     mobilityStatus: z.string().min(1, "거동 상태를 선택해 주세요."),
     cognitiveStatus: z.string().min(1, "인지 상태를 선택해 주세요."),

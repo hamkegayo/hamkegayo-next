@@ -54,7 +54,7 @@ export const RELATION_OPTIONS: string[] = [
 
 /**
  * 거동 상태 — 민감정보(처리방침 제3조 ①).
- * 매칭 전 파트너에게 수행 가능 여부 판단용으로 제공된다 (제5조 ④).
+ * 매칭 전 파트너에게 별도 동의로 제공된다 (처리방침 제5조 ② [단계 1]·④).
  */
 export const MOBILITY_OPTIONS: string[] = [
     "스스로 보행 가능",
