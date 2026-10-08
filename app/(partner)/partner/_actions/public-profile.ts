@@ -42,8 +42,9 @@ async function updateProfile(rpc: string, args: Record<string, unknown>) {
         if (error)
             return {
                 ok: false as const,
-                message:
-                    "저장하지 못했습니다. 입력 내용과 로그인 상태를 확인해 주세요.",
+                message: error.message.includes("evidence_retention_required")
+                    ? "심사·통지된 증빙은 직접 삭제할 수 없습니다. 보유기간·이의신청 메뉴 또는 고객센터로 수정·삭제를 요청해 주세요."
+                    : "저장하지 못했습니다. 입력 내용과 로그인 상태를 확인해 주세요.",
             };
         revalidatePath("/partner/profile");
         revalidatePath("/admin/qualifications");

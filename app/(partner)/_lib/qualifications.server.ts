@@ -25,7 +25,7 @@ function detailOf(r: Row): string {
     return [
         r.reg_no && `등록번호 ${r.reg_no}`,
         r.acquired_date && `취득일 ${r.acquired_date}`,
-        r.issuer,
+        r.issuer && `발급기관 ${r.issuer}`,
     ]
         .filter(Boolean)
         .join("    ");

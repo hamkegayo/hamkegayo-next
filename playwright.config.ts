@@ -37,6 +37,11 @@ export default defineConfig({
     projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
     webServer: [
         {
+            command: "node e2e/support/mock-address.mjs",
+            url: "http://127.0.0.1:4011/health",
+            reuseExistingServer: !CI,
+        },
+        {
             command: "node e2e/support/mock-nicepay.mjs",
             url: `${E2E_PAYMENT.apiBase}/health`,
             reuseExistingServer: !CI,
@@ -50,6 +55,7 @@ export default defineConfig({
             timeout: 300_000,
             reuseExistingServer: !CI,
             env: {
+                JUSO_CONFM_KEY: "e2e-local-address-only",
                 NEXT_PUBLIC_NICEPAY_CLIENT_KEY: E2E_PAYMENT.clientKey,
                 NICEPAY_SECRET_KEY: E2E_PAYMENT.secretKey,
                 NICEPAY_API_BASE_URL: E2E_PAYMENT.apiBase,

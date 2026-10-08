@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getPartnerQualifications } from "../../_lib/qualifications.server";
 
 import { createClient } from "@/utils/supabase/server";
 import type { QualificationView } from "../../_lib/qualifications.server";
@@ -109,20 +110,22 @@ export async function deleteQualification(id: string): Promise<SimpleResult> {
     } = await supabase.auth.getUser();
     if (!user) return { ok: false, message: "로그인이 필요합니다." };
 
-    const { data: row } = await supabase
-        .from("partner_qualifications")
-        .select("id, path")
-        .eq("id", id)
-        .maybeSingle();
-    if (!row) return { ok: false, message: "자격을 찾을 수 없습니다." };
-
-    if (row.path) await supabase.storage.from(BUCKET).remove([row.path]);
-    const { error } = await supabase
-        .from("partner_qualifications")
-        .delete()
-        .eq("id", id);
-    if (error) return { ok: false, message: "삭제에 실패했습니다." };
+    const { error } = await supabase.rpc("withdraw_partner_evidence", {
+        p_id: id,
+        p_kind: "QUALIFICATION",
+    });
+    if (error)
+        return {
+            ok: false,
+            message:
+                "심사·통지된 증빙은 직접 삭제할 수 없습니다. 보유기간·이의신청 메뉴 또는 고객센터로 수정·삭제를 요청해 주세요.",
+        };
 
     revalidatePath("/partner/profile");
     return { ok: true };
+}
+
+/** 등록 후 목록만 갱신한다. 다른 미저장 프로필 입력은 유지한다. */
+export async function getMyQualifications() {
+    return getPartnerQualifications();
 }

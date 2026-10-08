@@ -58,7 +58,7 @@ export default async function QualificationsPage({
                 <h1 className="mt-4 text-2xl font-bold">
                     파트너 근무 경력 심사
                 </h1>
-                <p className="text-muted-foreground mt-2 text-sm">
+                <p className="text-description-foreground mt-2 text-sm leading-relaxed">
                     증빙 확인 버튼으로 제출 자료를 확인하고 검증 결과를 기록해
                     주세요. 기존 별도 제출 자료는 담당자에게 확인해 주세요. 증빙
                     원본은 고객에게 공개하지 않습니다.
@@ -90,13 +90,13 @@ export default async function QualificationsPage({
                                 {names.get(row.partner_id) ?? "파트너"} ·{" "}
                                 {row.hospital}
                             </h2>
-                            <p className="mt-2 text-sm">
+                            <p className="mt-2 text-sm leading-relaxed">
                                 {row.kind === "COMPANION"
                                     ? "병원동행 경력"
                                     : "의료기관 근무 경력"}{" "}
                                 · {row.period} · {row.department}
                             </p>
-                            <p className="mt-2 text-sm break-words whitespace-pre-wrap">
+                            <p className="mt-2 text-sm leading-relaxed break-words whitespace-pre-wrap">
                                 {row.duties}
                             </p>
                             <WorkHistoryReview
@@ -171,7 +171,7 @@ export default async function QualificationsPage({
             >
                 생년월일 본인확인
             </Link>
-            <p className="text-description-foreground mt-2 text-sm">
+            <p className="text-description-foreground mt-2 text-sm leading-relaxed">
                 증빙을 확인한 뒤 사유와 함께 심사 결과를 저장해 주세요.
             </p>
             <nav aria-label="심사 상태" className="my-6 flex gap-4">
@@ -200,7 +200,7 @@ export default async function QualificationsPage({
                         <h2 className="font-bold">
                             {names.get(row.partner_id) ?? "파트너"} · {row.type}
                         </h2>
-                        <p className="text-muted-foreground mt-1 text-sm">
+                        <p className="text-description-foreground mt-1 text-sm leading-relaxed">
                             {[
                                 row.issuer,
                                 row.acquired_date,

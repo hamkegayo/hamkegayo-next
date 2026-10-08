@@ -3,10 +3,16 @@
  *
  * 서버에서만 호출한다. 승인키(JUSO_CONFM_KEY)는 브라우저로 내보내지 않는다.
  * 응답의 admCd 는 법정동코드(10자리)로, partner_activity_regions 와 같은 체계다.
- * 키가 없으면 enabled=false 를 돌려주고, 화면은 기존 직접 입력으로 동작한다.
+ * 키가 없으면 enabled=false 를 돌려주고 화면에서 검색 불가를 안내한다.
  */
 
 const ENDPOINT = "https://business.juso.go.kr/addrlink/addrLinkApi.do";
+/** 실제 승인키는 모의 서버로 보내지 않는다. E2E의 고정 가짜 키만 루프백 서버로 보낸다. */
+export function addressApiEndpoint(): string {
+    return process.env.JUSO_CONFM_KEY === "e2e-local-address-only"
+        ? "http://127.0.0.1:4011/addrlink/addrLinkApi.do"
+        : ENDPOINT;
+}
 const TIMEOUT_MS = 5000;
 /** juso 는 페이지 크기 10, 최대 20페이지까지 본다. 그 뒤로는 "더 보기"를 내리지 않는다 (#232 리뷰). */
 export const ADDRESS_PAGE_SIZE = 10;
@@ -73,7 +79,7 @@ export async function searchRoadAddress(
             ok: false,
             reason: "disabled",
             message:
-                "주소 검색을 사용할 수 없습니다. 주소를 직접 입력해 주세요.",
+                "주소 검색을 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",
         };
     const keyword = sanitizeAddressKeyword(rawKeyword);
     if (keyword.replace(/\s/g, "").length < 2)
@@ -91,7 +97,7 @@ export async function searchRoadAddress(
         };
     const appliedPage = page;
 
-    const url = new URL(ENDPOINT);
+    const url = new URL(addressApiEndpoint());
     url.search = new URLSearchParams({
         confmKey: key,
         currentPage: String(appliedPage),

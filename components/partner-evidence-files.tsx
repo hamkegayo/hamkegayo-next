@@ -87,7 +87,7 @@ export function PartnerEvidenceFiles({
                 ))}
             </ul>
             {links.length > 0 && (
-                <p className="text-muted-foreground text-xs">
+                <p className="text-description-foreground text-sm leading-relaxed">
                     링크는 5분간 유효합니다. 원본은 고객에게 공개하지 않습니다.
                 </p>
             )}

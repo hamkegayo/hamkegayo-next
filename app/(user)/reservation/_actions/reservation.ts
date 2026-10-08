@@ -42,6 +42,23 @@ export async function createReservation(
         };
     }
     const v = parsed.data;
+    for (const target of ["depart", "hospital"] as const) {
+        if (
+            !verifiedRegionCode({
+                address: v[`${target}Address`],
+                base: v[`${target}RegionBase`],
+                code: v[`${target}RegionCode`],
+                token: v[`${target}RegionToken`],
+            })
+        ) {
+            return {
+                ok: false,
+                reason: "validation",
+                message:
+                    "출발지와 병원 기본 주소를 주소 검색으로 다시 선택해 주세요.",
+            };
+        }
+    }
 
     const supabase = await createClient();
     const {

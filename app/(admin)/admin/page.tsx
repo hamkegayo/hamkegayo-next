@@ -155,7 +155,7 @@ export default async function AdminHome() {
                 <h2 className="text-foreground text-lg font-bold">
                     내 접속기록
                 </h2>
-                <p className="text-muted-foreground mt-1 text-sm">
+                <p className="text-description-foreground mt-1 text-sm leading-relaxed">
                     개인정보 열람 이력은 법령에 따라 2년간 보관됩니다.
                 </p>
 

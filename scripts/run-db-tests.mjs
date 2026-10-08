@@ -94,6 +94,10 @@ export const SUITES = [
             sql("test-exception-resolution.sql"),
         ],
     ],
+    [
+        "파트너 프로필 통합 저장·증빙 등록 취소 (#278)",
+        [sql("test-partner-profile-ux.sql")],
+    ],
     ["관리자 권한·접근통제·접속기록 (#50)", [npm("test:admin")]],
     [
         "예약 파트너 상세 · 공개 동의 · 경력 심사 (#173)",

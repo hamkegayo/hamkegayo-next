@@ -42,11 +42,9 @@ import type { PartnerBasicInfo } from "../../_lib/basic-info.server";
 import {
     addQualification,
     deleteQualification,
+    getMyQualifications,
 } from "../_actions/qualifications";
-import {
-    changePartnerEmail,
-    updatePartnerBasicInfo,
-} from "../_actions/basic-info";
+import { changePartnerEmail } from "../_actions/basic-info";
 import {
     deleteProfilePhoto,
     uploadProfilePhoto,
@@ -61,6 +59,11 @@ import {
 import { ProfilePreviewModal } from "../../_components/profile-preview-modal";
 import { COMPANY } from "@/lib/legal/company";
 import { PartnerEvidenceFiles } from "@/components/partner-evidence-files";
+import { EvidenceRegister } from "../../_components/evidence-register";
+import { PublicProfileEditor } from "../../_components/public-profile-editor";
+import { getPartnerPublicProfile } from "../_actions/public-profile";
+import { savePartnerProfile } from "../_actions/profile";
+import type { PartnerPublicProfile } from "@/lib/partner-details";
 
 const QUAL_ICON: Record<QualificationIcon, LucideIcon> = {
     license: IdCard,
@@ -130,13 +133,20 @@ export function PartnerProfileView({
     initialBasicInfo,
     activityLoad,
     identity,
+    publicProfile,
+    evidenceEnabled,
 }: {
     initialQuals: QualificationView[];
     initialPhotoUrl: string | null;
     initialBasicInfo: PartnerBasicInfo;
     activityLoad: ActivityLoad;
     identity: IdentityCheckView;
+    publicProfile: PartnerPublicProfile | null;
+    evidenceEnabled: boolean;
 }) {
+    const [publicInfo, setPublicInfo] = useState(publicProfile);
+    const [evidenceRevision, setEvidenceRevision] = useState(0);
+    const [saveMessage, setSaveMessage] = useState("");
     const [email, setEmail] = useState(initialBasicInfo.email);
     const [phone, setPhone] = useState(initialBasicInfo.phone);
     const [phoneOpen, setPhoneOpen] = useState(false);
@@ -192,12 +202,24 @@ export function PartnerProfileView({
     };
 
     const removeQual = (id: string) => {
+        if (
+            !window.confirm(
+                "미심사 등록을 취소하고 첨부 증빙을 삭제하시겠습니까?",
+            )
+        )
+            return;
         startQualTransition(async () => {
-            const res = await deleteQualification(id);
-            if (res.ok) {
-                setQuals((prev) => prev.filter((q) => q.id !== id));
-            } else {
-                toast.error(res.message);
+            try {
+                const res = await deleteQualification(id);
+                if (res.ok) {
+                    setQuals((prev) => prev.filter((q) => q.id !== id));
+                } else {
+                    toast.error(res.message);
+                }
+            } catch {
+                toast.error(
+                    "등록 취소 결과를 확인하지 못했습니다. 입력 내용은 유지됩니다. 다시 시도해 주세요.",
+                );
             }
         });
     };
@@ -230,21 +252,44 @@ export function PartnerProfileView({
         });
     };
 
-    const saveBasicInfo = () => {
+    const profileDirty =
+        intro !== savedIntro ||
+        JSON.stringify(activity) !== JSON.stringify(savedActivity);
+    const saveProfile = () => {
+        const snapshot = { intro, activity };
+        setSaveMessage("");
         startBasicInfoTransition(async () => {
-            const result = await updatePartnerBasicInfo(intro);
-            if (!result.ok) {
-                toast.error(result.message);
-                return;
+            try {
+                const result = await savePartnerProfile(
+                    snapshot.intro,
+                    activityLoad.ok ? snapshot.activity : null,
+                );
+                setSaveMessage(
+                    result.ok ? "프로필을 저장했습니다." : result.message,
+                );
+                if (!result.ok) {
+                    toast.error(result.message);
+                    return;
+                }
+                setSavedIntro(snapshot.intro);
+                if (activityLoad.ok) setSavedActivity(snapshot.activity);
+                toast.success("프로필을 저장했습니다.");
+            } catch {
+                const message =
+                    "저장 결과를 확인하지 못했습니다. 입력 내용은 유지됩니다. 다시 저장해 주세요.";
+                setSaveMessage(message);
+                toast.error(message);
             }
-            setSavedIntro(intro);
-            toast.success("자기소개가 저장되었습니다.");
         });
     };
-
-    const cancelBasicInfo = () => {
-        setIntro(savedIntro);
-        toast.info("자기소개 변경을 취소했습니다.");
+    const refreshEvidence = async () => {
+        const [nextQuals, nextPublic] = await Promise.all([
+            getMyQualifications(),
+            getPartnerPublicProfile(),
+        ]);
+        setQuals(nextQuals);
+        setPublicInfo(nextPublic);
+        setEvidenceRevision((n) => n + 1);
     };
 
     const saveVerifiedEmail = async (nextEmail: string) => {
@@ -263,7 +308,7 @@ export function PartnerProfileView({
                     <h1 className="text-foreground text-2xl font-extrabold md:text-3xl">
                         My 프로필
                     </h1>
-                    <p className="text-muted-foreground mt-2">
+                    <p className="text-description-foreground mt-2 leading-relaxed">
                         파트너 정보를 관리할 수 있습니다.
                     </p>
                 </div>
@@ -299,21 +344,21 @@ export function PartnerProfileView({
                                 <Upload className="size-4" />
                                 사진 변경
                             </button>
-                            <p className="text-muted-foreground mt-2 text-xs">
+                            <p className="text-description-foreground mt-2 text-sm leading-relaxed">
                                 JPG, PNG (최대 2MB)
                             </p>
                         </div>
                     </Card>
 
                     <div className="border-border bg-background rounded-2xl border p-5">
-                        <p className="text-foreground flex items-center gap-2 font-bold">
+                        <p className="text-foreground flex items-center gap-2 leading-relaxed font-bold">
                             <Headphones className="text-brand size-4" />
                             파트너 고객센터
                         </p>
-                        <p className="text-foreground mt-3 text-xl font-extrabold">
+                        <p className="text-foreground mt-3 text-xl leading-relaxed font-extrabold">
                             {COMPANY.tel}
                         </p>
-                        <p className="text-muted-foreground mt-1 text-xs">
+                        <p className="text-description-foreground mt-1 text-sm leading-relaxed">
                             {COMPANY.hours}
                         </p>
                         <Link
@@ -367,7 +412,7 @@ export function PartnerProfileView({
                                 이메일 인증 변경
                             </button>
                         </div>
-                        <p className="text-muted-foreground mt-1.5 text-xs font-medium">
+                        <p className="text-description-foreground mt-1.5 text-sm leading-relaxed font-medium">
                             등록된 연락용 이메일 인증 후 변경합니다. 휴대폰 소유
                             인증은 아닙니다.
                         </p>
@@ -390,14 +435,20 @@ export function PartnerProfileView({
                                 인증 변경
                             </button>
                         </div>
-                        <p className="text-brand mt-1.5 text-xs font-medium">
+                        <p className="text-brand mt-1.5 text-sm leading-relaxed font-medium">
                             변경 시 인증이 필요합니다.
                         </p>
 
-                        <label className="text-foreground mt-4 block text-sm font-bold">
+                        <label
+                            htmlFor="partnerIntro"
+                            className="text-foreground mt-4 block text-sm font-bold"
+                        >
                             자기소개
                         </label>
                         <textarea
+                            id="partnerIntro"
+                            aria-label="자기소개"
+                            disabled={basicInfoPending}
                             value={intro}
                             onChange={(e) =>
                                 setIntro(e.target.value.slice(0, 300))
@@ -406,33 +457,9 @@ export function PartnerProfileView({
                             className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/40 mt-1.5 min-h-28 w-full resize-y rounded-lg border px-3.5 py-2.5 text-sm outline-none focus-visible:ring-[3px]"
                         />
                         <div className="mt-1 flex items-center justify-between gap-3">
-                            <p className="text-muted-foreground text-xs">
+                            <p className="text-description-foreground text-sm leading-relaxed">
                                 {intro.length} / 300
                             </p>
-                            <div className="flex gap-2">
-                                <button
-                                    type="button"
-                                    onClick={cancelBasicInfo}
-                                    disabled={
-                                        basicInfoPending || intro === savedIntro
-                                    }
-                                    className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-4 py-2 text-sm font-bold transition-colors disabled:opacity-50"
-                                >
-                                    되돌리기
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={saveBasicInfo}
-                                    disabled={
-                                        basicInfoPending || intro === savedIntro
-                                    }
-                                    className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-5 py-2 text-sm font-bold transition-colors disabled:opacity-50"
-                                >
-                                    {basicInfoPending
-                                        ? "저장 중…"
-                                        : "자기소개 저장"}
-                                </button>
-                            </div>
                         </div>
                     </Card>
                 </div>
@@ -441,14 +468,13 @@ export function PartnerProfileView({
             {activityLoad.ok ? (
                 <ActivityEditor
                     value={activity}
-                    saved={savedActivity}
                     regionInfo={regionInfo}
                     regionsUnavailable={
                         activityLoad.ok && activityLoad.regionsUnavailable
                     }
                     onRegionInfo={addRegionInfo}
                     onChange={setActivity}
-                    onSaved={setSavedActivity}
+                    disabled={basicInfoPending}
                 />
             ) : (
                 <div
@@ -458,7 +484,7 @@ export function PartnerProfileView({
                     <h2 className="text-foreground text-xl font-extrabold">
                         활동 정보
                     </h2>
-                    <p className="text-destructive mt-2 text-sm break-keep">
+                    <p className="text-destructive mt-2 text-sm leading-relaxed break-keep">
                         활동 정보를 불러오지 못했습니다. 저장된 정보를 지키기
                         위해 수정을 잠시 막았습니다. 새로고침 후 다시 시도해
                         주세요.
@@ -467,33 +493,52 @@ export function PartnerProfileView({
             )}
 
             <div className="mt-8">
+                <EvidenceRegister
+                    enabled={evidenceEnabled}
+                    onRegistered={refreshEvidence}
+                />
+            </div>
+            <div className="mt-8">
                 {/* 자격 및 보유 사항 */}
                 <Card
                     title="자격 및 보유 사항"
                     hint="(인증 정보)"
                     action={
-                        <AddButton
-                            label="추가"
-                            onClick={() => setQualAddOpen(true)}
-                        />
+                        !evidenceEnabled && (
+                            <AddButton
+                                label="추가"
+                                onClick={() => setQualAddOpen(true)}
+                            />
+                        )
                     }
                 >
-                    <ul className="space-y-3">
+                    <p className="text-sm leading-relaxed">
+                        심사 전 등록은 취소할 수 있습니다. 심사·결과 통지된
+                        자료는 보유기간과 이의신청 처리를 위해 직접 삭제할 수
+                        없습니다. 수정·삭제 요청은 아래 보유기간·이의신청 메뉴
+                        또는 고객센터로 문의해 주세요.
+                    </p>
+                    {quals.length === 0 && (
+                        <p className="mt-4 text-sm leading-relaxed">
+                            등록된 자격 없음
+                        </p>
+                    )}
+                    <ul className="mt-4 space-y-3">
                         {quals.map((q) => {
                             const Icon = QUAL_ICON[q.icon] ?? Award;
                             return (
                                 <li
                                     key={q.id}
-                                    className="border-border flex items-center gap-3 rounded-xl border p-4"
+                                    className="border-border grid grid-cols-1 gap-3 rounded-xl border p-4 sm:grid-cols-[auto_1fr_auto]"
                                 >
                                     <span className="bg-brand/10 text-brand flex size-9 shrink-0 items-center justify-center rounded-lg">
                                         <Icon className="size-4" />
                                     </span>
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-foreground font-bold">
+                                        <p className="text-foreground leading-relaxed font-bold">
                                             {q.title}
                                         </p>
-                                        <p className="text-muted-foreground truncate text-xs">
+                                        <p className="text-foreground mt-1 text-sm leading-relaxed break-words">
                                             {q.detail}
                                         </p>
                                         <PartnerEvidenceFiles
@@ -501,24 +546,34 @@ export function PartnerProfileView({
                                             kind="QUALIFICATION"
                                         />
                                     </div>
-                                    {q.pending ? (
-                                        <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-600 dark:bg-amber-500/15">
-                                            인증 대기
-                                        </span>
-                                    ) : (
-                                        <VerifiedBadge />
-                                    )}
-                                    {q.pending && (
-                                        <button
-                                            type="button"
-                                            aria-label="자격 삭제"
-                                            disabled={qualPending}
-                                            onClick={() => removeQual(q.id)}
-                                            className="text-muted-foreground hover:bg-muted flex size-7 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-50"
-                                        >
-                                            <X className="size-4" />
-                                        </button>
-                                    )}
+                                    <div className="flex flex-wrap items-start gap-3 sm:flex-col">
+                                        {q.pending ? (
+                                            <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-sm font-bold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+                                                인증 대기
+                                            </span>
+                                        ) : (
+                                            <VerifiedBadge />
+                                        )}
+                                        {q.pending ? (
+                                            <button
+                                                type="button"
+                                                aria-label={`${q.title} 등록 취소·증빙 삭제`}
+                                                disabled={qualPending}
+                                                onClick={() => removeQual(q.id)}
+                                                className="text-destructive inline-flex items-center gap-1 text-sm underline disabled:opacity-50"
+                                            >
+                                                <X className="size-4" /> 등록
+                                                취소·증빙 삭제
+                                            </button>
+                                        ) : (
+                                            <Link
+                                                href="/partner-evidence-notice"
+                                                className="text-brand text-sm underline"
+                                            >
+                                                수정·삭제 절차
+                                            </Link>
+                                        )}
+                                    </div>
                                 </li>
                             );
                         })}
@@ -544,6 +599,52 @@ export function PartnerProfileView({
                 onAdd={addQual}
                 types={PARTNER_PROFILE.qualificationTypes}
             />
+            <div className="mt-8">
+                <PublicProfileEditor
+                    key={evidenceRevision}
+                    initial={publicInfo}
+                    evidenceEnabled={evidenceEnabled}
+                />
+            </div>
+            <div className="border-border bg-background mt-8 rounded-2xl border p-6">
+                <p className="text-sm leading-relaxed">
+                    자기소개와 활동 정보를 함께 저장합니다. 연락처 인증,
+                    본인확인, 사진·증빙 등록과 공개 동의는 각 항목의 버튼으로
+                    처리합니다.
+                </p>
+                <div className="mt-4 flex flex-wrap justify-end gap-3">
+                    <button
+                        type="button"
+                        disabled={basicInfoPending || !profileDirty}
+                        onClick={() => {
+                            setIntro(savedIntro);
+                            setActivity(savedActivity);
+                            setSaveMessage("변경사항을 되돌렸습니다.");
+                        }}
+                        className="rounded-lg border px-5 py-3 text-sm font-bold disabled:opacity-50"
+                    >
+                        변경사항 되돌리기
+                    </button>
+                    <button
+                        type="button"
+                        disabled={basicInfoPending || !profileDirty}
+                        onClick={saveProfile}
+                        className="bg-brand text-brand-foreground rounded-lg px-6 py-3 font-bold disabled:opacity-50"
+                    >
+                        {basicInfoPending ? "저장 중…" : "프로필 저장"}
+                    </button>
+                </div>
+                <p
+                    role="status"
+                    aria-live="polite"
+                    className="mt-3 text-sm leading-relaxed"
+                >
+                    {basicInfoPending
+                        ? "프로필을 저장하고 있습니다."
+                        : saveMessage}
+                </p>
+            </div>
+
             <ProfilePhotoModal
                 open={photoOpen}
                 onClose={() => setPhotoOpen(false)}
@@ -574,7 +675,7 @@ export function PartnerProfileView({
 
 function VerifiedBadge() {
     return (
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-600 dark:bg-emerald-500/15">
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-sm font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
             <Check className="size-3" strokeWidth={3} />
             인증 완료
         </span>
