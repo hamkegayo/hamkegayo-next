@@ -1,10 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getPartnerQualifications } from "../../_lib/qualifications.server";
+import {
+    getPartnerQualifications,
+    toQualificationView,
+    type QualificationRow,
+    type QualificationView,
+} from "../../_lib/qualifications.server";
 
+import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
-import type { QualificationView } from "../../_lib/qualifications.server";
 
 const BUCKET = "partner-qualifications";
 const MAX_SIZE = 5 * 1024 * 1024;
@@ -75,7 +80,7 @@ export async function addQualification(
             size: file.size,
         })
         .select("id, type, reg_no, acquired_date, issuer, filename, status")
-        .single();
+        .single<QualificationRow>();
 
     if (error || !data) {
         await supabase.storage.from(BUCKET).remove([path]);
@@ -83,46 +88,63 @@ export async function addQualification(
     }
 
     revalidatePath("/partner/profile");
-    return {
-        ok: true,
-        qualification: {
-            id: data.id,
-            icon: "license",
-            title: data.type,
-            detail: [
-                data.reg_no && `등록번호 ${data.reg_no}`,
-                data.acquired_date && `취득일 ${data.acquired_date}`,
-                data.issuer,
-            ]
-                .filter(Boolean)
-                .join("    "),
-            filename: data.filename,
-            pending: data.status === "PENDING",
-        },
-    };
+    return { ok: true, qualification: toQualificationView(data) };
 }
 
-/** 자격 삭제 (Storage 파일 + 메타) */
-export async function deleteQualification(id: string): Promise<SimpleResult> {
+/**
+ * 미심사 등록 취소. 심사·통지된 자료는 DB가 막는다(보유기간·이의신청 처리).
+ * DB가 대기열에 넣은 경로를 바로 지우고, 실패하면 정리 크론이 다시 지운다.
+ */
+export async function withdrawPartnerEvidence(
+    id: string,
+    kind: "QUALIFICATION" | "HISTORY",
+): Promise<SimpleResult> {
     const supabase = await createClient();
     const {
         data: { user },
     } = await supabase.auth.getUser();
     if (!user) return { ok: false, message: "로그인이 필요합니다." };
 
-    const { error } = await supabase.rpc("withdraw_partner_evidence", {
+    const { data, error } = await supabase.rpc("withdraw_partner_evidence", {
         p_id: id,
-        p_kind: "QUALIFICATION",
+        p_kind: kind,
     });
     if (error)
         return {
             ok: false,
-            message:
-                "심사·통지된 증빙은 직접 삭제할 수 없습니다. 보유기간·이의신청 메뉴 또는 고객센터로 수정·삭제를 요청해 주세요.",
+            message: error.message.includes("evidence_retention_required")
+                ? "심사·통지된 증빙은 직접 삭제할 수 없습니다. 보유기간·이의신청 메뉴 또는 고객센터로 수정·삭제를 요청해 주세요."
+                : error.message.includes("not_found")
+                  ? "등록 내역을 찾을 수 없습니다. 새로고침해 주세요."
+                  : "삭제하지 못했습니다. 다시 시도해 주세요.",
         };
 
+    // 대기열 경로는 소유자 열람 정책에서 빠지므로 서비스 권한으로 지운다.
+    // RPC가 본인 등록의 경로만 돌려주며, 실패해도 정리 크론이 같은 대기열을 다시 처리한다.
+    const paths = ((data as string[] | null) ?? []).filter((p) =>
+        p.startsWith(`${user.id}/`),
+    );
+    if (paths.length) {
+        try {
+            const admin = createAdminClient();
+            const removed = await admin.storage.from(BUCKET).remove(paths);
+            if (!removed.error)
+                await admin
+                    .from("partner_evidence_deletions")
+                    .delete()
+                    .in("path", paths);
+        } catch {
+            // 크론이 다시 지운다.
+        }
+    }
+
     revalidatePath("/partner/profile");
+    revalidatePath("/admin/qualifications");
     return { ok: true };
+}
+
+export async function deleteQualification(id: string): Promise<SimpleResult> {
+    return withdrawPartnerEvidence(id, "QUALIFICATION");
 }
 
 /** 등록 후 목록만 갱신한다. 다른 미저장 프로필 입력은 유지한다. */

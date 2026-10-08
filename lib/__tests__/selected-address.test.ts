@@ -41,14 +41,18 @@ describe("검색 기본 주소와 상세주소", () => {
             }),
         ).toBeNull();
     });
-    it("고정된 가짜 키만 모의 주소 서버로 보내고 실제 키는 공식 API로 보낸다", () => {
-        vi.stubEnv("JUSO_CONFM_KEY", "real-placeholder");
+    it("기본은 공식 API이고 루프백 주소만 모의 서버로 바꿀 수 있다", () => {
+        vi.stubEnv("JUSO_API_BASE_URL", "");
         expect(addressApiEndpoint()).toBe(
             "https://business.juso.go.kr/addrlink/addrLinkApi.do",
         );
-        vi.stubEnv("JUSO_CONFM_KEY", "e2e-local-address-only");
+        vi.stubEnv("JUSO_API_BASE_URL", "http://127.0.0.1:4011");
         expect(addressApiEndpoint()).toBe(
             "http://127.0.0.1:4011/addrlink/addrLinkApi.do",
+        );
+        vi.stubEnv("JUSO_API_BASE_URL", "https://example.com");
+        expect(addressApiEndpoint()).toBe(
+            "https://business.juso.go.kr/addrlink/addrLinkApi.do",
         );
     });
 });

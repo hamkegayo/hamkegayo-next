@@ -42,19 +42,26 @@ create trigger qualification_withdraw_guard before delete on public.partner_qual
 create trigger history_withdraw_guard before delete on public.partner_work_histories
   for each row execute function public.guard_partner_evidence_withdraw();
 
-create function public.withdraw_partner_evidence(p_id uuid,p_kind text) returns void
+-- 대기열에 넣은 경로를 돌려준다. 서버 액션이 서비스 권한으로 즉시 지우고, 실패하면 크론이 지운다.
+create function public.withdraw_partner_evidence(p_id uuid,p_kind text) returns text[]
 language plpgsql security definer set search_path='' as $$
+declare v_paths text[];
 begin
   if p_kind='QUALIFICATION' then
     perform 1 from public.partner_qualifications where id=p_id and partner_id=auth.uid() for update;
     if not found then raise exception 'not_found' using errcode='42501'; end if;
+    select array_remove(array_agg(distinct x.path),null) into v_paths from (
+      select q.path from public.partner_qualifications q where q.id=p_id
+      union all select f.path from public.partner_evidence_files f where f.qualification_id=p_id) x;
     delete from public.partner_qualifications where id=p_id and partner_id=auth.uid();
   elsif p_kind='HISTORY' then
     perform 1 from public.partner_work_histories where id=p_id and partner_id=auth.uid() for update;
     if not found then raise exception 'not_found' using errcode='42501'; end if;
+    select array_agg(f.path) into v_paths from public.partner_evidence_files f where f.history_id=p_id;
     delete from public.partner_work_histories where id=p_id and partner_id=auth.uid();
   else raise exception 'invalid_kind' using errcode='22023'; end if;
   -- 기존 삭제 트리거가 모든 첨부의 Storage 삭제를 대기열에 추가한다.
+  return coalesce(v_paths,'{}');
 end $$;
 revoke all on function public.withdraw_partner_evidence(uuid,text) from public,anon;
 grant execute on function public.withdraw_partner_evidence(uuid,text) to authenticated;
@@ -62,3 +69,19 @@ grant execute on function public.withdraw_partner_evidence(uuid,text) to authent
 create or replace function public.delete_partner_work_history(p_id uuid)
 returns void language plpgsql security definer set search_path='' as $$
 begin perform public.withdraw_partner_evidence(p_id,'HISTORY'); end $$;
+
+-- 소유자 Storage 삭제는 DB가 참조하지 않는 객체(행 생성 전 실패한 업로드, 등록 취소로 대기열에
+-- 들어간 파일)로만 좁힌다. 보유 중인 원본은 withdraw_partner_evidence 경로로만 지워진다.
+-- RPC로 불려도 다른 파트너 경로의 참조 여부는 알 수 없게 본인 폴더만 판정한다.
+create function public.partner_evidence_owner_deletable(p_path text) returns boolean
+language sql stable security definer set search_path='' as $$
+  select (storage.foldername(p_path))[1]=auth.uid()::text
+    and not exists(select 1 from public.partner_qualifications q where q.path=p_path)
+    and not exists(select 1 from public.partner_evidence_files f where f.path=p_path);
+$$;
+revoke all on function public.partner_evidence_owner_deletable(text) from public,anon;
+grant execute on function public.partner_evidence_owner_deletable(text) to authenticated;
+drop policy if exists "partner_qual_delete_own" on storage.objects;
+create policy "partner_qual_delete_own" on storage.objects for delete to authenticated using (
+  bucket_id='partner-qualifications' and public.partner_evidence_owner_deletable(name)
+);

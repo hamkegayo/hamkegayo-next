@@ -92,12 +92,28 @@ test("파트너 프로필 통합 저장, 실패 입력 유지, 증빙 선택 제
         await page
             .getByRole("button", { name: "프로필 저장", exact: true })
             .click();
-        await expect(
-            page
-                .getByRole("status")
-                .filter({ hasText: "프로필을 저장했습니다." }),
-        ).toBeVisible();
-        await page.reload();
+        // 저장 완료 안내를 확인하면 저장된 값으로 새로고침한다.
+        const doneDialog = page.getByRole("dialog");
+        await expect(doneDialog).toContainText("프로필을 저장했습니다.");
+        await Promise.all([
+            page.waitForEvent("load"),
+            doneDialog
+                .getByRole("button", { name: "확인", exact: true })
+                .click(),
+        ]);
+        await expect(intro).toHaveValue("E2E 프로필 저장 확인");
+
+        await intro.fill("E2E 되돌릴 입력");
+        await page
+            .getByRole("button", { name: "변경사항 되돌리기", exact: true })
+            .click();
+        await expect(doneDialog).toContainText("변경사항을 되돌렸습니다.");
+        await Promise.all([
+            page.waitForEvent("load"),
+            doneDialog
+                .getByRole("button", { name: "확인", exact: true })
+                .click(),
+        ]);
         await expect(intro).toHaveValue("E2E 프로필 저장 확인");
 
         await intro.fill("E2E 실패해도 남는 입력");
@@ -210,12 +226,15 @@ test("파트너 프로필 통합 저장, 실패 입력 유지, 증빙 선택 제
             .screenshot({
                 path: "test-results/partner-qualifications-mobile.png",
             });
-        page.once("dialog", (dialog) => dialog.accept());
         await page
             .getByRole("button", {
                 name: "E2E 자격 대기 등록 취소·증빙 삭제",
                 exact: true,
             })
+            .click();
+        await page
+            .getByRole("dialog")
+            .getByRole("button", { name: "등록 취소", exact: true })
             .click();
         await expect(
             page.getByText("E2E 자격 대기", { exact: true }),

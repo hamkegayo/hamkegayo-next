@@ -7,11 +7,22 @@
  */
 
 const ENDPOINT = "https://business.juso.go.kr/addrlink/addrLinkApi.do";
-/** 실제 승인키는 모의 서버로 보내지 않는다. E2E의 고정 가짜 키만 루프백 서버로 보낸다. */
+const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"]);
+/**
+ * 기본은 공식 API다. JUSO_API_BASE_URL 은 E2E 모의 서버용으로 Playwright 에서만 지정한다.
+ * 설정 실수로 승인키가 외부 주소로 나가지 않게 루프백 주소만 받는다.
+ */
 export function addressApiEndpoint(): string {
-    return process.env.JUSO_CONFM_KEY === "e2e-local-address-only"
-        ? "http://127.0.0.1:4011/addrlink/addrLinkApi.do"
-        : ENDPOINT;
+    const base = process.env.JUSO_API_BASE_URL?.trim();
+    if (!base) return ENDPOINT;
+    try {
+        const url = new URL("/addrlink/addrLinkApi.do", base);
+        return url.protocol === "http:" && LOOPBACK.has(url.hostname)
+            ? url.toString()
+            : ENDPOINT;
+    } catch {
+        return ENDPOINT;
+    }
 }
 const TIMEOUT_MS = 5000;
 /** juso 는 페이지 크기 10, 최대 20페이지까지 본다. 그 뒤로는 "더 보기"를 내리지 않는다 (#232 리뷰). */
@@ -157,7 +168,7 @@ export async function searchRoadAddress(
             ok: false,
             reason: "error",
             message:
-                "주소 검색 서버에 연결하지 못했습니다. 잠시 후 다시 시도하거나 직접 입력해 주세요.",
+                "주소 검색 서버에 연결하지 못했습니다. 잠시 후 다시 시도하거나 고객센터로 문의해 주세요.",
         };
     }
 }

@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { FileText, X } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
 import { EVIDENCE_MAX_SIZE, type EvidenceUpload } from "@/lib/partner-evidence";
@@ -96,8 +97,15 @@ export function EvidenceRegister({
             toast.success(
                 "증빙을 등록했습니다. 관리자 심사 전에는 인증 대기로 표시됩니다.",
             );
-            if (onRegistered) await onRegistered();
-            else router.refresh();
+            // 등록은 끝났다. 목록 갱신 실패를 등록 실패로 안내하지 않는다.
+            try {
+                if (onRegistered) await onRegistered();
+                else router.refresh();
+            } catch {
+                toast.info(
+                    "등록 목록을 불러오지 못했습니다. 새로고침해 주세요.",
+                );
+            }
         } catch {
             toast.error(
                 "등록 결과를 확인하지 못했습니다. 새로고침하여 등록 여부를 확인해 주세요.",
@@ -209,6 +217,7 @@ export function EvidenceRegister({
                     <input
                         ref={fileRef}
                         key={fileKey}
+                        tabIndex={-1}
                         type="file"
                         multiple
                         disabled={pending || !enabled}
@@ -223,7 +232,7 @@ export function EvidenceRegister({
                     type="button"
                     onClick={() => fileRef.current?.click()}
                     disabled={pending || !enabled}
-                    className="rounded-lg border px-5 py-3 text-sm font-bold disabled:opacity-50"
+                    className="border-border bg-background text-foreground hover:bg-muted cursor-pointer rounded-lg border px-5 py-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     파일 선택{files.length ? "·다시 선택" : ""}
                 </button>
@@ -231,9 +240,17 @@ export function EvidenceRegister({
                     {files.map((f, i) => (
                         <li
                             key={`${f.name}-${i}`}
-                            className="mt-2 flex items-start justify-between gap-3 rounded-lg border p-3"
+                            className="mt-2 flex items-center justify-between gap-3 rounded-lg border p-3"
                         >
-                            <span className="min-w-0 break-all">{f.name}</span>
+                            <span className="flex min-w-0 items-center gap-2">
+                                <FileText
+                                    aria-hidden
+                                    className="size-4 shrink-0"
+                                />
+                                <span className="min-w-0 break-all">
+                                    {f.name}
+                                </span>
+                            </span>
                             <button
                                 type="button"
                                 disabled={pending}
@@ -246,8 +263,9 @@ export function EvidenceRegister({
                                     );
                                     setFileKey((k) => k + 1);
                                 }}
-                                className="text-destructive shrink-0 underline disabled:opacity-50"
+                                className="border-destructive/40 text-destructive hover:bg-destructive hover:border-destructive focus-visible:ring-destructive/30 inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors hover:text-white focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                             >
+                                <X aria-hidden className="size-4" />
                                 선택 제거
                             </button>
                         </li>

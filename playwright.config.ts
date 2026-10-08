@@ -56,6 +56,7 @@ export default defineConfig({
             reuseExistingServer: !CI,
             env: {
                 JUSO_CONFM_KEY: "e2e-local-address-only",
+                JUSO_API_BASE_URL: "http://127.0.0.1:4011",
                 NEXT_PUBLIC_NICEPAY_CLIENT_KEY: E2E_PAYMENT.clientKey,
                 NICEPAY_SECRET_KEY: E2E_PAYMENT.secretKey,
                 NICEPAY_API_BASE_URL: E2E_PAYMENT.apiBase,

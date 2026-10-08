@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import type { PartnerPublicProfile, WorkHistory } from "@/lib/partner-details";
+import { withdrawPartnerEvidence } from "./qualifications";
 
 export async function getPartnerPublicProfile(): Promise<PartnerPublicProfile | null> {
     const supabase = await createClient();
@@ -91,5 +92,12 @@ export async function submitPartnerWorkHistory(input: Omit<WorkHistory, "id">) {
 }
 
 export async function deletePartnerWorkHistory(id: string) {
-    return updateProfile("delete_partner_work_history", { p_id: id });
+    try {
+        return await withdrawPartnerEvidence(id, "HISTORY");
+    } catch {
+        return {
+            ok: false as const,
+            message: "저장 요청에 실패했습니다. 다시 시도해 주세요.",
+        };
+    }
 }

@@ -7,6 +7,7 @@ import {
     type PartnerPublicProfile,
 } from "@/lib/partner-details";
 import { PartnerEvidenceFiles } from "@/components/partner-evidence-files";
+import { ConfirmModal } from "@/components/ui/modal";
 import {
     deletePartnerWorkHistory,
     getPartnerPublicProfile,
@@ -47,6 +48,10 @@ export function PublicProfileEditor({
     const [profile, setProfile] = useState(initial);
     const [input, setInput] = useState(EMPTY);
     const [pending, startTransition] = useTransition();
+    const [withdrawTarget, setWithdrawTarget] = useState<{
+        id: string;
+        hospital: string;
+    } | null>(null);
     const refresh = async () => {
         setProfile(await getPartnerPublicProfile());
     };
@@ -129,29 +134,20 @@ export function PublicProfileEditor({
                                         <button
                                             type="button"
                                             disabled={pending}
-                                            onClick={() => {
-                                                if (
-                                                    !window.confirm(
-                                                        "미심사 경력 등록을 취소하고 첨부 증빙을 삭제하시겠습니까?",
-                                                    )
-                                                )
-                                                    return;
-                                                run(
-                                                    () =>
-                                                        deletePartnerWorkHistory(
-                                                            history.id,
-                                                        ),
-                                                    "등록을 취소했습니다. 증빙은 삭제 처리됩니다.",
-                                                );
-                                            }}
-                                            className="text-destructive shrink-0 text-sm underline"
+                                            onClick={() =>
+                                                setWithdrawTarget({
+                                                    id: history.id,
+                                                    hospital: history.hospital,
+                                                })
+                                            }
+                                            className="border-destructive/40 bg-background text-destructive hover:bg-destructive/5 shrink-0 cursor-pointer rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                             등록 취소·증빙 삭제
                                         </button>
                                     ) : (
                                         <a
                                             href="/partner-evidence-notice"
-                                            className="text-brand shrink-0 text-sm underline"
+                                            className="border-border bg-background text-foreground hover:bg-muted shrink-0 rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors"
                                         >
                                             수정·삭제 절차
                                         </a>
@@ -304,6 +300,30 @@ export function PublicProfileEditor({
                     </div>
                 </>
             )}
+            <ConfirmModal
+                open={withdrawTarget !== null}
+                onClose={() => setWithdrawTarget(null)}
+                onConfirm={() => {
+                    const target = withdrawTarget;
+                    setWithdrawTarget(null);
+                    if (target)
+                        run(
+                            () => deletePartnerWorkHistory(target.id),
+                            "등록을 취소하고 첨부 증빙을 삭제했습니다.",
+                        );
+                }}
+                title="경력 등록을 취소할까요?"
+                description={
+                    <>
+                        {withdrawTarget?.hospital} 경력 등록을 취소하고 첨부한
+                        증빙 파일을 삭제합니다. 취소 후에는 되돌릴 수 없습니다.
+                    </>
+                }
+                cancelLabel="돌아가기"
+                confirmLabel="등록 취소"
+                tone="destructive"
+                confirmDisabled={pending}
+            />
         </section>
     );
 }

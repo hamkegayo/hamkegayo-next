@@ -87,8 +87,8 @@ export function BirthDateField({ initial }: { initial: IdentityCheckView }) {
                         : "확인 기간이 지나 파기되었습니다. 다시 제출해 주세요."}
                 </p>
             )}
-            <div className="flex flex-wrap gap-2">
-                <div className="min-w-0 flex-1">
+            <div className="flex max-w-md flex-wrap gap-2">
+                <div className="min-w-0 flex-1 basis-48">
                     <label className="sr-only" htmlFor="partnerBirthDate">
                         생년월일
                     </label>
@@ -104,7 +104,7 @@ export function BirthDateField({ initial }: { initial: IdentityCheckView }) {
                     type="button"
                     onClick={submit}
                     disabled={pending || !value}
-                    className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-4 text-sm font-bold disabled:opacity-50"
+                    className="bg-brand text-brand-foreground hover:bg-brand/90 h-11 shrink-0 cursor-pointer rounded-lg px-5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {pending ? "제출 중…" : "본인확인 제출"}
                 </button>

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { isCalendarDate } from "@/lib/reservation-window";
 import { createClient } from "@/utils/supabase/server";
 
 export type IdentityResult = { ok: true } | { ok: false; message: string };
@@ -15,6 +16,9 @@ export async function submitPartnerBirthDate(
             ok: false,
             message: "생년월일을 YYYY-MM-DD 형식으로 입력해 주세요.",
         };
+    // 2000-02-30 같은 값은 DB 날짜 변환에서 먼저 실패해 일반 오류가 된다. 여기서 안내한다.
+    if (!isCalendarDate(birthDate))
+        return { ok: false, message: "올바른 생년월일을 입력해 주세요." };
     try {
         const supabase = await createClient();
         const { error } = await supabase.rpc("submit_partner_birth_date", {

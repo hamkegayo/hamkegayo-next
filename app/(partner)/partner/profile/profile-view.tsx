@@ -58,6 +58,7 @@ import {
 } from "../../_components/qualification-add-modal";
 import { ProfilePreviewModal } from "../../_components/profile-preview-modal";
 import { COMPANY } from "@/lib/legal/company";
+import { ConfirmModal, Modal } from "@/components/ui/modal";
 import { PartnerEvidenceFiles } from "@/components/partner-evidence-files";
 import { EvidenceRegister } from "../../_components/evidence-register";
 import { PublicProfileEditor } from "../../_components/public-profile-editor";
@@ -72,7 +73,18 @@ const QUAL_ICON: Record<QualificationIcon, LucideIcon> = {
     record: FileSearch,
 };
 
-type QualItem = Qualification & { pending?: boolean };
+type QualItem = Qualification &
+    Partial<Pick<QualificationView, "regNo" | "acquiredDate" | "issuer">> & {
+        pending?: boolean;
+    };
+
+/** "20251010"·"2025-10-10" → "2025.10.10". 형식을 알 수 없으면 입력값 그대로. */
+function qualDate(value: string): string {
+    const d = value.replace(/\D/g, "");
+    return d.length === 8
+        ? `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6)}`
+        : value;
+}
 
 /* ---------- 재사용 UI ---------- */
 
@@ -147,6 +159,9 @@ export function PartnerProfileView({
     const [publicInfo, setPublicInfo] = useState(publicProfile);
     const [evidenceRevision, setEvidenceRevision] = useState(0);
     const [saveMessage, setSaveMessage] = useState("");
+    /** 저장·되돌리기 완료 안내. 확인하면 저장된 값으로 새로고침한다. */
+    const [doneNotice, setDoneNotice] = useState<string | null>(null);
+    const [withdrawTarget, setWithdrawTarget] = useState<QualItem | null>(null);
     const [email, setEmail] = useState(initialBasicInfo.email);
     const [phone, setPhone] = useState(initialBasicInfo.phone);
     const [phoneOpen, setPhoneOpen] = useState(false);
@@ -202,17 +217,13 @@ export function PartnerProfileView({
     };
 
     const removeQual = (id: string) => {
-        if (
-            !window.confirm(
-                "미심사 등록을 취소하고 첨부 증빙을 삭제하시겠습니까?",
-            )
-        )
-            return;
+        setWithdrawTarget(null);
         startQualTransition(async () => {
             try {
                 const res = await deleteQualification(id);
                 if (res.ok) {
                     setQuals((prev) => prev.filter((q) => q.id !== id));
+                    toast.success("등록을 취소하고 첨부 증빙을 삭제했습니다.");
                 } else {
                     toast.error(res.message);
                 }
@@ -264,16 +275,15 @@ export function PartnerProfileView({
                     snapshot.intro,
                     activityLoad.ok ? snapshot.activity : null,
                 );
-                setSaveMessage(
-                    result.ok ? "프로필을 저장했습니다." : result.message,
-                );
                 if (!result.ok) {
+                    setSaveMessage(result.message);
                     toast.error(result.message);
                     return;
                 }
                 setSavedIntro(snapshot.intro);
                 if (activityLoad.ok) setSavedActivity(snapshot.activity);
-                toast.success("프로필을 저장했습니다.");
+                setSaveMessage("프로필을 저장했습니다.");
+                setDoneNotice("프로필을 저장했습니다.");
             } catch {
                 const message =
                     "저장 결과를 확인하지 못했습니다. 입력 내용은 유지됩니다. 다시 저장해 주세요.";
@@ -377,10 +387,10 @@ export function PartnerProfileView({
                         hint="(수정 가능)"
                         className="h-full"
                     >
-                        <dl className="mb-4 space-y-2 text-sm">
+                        <dl className="mb-4 space-y-4 text-sm">
                             <div>
                                 <dt className="text-muted-foreground">이름</dt>
-                                <dd className="font-bold">
+                                <dd className="mt-1 font-bold">
                                     {initialBasicInfo.name ||
                                         "등록된 정보 없음"}
                                 </dd>
@@ -389,7 +399,7 @@ export function PartnerProfileView({
                                 <dt className="text-muted-foreground">
                                     생년월일
                                 </dt>
-                                <dd>
+                                <dd className="mt-1.5">
                                     <BirthDateField initial={identity} />
                                 </dd>
                             </div>
@@ -526,53 +536,97 @@ export function PartnerProfileView({
                     <ul className="mt-4 space-y-3">
                         {quals.map((q) => {
                             const Icon = QUAL_ICON[q.icon] ?? Award;
+                            const fields = [
+                                ["자격·면허번호", q.regNo],
+                                [
+                                    "취득일",
+                                    q.acquiredDate && qualDate(q.acquiredDate),
+                                ],
+                                ["발급기관", q.issuer],
+                            ] as const;
                             return (
                                 <li
                                     key={q.id}
-                                    className="border-border grid grid-cols-1 gap-3 rounded-xl border p-4 sm:grid-cols-[auto_1fr_auto]"
+                                    className="border-border overflow-hidden rounded-xl border"
                                 >
-                                    <span className="bg-brand/10 text-brand flex size-9 shrink-0 items-center justify-center rounded-lg">
-                                        <Icon className="size-4" />
-                                    </span>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-foreground leading-relaxed font-bold">
-                                            {q.title}
-                                        </p>
-                                        <p className="text-foreground mt-1 text-sm leading-relaxed break-words">
-                                            {q.detail}
-                                        </p>
+                                    <div className="flex items-start gap-3 p-4 sm:p-5">
+                                        <span className="bg-brand/10 text-brand flex size-10 shrink-0 items-center justify-center rounded-lg">
+                                            <Icon className="size-5" />
+                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <p className="text-foreground text-base leading-snug font-bold break-keep">
+                                                    {q.title}
+                                                </p>
+                                                {q.pending ? (
+                                                    <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-sm font-bold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+                                                        인증 대기
+                                                    </span>
+                                                ) : (
+                                                    <VerifiedBadge />
+                                                )}
+                                            </div>
+                                            {q.regNo === undefined ? (
+                                                <p className="text-foreground mt-2 text-sm leading-relaxed break-words">
+                                                    {q.detail}
+                                                </p>
+                                            ) : (
+                                                <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-3">
+                                                    {fields.map(
+                                                        ([label, value]) => (
+                                                            <div
+                                                                key={label}
+                                                                className="flex gap-3 sm:block"
+                                                            >
+                                                                <dt className="text-muted-foreground w-24 shrink-0 text-sm sm:w-auto">
+                                                                    {label}
+                                                                </dt>
+                                                                <dd
+                                                                    className={cn(
+                                                                        "min-w-0 text-sm break-words sm:mt-0.5",
+                                                                        value
+                                                                            ? "text-foreground font-semibold"
+                                                                            : "text-muted-foreground",
+                                                                    )}
+                                                                >
+                                                                    {value ||
+                                                                        "미입력"}
+                                                                </dd>
+                                                            </div>
+                                                        ),
+                                                    )}
+                                                </dl>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="border-border bg-muted/30 border-t px-4 pt-1 pb-4 sm:px-5">
                                         <PartnerEvidenceFiles
                                             id={q.id}
                                             kind="QUALIFICATION"
                                         />
-                                    </div>
-                                    <div className="flex flex-wrap items-start gap-3 sm:flex-col">
-                                        {q.pending ? (
-                                            <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-sm font-bold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
-                                                인증 대기
-                                            </span>
-                                        ) : (
-                                            <VerifiedBadge />
-                                        )}
-                                        {q.pending ? (
-                                            <button
-                                                type="button"
-                                                aria-label={`${q.title} 등록 취소·증빙 삭제`}
-                                                disabled={qualPending}
-                                                onClick={() => removeQual(q.id)}
-                                                className="text-destructive inline-flex items-center gap-1 text-sm underline disabled:opacity-50"
-                                            >
-                                                <X className="size-4" /> 등록
-                                                취소·증빙 삭제
-                                            </button>
-                                        ) : (
-                                            <Link
-                                                href="/partner-evidence-notice"
-                                                className="text-brand text-sm underline"
-                                            >
-                                                수정·삭제 절차
-                                            </Link>
-                                        )}
+                                        <div className="mt-3 flex flex-wrap justify-end gap-2">
+                                            {q.pending ? (
+                                                <button
+                                                    type="button"
+                                                    aria-label={`${q.title} 등록 취소·증빙 삭제`}
+                                                    disabled={qualPending}
+                                                    onClick={() =>
+                                                        setWithdrawTarget(q)
+                                                    }
+                                                    className="border-destructive/40 bg-background text-destructive hover:bg-destructive/5 inline-flex cursor-pointer items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                                                >
+                                                    <X className="size-4" />
+                                                    등록 취소·증빙 삭제
+                                                </button>
+                                            ) : (
+                                                <Link
+                                                    href="/partner-evidence-notice"
+                                                    className="border-border bg-background text-foreground hover:bg-muted inline-flex items-center rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors"
+                                                >
+                                                    수정·삭제 절차
+                                                </Link>
+                                            )}
+                                        </div>
                                     </div>
                                 </li>
                             );
@@ -620,8 +674,9 @@ export function PartnerProfileView({
                             setIntro(savedIntro);
                             setActivity(savedActivity);
                             setSaveMessage("변경사항을 되돌렸습니다.");
+                            setDoneNotice("변경사항을 되돌렸습니다.");
                         }}
-                        className="rounded-lg border px-5 py-3 text-sm font-bold disabled:opacity-50"
+                        className="border-border bg-background text-foreground hover:bg-muted cursor-pointer rounded-lg border px-5 py-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         변경사항 되돌리기
                     </button>
@@ -629,7 +684,7 @@ export function PartnerProfileView({
                         type="button"
                         disabled={basicInfoPending || !profileDirty}
                         onClick={saveProfile}
-                        className="bg-brand text-brand-foreground rounded-lg px-6 py-3 font-bold disabled:opacity-50"
+                        className="bg-brand text-brand-foreground hover:bg-brand/90 cursor-pointer rounded-lg px-6 py-3 font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {basicInfoPending ? "저장 중…" : "프로필 저장"}
                     </button>
@@ -645,6 +700,45 @@ export function PartnerProfileView({
                 </p>
             </div>
 
+            <ConfirmModal
+                open={withdrawTarget !== null}
+                onClose={() => setWithdrawTarget(null)}
+                onConfirm={() =>
+                    withdrawTarget && removeQual(withdrawTarget.id)
+                }
+                title="등록을 취소할까요?"
+                description={
+                    <>
+                        {withdrawTarget?.title} 등록을 취소하고 첨부한 증빙
+                        파일을 삭제합니다. 취소 후에는 되돌릴 수 없습니다.
+                    </>
+                }
+                cancelLabel="돌아가기"
+                confirmLabel="등록 취소"
+                tone="destructive"
+                confirmDisabled={qualPending}
+            />
+            {/* 저장·되돌리기 완료 안내. 확인하면 서버에 저장된 값으로 새로고침한다. */}
+            <Modal
+                open={doneNotice !== null}
+                onClose={() => window.location.reload()}
+                className="max-w-sm"
+            >
+                <p
+                    role="alert"
+                    className="text-foreground text-center text-lg font-extrabold"
+                >
+                    {doneNotice}
+                </p>
+                <button
+                    type="button"
+                    autoFocus
+                    onClick={() => window.location.reload()}
+                    className="bg-brand text-brand-foreground hover:bg-brand/90 mt-6 w-full cursor-pointer rounded-lg px-4 py-3 text-sm font-bold transition-colors"
+                >
+                    확인
+                </button>
+            </Modal>
             <ProfilePhotoModal
                 open={photoOpen}
                 onClose={() => setPhotoOpen(false)}
