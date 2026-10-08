@@ -6,12 +6,15 @@ export type QualificationView = {
     icon: "license";
     title: string;
     detail: string;
+    regNo: string | null;
+    acquiredDate: string | null;
+    issuer: string | null;
     filename: string | null;
     /** 인증 대기 여부 (PENDING) */
     pending: boolean;
 };
 
-type Row = {
+export type QualificationRow = {
     id: string;
     type: string;
     reg_no: string | null;
@@ -21,14 +24,28 @@ type Row = {
     status: "PENDING" | "VERIFIED";
 };
 
-function detailOf(r: Row): string {
+function detailOf(r: QualificationRow): string {
     return [
         r.reg_no && `등록번호 ${r.reg_no}`,
         r.acquired_date && `취득일 ${r.acquired_date}`,
-        r.issuer,
+        r.issuer && `발급기관 ${r.issuer}`,
     ]
         .filter(Boolean)
         .join("    ");
+}
+
+export function toQualificationView(r: QualificationRow): QualificationView {
+    return {
+        id: r.id,
+        icon: "license",
+        title: r.type,
+        detail: detailOf(r),
+        regNo: r.reg_no,
+        acquiredDate: r.acquired_date,
+        issuer: r.issuer,
+        filename: r.filename,
+        pending: r.status === "PENDING",
+    };
 }
 
 /** 로그인 파트너의 자격/보유 사항 목록 */
@@ -45,18 +62,11 @@ export async function getPartnerQualifications(): Promise<QualificationView[]> {
             .select("id, type, reg_no, acquired_date, issuer, filename, status")
             .eq("partner_id", user.id)
             .order("created_at", { ascending: false })
-            .returns<Row[]>();
+            .returns<QualificationRow[]>();
 
         if (error || !data) return [];
 
-        return data.map((r) => ({
-            id: r.id,
-            icon: "license" as const,
-            title: r.type,
-            detail: detailOf(r),
-            filename: r.filename,
-            pending: r.status === "PENDING",
-        }));
+        return data.map(toQualificationView);
     } catch {
         return [];
     }

@@ -80,10 +80,10 @@ export function WithdrawSection() {
             >
                 <div className="mt-4 text-left">
                     <div className="border-border rounded-xl border px-4 py-4">
-                        <p className="text-foreground text-sm font-bold">
+                        <p className="text-foreground text-sm leading-relaxed font-bold">
                             탈퇴 후에도 남는 정보가 있습니다
                         </p>
-                        <ul className="text-description-foreground mt-2.5 space-y-1.5 text-xs leading-relaxed">
+                        <ul className="text-description-foreground mt-2.5 space-y-1.5 text-sm leading-relaxed">
                             <li>
                                 · 결제·환불·정산 기록 —{" "}
                                 <span className="text-foreground font-semibold">
@@ -105,7 +105,7 @@ export function WithdrawSection() {
                                 (분리 보관)
                             </li>
                         </ul>
-                        <p className="text-description-foreground mt-3 text-xs leading-relaxed">
+                        <p className="text-description-foreground mt-3 text-sm leading-relaxed">
                             보관 기간이 지나면 자동으로 파기됩니다. 자세한
                             내용은{" "}
                             <a
@@ -120,7 +120,7 @@ export function WithdrawSection() {
                         </p>
                     </div>
 
-                    <p className="text-description-foreground mt-4 text-xs leading-relaxed">
+                    <p className="text-description-foreground mt-4 text-sm leading-relaxed">
                         미결제 금액, 진행 예정인 예약, 지급되지 않은 정산금이
                         있으면 탈퇴가 제한됩니다.
                     </p>

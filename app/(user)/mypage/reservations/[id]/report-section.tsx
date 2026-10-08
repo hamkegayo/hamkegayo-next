@@ -30,7 +30,7 @@ export function ReportSection({ reservationId }: { reservationId: string }) {
     if (!report) {
         return (
             <div className="space-y-3">
-                <p className="text-description-foreground text-sm">
+                <p className="text-description-foreground text-sm leading-relaxed">
                     {missing
                         ? "아직 파트너가 리포트를 제출하지 않았어요. 제출되면 알림으로 알려드려요."
                         : "파트너가 작성한 동행 리포트를 확인할 수 있어요."}
@@ -54,7 +54,7 @@ export function ReportSection({ reservationId }: { reservationId: string }) {
 
     if (report.purged) {
         return (
-            <p className="text-description-foreground text-sm">
+            <p className="text-description-foreground text-sm leading-relaxed">
                 보유기간이 지나 리포트 내용이 파기되었어요.
             </p>
         );
@@ -62,7 +62,7 @@ export function ReportSection({ reservationId }: { reservationId: string }) {
 
     if (!report.medicalShared) {
         return (
-            <p className="text-description-foreground text-sm break-keep">
+            <p className="text-description-foreground text-sm leading-relaxed break-keep">
                 이용자가 진료 내용 전달에 동의하지 않아 리포트 내용을 보여 드릴
                 수 없어요. 서비스 진행 상태와 시각은 위에서 확인할 수 있어요.
             </p>
@@ -72,7 +72,7 @@ export function ReportSection({ reservationId }: { reservationId: string }) {
     return (
         <div className="space-y-5 text-sm">
             <div className="flex items-center justify-between gap-3">
-                <p className="text-muted-foreground text-xs">
+                <p className="text-description-foreground text-sm leading-relaxed">
                     {report.submittedAtLabel
                         ? `${report.submittedAtLabel} 제출`
                         : ""}
@@ -81,14 +81,16 @@ export function ReportSection({ reservationId }: { reservationId: string }) {
                     type="button"
                     onClick={onOpen}
                     disabled={pending}
-                    className="text-muted-foreground text-xs underline disabled:opacity-60"
+                    className="text-muted-foreground text-sm underline disabled:opacity-60"
                 >
                     {pending ? "불러오는 중…" : "다시 불러오기"}
                 </button>
             </div>
 
             <div>
-                <p className="text-foreground font-bold">수행 지원 내용</p>
+                <p className="text-foreground leading-relaxed font-bold">
+                    수행 지원 내용
+                </p>
                 {report.supports.length > 0 ? (
                     <ul className="text-description-foreground mt-2 list-disc space-y-1 pl-5">
                         {report.supports.map((s) => (
@@ -96,27 +98,35 @@ export function ReportSection({ reservationId }: { reservationId: string }) {
                         ))}
                     </ul>
                 ) : (
-                    <p className="text-muted-foreground mt-2">-</p>
+                    <p className="text-description-foreground mt-2 leading-relaxed">
+                        -
+                    </p>
                 )}
             </div>
 
             <div>
-                <p className="text-foreground font-bold">진료·검사 메모</p>
-                <p className="text-description-foreground mt-2 whitespace-pre-wrap">
+                <p className="text-foreground leading-relaxed font-bold">
+                    진료·검사 메모
+                </p>
+                <p className="text-description-foreground mt-2 leading-relaxed whitespace-pre-wrap">
                     {report.exam || "-"}
                 </p>
             </div>
 
             <div>
-                <p className="text-foreground font-bold">보호자 전달 사항</p>
-                <p className="text-description-foreground mt-2 whitespace-pre-wrap">
+                <p className="text-foreground leading-relaxed font-bold">
+                    보호자 전달 사항
+                </p>
+                <p className="text-description-foreground mt-2 leading-relaxed whitespace-pre-wrap">
                     {report.guardianNote || "-"}
                 </p>
             </div>
 
             {report.attachments.length > 0 && (
                 <div>
-                    <p className="text-foreground font-bold">첨부</p>
+                    <p className="text-foreground leading-relaxed font-bold">
+                        첨부
+                    </p>
                     <ul className="mt-2 space-y-2">
                         {report.attachments.map((a) => (
                             <li key={a.id} className="flex items-center gap-2">
@@ -135,13 +145,13 @@ export function ReportSection({ reservationId }: { reservationId: string }) {
                                         {a.filename} (지금은 열 수 없어요)
                                     </span>
                                 )}
-                                <span className="text-muted-foreground shrink-0 text-xs">
+                                <span className="text-muted-foreground shrink-0 text-sm">
                                     {formatSize(a.size)}
                                 </span>
                             </li>
                         ))}
                     </ul>
-                    <p className="text-muted-foreground mt-2 text-xs">
+                    <p className="text-description-foreground mt-2 text-sm leading-relaxed">
                         첨부 링크는 5분 동안만 열려요. 시간이 지나면 “다시
                         불러오기”를 눌러 주세요.
                     </p>

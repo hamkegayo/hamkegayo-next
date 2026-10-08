@@ -91,13 +91,37 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
         await user.locator("#arriveTime").selectOption({ label: "10시 00분" });
         await user.locator("#reserveTime").selectOption({ label: "10시 30분" });
         await user.locator("#duration").selectOption({ label: "2시간" });
+        await expect(user.locator("#departAddress")).toHaveAttribute(
+            "readonly",
+            "",
+        );
         await user
-            .locator("#departAddress")
-            .fill("서울특별시 종로구 세종대로 175");
+            .getByRole("button", { name: "주소 검색", exact: true })
+            .first()
+            .click();
+        await user
+            .getByPlaceholder("도로명, 건물명, 지번 (예: 올림픽로43길 88)")
+            .fill("세종대로 175");
+        await user.getByRole("button", { name: "검색", exact: true }).click();
+        await user
+            .getByRole("button", { name: /서울특별시 종로구 세종대로 175/ })
+            .click();
+        await user.locator("#departAddressDetail").fill("1층 안내데스크");
+        await expect(user.locator("#departAddress")).toHaveValue(
+            "서울특별시 종로구 세종대로 175",
+        );
         await user.locator("#hospitalName").fill(hospital);
         await user
-            .locator("#hospitalAddress")
-            .fill("서울특별시 서대문구 연세로 50");
+            .getByRole("button", { name: "주소 검색", exact: true })
+            .last()
+            .click();
+        await user
+            .getByPlaceholder("도로명, 건물명, 지번 (예: 올림픽로43길 88)")
+            .fill("연세로 50");
+        await user.getByRole("button", { name: "검색", exact: true }).click();
+        await user
+            .getByRole("button", { name: /서울특별시 서대문구 연세로 50/ })
+            .click();
         await user.locator("#transportTo").selectOption({ label: "택시" });
         await user.locator("#transportHome").selectOption({ label: "택시" });
         await user

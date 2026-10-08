@@ -2,11 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import {
-    getPartnerEmailChangeErrorMessage,
-    isValidPartnerIntro,
-    PARTNER_INTRO_MAX_LENGTH_MESSAGE,
-} from "@/lib/partner-profile";
+import { getPartnerEmailChangeErrorMessage } from "@/lib/partner-profile";
 import { isValidEmail, normalizeEmail, VERIFIED_VALID_MS } from "@/lib/otp";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
@@ -26,36 +22,6 @@ async function getCurrentPartnerId(): Promise<string | null> {
         .eq("profile_id", user.id)
         .maybeSingle();
     return account?.profile_id ?? null;
-}
-
-/** 파트너 자기소개 저장. 화면 제한과 별개로 서버에서도 300자를 검증한다. */
-export async function updatePartnerBasicInfo(
-    intro: string,
-): Promise<BasicInfoResult> {
-    if (typeof intro !== "string" || !isValidPartnerIntro(intro)) {
-        return { ok: false, message: PARTNER_INTRO_MAX_LENGTH_MESSAGE };
-    }
-
-    const partnerId = await getCurrentPartnerId();
-    if (!partnerId) return { ok: false, message: "로그인이 필요합니다." };
-
-    const supabase = await createClient();
-    const { data, error } = await supabase
-        .from("partner_accounts")
-        .update({ intro })
-        .eq("profile_id", partnerId)
-        .select("profile_id")
-        .maybeSingle();
-
-    if (error || !data) {
-        return {
-            ok: false,
-            message: "저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-        };
-    }
-
-    revalidatePath("/partner/profile");
-    return { ok: true };
 }
 
 /**

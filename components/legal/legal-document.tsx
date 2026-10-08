@@ -119,7 +119,7 @@ export function LegalDocumentView({ doc }: { doc: LegalDocument }) {
               올리지 않고 본문만 고치는 경우가 있어, 시행일만 보면 최신본인지
               알 수 없다 (#105).
             */}
-            <p className="text-muted-foreground mt-3 text-sm">
+            <p className="text-description-foreground mt-3 text-sm leading-relaxed">
                 시행일 {doc.effectiveDate}
                 {doc.revisedDate !== doc.effectiveDate && (
                     <span> · 최종 개정일 {doc.revisedDate}</span>
@@ -133,7 +133,7 @@ export function LegalDocumentView({ doc }: { doc: LegalDocument }) {
                         {/* 접힘/펼침 표시. 기본 삼각형은 list-none 과 webkit 마커로 숨겼다. */}
                         <span
                             aria-hidden
-                            className="text-muted-foreground text-xs transition-transform group-open:rotate-180"
+                            className="text-muted-foreground text-sm transition-transform group-open:rotate-180"
                         >
                             ▼
                         </span>

@@ -5,8 +5,6 @@ import { getMyPartnerActivity } from "../../_lib/activity.server";
 import { getMyIdentityCheck } from "../../_lib/identity.server";
 import { PartnerProfileView } from "./profile-view";
 import { getPartnerPublicProfile } from "../_actions/public-profile";
-import { PublicProfileEditor } from "../../_components/public-profile-editor";
-import { EvidenceRegister } from "../../_components/evidence-register";
 import { createClient } from "@/utils/supabase/server";
 
 export default async function PartnerProfile() {
@@ -27,7 +25,7 @@ export default async function PartnerProfile() {
     const { data: evidenceEnabled } = await (
         await createClient()
     ).rpc("partner_evidence_enabled");
-    // 제목·기본 정보·활동 정보 → 경력·공개 동의 → 증빙 등록 순서 (#226)
+    // #278: 기본·활동 정보 → 증빙 등록 → 자격·경력 목록 → 통합 저장
     return (
         <>
             <PartnerProfileView
@@ -36,17 +34,9 @@ export default async function PartnerProfile() {
                 initialBasicInfo={initialBasicInfo}
                 activityLoad={activity}
                 identity={identity}
+                publicProfile={publicProfile}
+                evidenceEnabled={evidenceEnabled === true}
             />
-            <div className="mt-8">
-                <PublicProfileEditor
-                    initial={publicProfile}
-                    evidenceEnabled={evidenceEnabled === true}
-                />
-            </div>
-            {/* 카드끼리 붙어 보이지 않게 다른 섹션과 같은 간격을 둔다 */}
-            <div className="mt-8">
-                <EvidenceRegister enabled={evidenceEnabled === true} />
-            </div>
         </>
     );
 }

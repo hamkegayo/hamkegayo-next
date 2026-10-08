@@ -59,13 +59,15 @@ export default async function IdentityChecksPage() {
             <h1 className="mt-4 text-2xl font-bold">
                 파트너 생년월일 본인확인
             </h1>
-            <p className="text-description-foreground mt-2 text-sm break-keep">
+            <p className="text-description-foreground mt-2 text-sm leading-relaxed break-keep">
                 파트너가 제출한 생년월일을 같은 파트너의 면허·자격증 증빙과
                 대조해 주세요. 결정하면 생년월일은 즉시 파기되고 결과만
                 남습니다. 30일 안에 처리하지 않으면 자동 파기됩니다.
             </p>
             {rows.length === 0 && (
-                <p className="mt-6">확인 대기 중인 파트너가 없습니다.</p>
+                <p className="mt-6 leading-relaxed">
+                    확인 대기 중인 파트너가 없습니다.
+                </p>
             )}
             <ul className="mt-6 space-y-4">
                 {rows.map((row) => {
@@ -81,7 +83,7 @@ export default async function IdentityChecksPage() {
                                 {names.get(row.partner_id) ?? "파트너"} ·
                                 생년월일 {row.birth_date}
                             </h2>
-                            <p className="text-muted-foreground mt-1 text-sm">
+                            <p className="text-description-foreground mt-1 text-sm leading-relaxed">
                                 제출 {kstDateTime(row.submitted_at)} · 자동 파기{" "}
                                 {kstDateTime(row.purge_after)}
                             </p>
@@ -89,7 +91,7 @@ export default async function IdentityChecksPage() {
                                 대조할 자격 증빙
                             </h3>
                             {partnerQuals.length === 0 ? (
-                                <p className="text-muted-foreground text-sm">
+                                <p className="text-description-foreground text-sm leading-relaxed">
                                     등록된 자격 증빙이 없습니다. 반려 사유에
                                     증빙 등록을 안내해 주세요.
                                 </p>

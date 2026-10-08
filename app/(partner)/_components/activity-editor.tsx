@@ -15,16 +15,12 @@ import {
     applyPickedRegions,
     regionDisplayLabel,
     toMinutes,
-    validateActivity,
     type ActivityDay,
     type ActivityRegion,
     type PartnerActivity,
 } from "@/lib/partner-activity";
 import type { TransportCode } from "@/lib/handover";
-import {
-    savePartnerActivity,
-    searchPreferredHospitals,
-} from "../partner/_actions/activity";
+import { searchPreferredHospitals } from "../partner/_actions/activity";
 import type { HospitalResult } from "@/lib/hospital-search.server";
 import { RegionPickerModal } from "./region-picker-modal";
 
@@ -65,31 +61,24 @@ function toggleIn<T>(list: T[], value: T): T[] {
         : [...list, value];
 }
 
-function sameActivity(a: PartnerActivity, b: PartnerActivity): boolean {
-    return JSON.stringify(a) === JSON.stringify(b);
-}
-
-/** 파트너 활동 정보 편집 (#226). 저장 버튼은 이 섹션만 저장한다. */
+/** 파트너 활동 정보 편집. 페이지 하단에서 자기소개와 함께 저장한다 (#278). */
 export function ActivityEditor({
     value,
-    saved,
     regionInfo,
     regionsUnavailable,
     onRegionInfo,
     onChange,
-    onSaved,
+    disabled = false,
 }: {
     value: PartnerActivity;
-    saved: PartnerActivity;
     /** 지금까지 본 지역 코드 → 지역 정보. 칩 이름 표시용이라 지우지 않고 쌓는다. */
     regionInfo: Record<string, ActivityRegion>;
     /** 저장된 지역 중 이름을 불러오지 못한 것이 있음 — 지역 변경을 막아 기존 코드를 지키지 않게 */
     regionsUnavailable: boolean;
     onRegionInfo: (regions: ActivityRegion[]) => void;
     onChange: (next: PartnerActivity) => void;
-    onSaved: (next: PartnerActivity) => void;
+    disabled?: boolean;
 }) {
-    const [pending, startTransition] = useTransition();
     const [hospital, setHospital] = useState("");
     /** 선호 병원 검색 결과. null 은 아직 검색 안 함 */
     const [hospitalResults, setHospitalResults] = useState<
@@ -105,7 +94,6 @@ export function ActivityEditor({
     /** 이름을 모르는 저장 코드. 화면에 못 보여도 지우지 않는다 (#231 리뷰) */
     const unknownRegionCodes = value.regions.filter((c) => !regionInfo[c]);
 
-    const dirty = !sameActivity(value, saved);
     const set = (patch: Partial<PartnerActivity>) =>
         onChange({ ...value, ...patch });
 
@@ -168,25 +156,8 @@ export function ActivityEditor({
         setHospitalMessage("");
     };
 
-    const save = () => {
-        const message = validateActivity(value);
-        if (message) {
-            toast.error(message);
-            return;
-        }
-        startTransition(async () => {
-            const result = await savePartnerActivity(value);
-            if (!result.ok) {
-                toast.error(result.message);
-                return;
-            }
-            onSaved(value);
-            toast.success("활동 정보를 저장했습니다.");
-        });
-    };
-
     return (
-        <div className="mt-8">
+        <fieldset disabled={disabled} className="mt-8 min-w-0">
             <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
                     <h2 className="text-foreground text-xl font-extrabold">
@@ -196,24 +167,6 @@ export function ActivityEditor({
                         조건에 맞는 동행 요청을 먼저 보여 드리는 데 씁니다. 비워
                         두면 모든 요청을 지금처럼 봅니다.
                     </p>
-                </div>
-                <div className="flex gap-2">
-                    <button
-                        type="button"
-                        onClick={() => onChange(saved)}
-                        disabled={pending || !dirty}
-                        className="border-border bg-background text-foreground hover:bg-muted rounded-lg border px-4 py-2 text-sm font-bold transition-colors disabled:opacity-50"
-                    >
-                        되돌리기
-                    </button>
-                    <button
-                        type="button"
-                        onClick={save}
-                        disabled={pending || !dirty}
-                        className="bg-brand text-brand-foreground hover:bg-brand/90 rounded-lg px-5 py-2 text-sm font-bold transition-colors disabled:opacity-50"
-                    >
-                        {pending ? "저장 중…" : "활동 정보 저장"}
-                    </button>
                 </div>
             </div>
 
@@ -554,6 +507,6 @@ export function ActivityEditor({
                     )}
                 </Panel>
             </div>
-        </div>
+        </fieldset>
     );
 }

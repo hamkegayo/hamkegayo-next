@@ -97,15 +97,15 @@ export function AddressSearchModal({
                     검색
                 </button>
             </div>
-            <p className="text-muted-foreground px-5 pt-2 text-xs break-keep">
+            <p className="text-muted-foreground px-5 pt-2 text-sm leading-relaxed break-keep">
                 건물명(예: 서울아산병원)이나 &ldquo;원주시 단계동&rdquo;처럼
                 검색할 수도 있습니다.
             </p>
             {/* #232 리뷰 — 검색어 외부 전송 안내(사용자 결정: 화면 안내만, 2026-10-06) */}
-            <p className="text-muted-foreground px-5 pt-1 text-xs break-keep">
+            <p className="text-muted-foreground px-5 pt-1 text-sm leading-relaxed break-keep">
                 검색어는 주소 확인을 위해 행정안전부 도로명주소 서비스로
                 전송되며, 함께가요는 검색어를 저장하지 않습니다. 동·호수는 검색
-                후 주소 칸에 이어서 적어 주세요.
+                후 상세주소 칸에 적어 주세요.
             </p>
 
             <div className="mx-5 mt-3 mb-5 min-h-32 flex-1 overflow-y-auto">
@@ -141,7 +141,7 @@ export function AddressSearchModal({
                                                 {r.buildingName}
                                             </span>
                                         )}
-                                        <span className="text-muted-foreground block text-xs break-keep">
+                                        <span className="text-muted-foreground block text-sm leading-relaxed break-keep">
                                             지번 {r.jibunAddr}
                                         </span>
                                     </span>
