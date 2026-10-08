@@ -554,16 +554,40 @@ export function PartnerProfileView({
                                             <Icon className="size-5" />
                                         </span>
                                         <div className="min-w-0 flex-1">
-                                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                                <p className="text-foreground text-base leading-snug font-bold break-keep">
-                                                    {q.title}
-                                                </p>
+                                            {/* 상태와 관리 동작을 제목 줄에 함께 둔다. 아래에 따로 두면 버튼만 떨어져 보인다. */}
+                                            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                                                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                                    <p className="text-foreground text-base leading-snug font-bold break-keep">
+                                                        {q.title}
+                                                    </p>
+                                                    {q.pending ? (
+                                                        <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-sm font-bold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+                                                            인증 대기
+                                                        </span>
+                                                    ) : (
+                                                        <VerifiedBadge />
+                                                    )}
+                                                </div>
                                                 {q.pending ? (
-                                                    <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-sm font-bold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
-                                                        인증 대기
-                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        aria-label={`${q.title} 등록 취소·증빙 삭제`}
+                                                        disabled={qualPending}
+                                                        onClick={() =>
+                                                            setWithdrawTarget(q)
+                                                        }
+                                                        className="border-destructive/40 bg-background text-destructive hover:bg-destructive/5 inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                                                    >
+                                                        <X className="size-4" />
+                                                        등록 취소·증빙 삭제
+                                                    </button>
                                                 ) : (
-                                                    <VerifiedBadge />
+                                                    <Link
+                                                        href="/partner-evidence-notice"
+                                                        className="border-border bg-background text-foreground hover:bg-muted inline-flex shrink-0 items-center rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors"
+                                                    >
+                                                        수정·삭제 절차
+                                                    </Link>
                                                 )}
                                             </div>
                                             {q.regNo === undefined ? (
@@ -604,29 +628,6 @@ export function PartnerProfileView({
                                             id={q.id}
                                             kind="QUALIFICATION"
                                         />
-                                        <div className="mt-3 flex flex-wrap justify-end gap-2">
-                                            {q.pending ? (
-                                                <button
-                                                    type="button"
-                                                    aria-label={`${q.title} 등록 취소·증빙 삭제`}
-                                                    disabled={qualPending}
-                                                    onClick={() =>
-                                                        setWithdrawTarget(q)
-                                                    }
-                                                    className="border-destructive/40 bg-background text-destructive hover:bg-destructive/5 inline-flex cursor-pointer items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                                                >
-                                                    <X className="size-4" />
-                                                    등록 취소·증빙 삭제
-                                                </button>
-                                            ) : (
-                                                <Link
-                                                    href="/partner-evidence-notice"
-                                                    className="border-border bg-background text-foreground hover:bg-muted inline-flex items-center rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors"
-                                                >
-                                                    수정·삭제 절차
-                                                </Link>
-                                            )}
-                                        </div>
                                     </div>
                                 </li>
                             );
