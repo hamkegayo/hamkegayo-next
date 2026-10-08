@@ -3,7 +3,8 @@ import { Ticket } from "lucide-react";
 
 import { AutoRefresh } from "@/components/auto-refresh";
 import { createClient } from "@/utils/supabase/server";
-import { ensureOpeningEventEmail } from "@/lib/opening-event-email.server";
+import { openingEventEmailStatus } from "@/lib/opening-event-email.server";
+import { OpeningEventRegister } from "@/components/opening-event-register";
 import { OPENING_EVENT_TERMS } from "@/lib/opening-event";
 import {
     OPENING_COUPON_MESSAGES,
@@ -13,8 +14,10 @@ import { getSessionProfile } from "../_lib/profile";
 
 export default async function CouponWalletPage() {
     const { user } = await getSessionProfile();
-    // 인증 이메일 HMAC가 없거나 바뀐 경우에만 등록한다. 조회로 정원을 확보하지 않는다.
-    const registered = await ensureOpeningEventEmail(user);
+    // 렌더링(프리페치 포함)은 읽기만 한다. 미등록이면 화면에서 POST로 등록한 뒤 다시 그린다 (#283 리뷰).
+    // 조회로 정원을 확보하지 않는다.
+    const emailStatus = await openingEventEmailStatus(user);
+    const registered = emailStatus === "registered";
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("opening_event_coupon");
     const rawCoupon = data as OpeningCoupon | null;
@@ -27,8 +30,13 @@ export default async function CouponWalletPage() {
     return (
         <div>
             {coupon?.state === "HELD" && <AutoRefresh />}
+            {emailStatus === "missing" && <OpeningEventRegister />}
             <h1 className="text-foreground text-2xl font-extrabold">쿠폰함</h1>
-            {error || !coupon ? (
+            {emailStatus === "missing" && !error ? (
+                <p role="status" className="text-muted-foreground mt-6">
+                    쿠폰을 확인하고 있습니다.
+                </p>
+            ) : error || !coupon ? (
                 <p role="alert" className="mt-6 text-sm">
                     쿠폰을 불러오지 못했습니다. 잠시 후 다시 확인해 주세요.
                 </p>

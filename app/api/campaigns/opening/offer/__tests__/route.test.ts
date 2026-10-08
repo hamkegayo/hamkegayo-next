@@ -11,7 +11,7 @@ vi.mock("@/utils/supabase/server", () => ({
     }),
 }));
 vi.mock("@/lib/opening-event-email.server", () => ({
-    ensureOpeningEventEmail: mock.register,
+    openingEventEmailStatus: mock.register,
 }));
 import { GET } from "../route";
 
@@ -21,8 +21,8 @@ const request = {
         "http://localhost/api/campaigns/opening/offer?rid=00000000-0000-4000-8000-000000000001",
     ),
 } as NextRequest;
-it("registration failure overrides an existing available identity", async () => {
-    mock.register.mockResolvedValue(false);
+it("unregistered email overrides an existing available identity", async () => {
+    mock.register.mockResolvedValue("missing");
     mock.rpc.mockResolvedValue({
         data: { eligible: true, state: "AVAILABLE", discount: 25000 },
         error: null,
@@ -32,8 +32,8 @@ it("registration failure overrides an existing available identity", async () => 
         state: "PAUSED",
     });
 });
-it("registration failure preserves closed campaign status", async () => {
-    mock.register.mockResolvedValue(false);
+it("unavailable email preserves closed campaign status", async () => {
+    mock.register.mockResolvedValue("unavailable");
     mock.rpc.mockResolvedValue({
         data: { eligible: false, state: "CLOSED", discount: 25000 },
         error: null,
@@ -43,8 +43,8 @@ it("registration failure preserves closed campaign status", async () => {
         state: "CLOSED",
     });
 });
-it("successful registration returns the trusted offer", async () => {
-    mock.register.mockResolvedValue(true);
+it("registered email returns the trusted offer", async () => {
+    mock.register.mockResolvedValue("registered");
     mock.rpc.mockResolvedValue({
         data: { eligible: true, state: "AVAILABLE", discount: 25000 },
         error: null,

@@ -11,7 +11,10 @@ vi.mock("@/utils/supabase/admin", () => ({
         rpc: mock.rpc,
     }),
 }));
-import { ensureOpeningEventEmail } from "../opening-event-email.server";
+import {
+    ensureOpeningEventEmail,
+    openingEventEmailStatus,
+} from "../opening-event-email.server";
 
 const key = "local-test-hmac-key-32-characters-only";
 const user = {
@@ -50,4 +53,11 @@ it("missing key and failed registration are not eligible", async () => {
     mock.read.mockResolvedValue({ data: null, error: null });
     mock.rpc.mockResolvedValue({ error: { message: "unavailable" } });
     expect(await ensureOpeningEventEmail(user)).toBe(false);
+});
+it("status check never writes the identity", async () => {
+    mock.read.mockResolvedValue({ data: null, error: null });
+    expect(await openingEventEmailStatus(user)).toBe("missing");
+    vi.stubEnv("OPENING_EVENT_EMAIL_HMAC_KEY", "");
+    expect(await openingEventEmailStatus(user)).toBe("unavailable");
+    expect(mock.rpc).not.toHaveBeenCalled();
 });
