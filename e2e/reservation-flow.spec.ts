@@ -143,9 +143,9 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
         await user.getByRole("checkbox", { name: /쿠폰.*25,000원/ }).check();
         await user.getByRole("button", { name: "15,000원 결제하기" }).click();
         await expect(
-            user.getByText("현재 쿠폰 사용이 일시 중지되었습니다.", {
-                exact: true,
-            }),
+            user
+                .getByRole("status")
+                .filter({ hasText: "현재 쿠폰 사용이 일시 중지되었습니다." }),
         ).toBeVisible();
         await expect(
             user.getByRole("checkbox", { name: /쿠폰.*25,000원/ }),
