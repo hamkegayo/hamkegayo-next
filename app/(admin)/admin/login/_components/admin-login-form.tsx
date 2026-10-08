@@ -73,17 +73,29 @@ export function AdminLoginForm() {
         }
         setBusy(true);
         try {
+            // 리다이렉트·HTML 오류 응답도 실패로 안내한다. 알림 없이 멈추지 않게 한다 (#287).
             const response = await fetch("/api/admin/accounts/activate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ password: newPassword }),
-            });
-            const result = (await response.json()) as { message?: string };
-            if (!response.ok) {
-                toast.error(result.message ?? "비밀번호 변경에 실패했습니다.");
+                redirect: "manual",
+            }).catch(() => null);
+            const result = response?.headers
+                .get("content-type")
+                ?.includes("application/json")
+                ? ((await response.json().catch(() => ({}))) as {
+                      message?: string;
+                  })
+                : {};
+            if (!response?.ok) {
+                toast.error(
+                    result.message ??
+                        "비밀번호 변경에 실패했습니다. 새로고침 후 다시 시도해 주세요.",
+                );
                 return;
             }
-            await cancelAdminLogin();
+            // 변경은 끝났다. 세션 정리가 실패해도 다시 로그인하도록 안내한다.
+            await cancelAdminLogin().catch(() => undefined);
             setStep({ name: "credentials" });
             setPassword("");
             setNewPassword("");
