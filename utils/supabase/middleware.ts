@@ -8,6 +8,32 @@ const PARTNER_PREFIXES = ["/partner"];
 const ADMIN_PREFIXES = ["/admin"];
 // 관리자 로그인 — /admin 밑이지만 비로그인 상태로 들어와야 한다
 const ADMIN_LOGIN = "/admin/login";
+// 2단계 인증(aal2) 전에도 열어야 하는 관리자 경로.
+// 초기 비밀번호 변경은 인증기 등록보다 먼저라 세션이 aal1 이다 (#287).
+// activate 는 스스로 관리자·활성·must_change_password·요청 출처를 검사한다.
+const ADMIN_PRE_MFA_PATHS = [ADMIN_LOGIN, "/api/admin/accounts/activate"];
+// 관리자 계정이 머무를 수 있는 영역. 관리자 화면이 호출하는 /api/admin 도 포함한다 (#287).
+// 각 API 는 자체적으로 관리자 권한(aal2 포함)을 다시 검사한다.
+const ADMIN_AREA = ["/admin", "/api/admin"];
+
+/**
+ * 관리자 세션의 이동 대상. 그대로 두면 null.
+ * 미들웨어 밖에서 테스트할 수 있게 순수 함수로 둔다.
+ */
+export function adminRedirect(
+    pathname: string,
+    verified: boolean,
+): { to: string; search?: string } | null {
+    const preMfa = ADMIN_PRE_MFA_PATHS.includes(pathname);
+    // 2단계 인증을 마치기 전에는 관리자 화면 어디에도 들어갈 수 없다.
+    // DB 도 is_admin() 에서 aal2 를 요구하므로 여기를 지나도 데이터는 안 보인다.
+    if (!verified && !preMfa) return { to: ADMIN_LOGIN };
+    if (verified && pathname === ADMIN_LOGIN) return { to: "/admin" };
+    // 관리자는 관리자 영역 밖 접근 차단 (관리자 계정으로 예약이 생기지 않도록)
+    if (!preMfa && !matches(pathname, ADMIN_AREA))
+        return { to: "/admin", search: "?blocked=user" };
+    return null;
+}
 // 로그인이 필요한(비로그인 접근 불가) 라우트 — 역할 무관
 const LOGIN_REQUIRED = [
     "/mypage",
@@ -105,19 +131,13 @@ export async function updateSession(request: NextRequest) {
         }
 
         if (role === "ADMIN") {
-            // 2단계 인증을 마치기 전에는 관리자 화면 어디에도 들어갈 수 없다.
-            // DB 도 is_admin() 에서 aal2 를 요구하므로 여기를 지나도 데이터는 안 보인다.
             const { data: aal } =
                 await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-            const verified = aal?.currentLevel === "aal2";
-
-            if (!verified && !isAdminLogin) return redirect(ADMIN_LOGIN);
-            if (verified && isAdminLogin) return redirect(ADMIN_HOME);
-
-            // 관리자는 관리자 영역 밖 접근 차단 (관리자 계정으로 예약이 생기지 않도록)
-            if (!matches(pathname, ADMIN_PREFIXES)) {
-                return redirect(ADMIN_HOME, "?blocked=user");
-            }
+            const target = adminRedirect(
+                pathname,
+                aal?.currentLevel === "aal2",
+            );
+            if (target) return redirect(target.to, target.search);
         } else if (role === "PARTNER") {
             // 파트너는 파트너 영역(/partner) 밖 = 사용자 영역 전체 접근 차단
             if (!matches(pathname, PARTNER_PREFIXES)) {
