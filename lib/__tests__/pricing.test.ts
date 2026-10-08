@@ -8,6 +8,7 @@ import {
     parseDurationMinutes,
     surchargeRateOf,
     SURCHARGE_RATE,
+    withSurcharge,
 } from "@/lib/pricing";
 
 // 기존 경계값 회귀는 scripts/test-pricing.mjs(npm run test:pricing)에 있다.
@@ -100,5 +101,23 @@ describe("최종 이용요금 (약관 제11조)", () => {
         expect(c.minimumApplied).toBe(true);
         expect(c.billedMinutes).toBe(60);
         expect(c.total).toBe(20_000);
+    });
+});
+
+// 쿠폰 확보 DB 검증식(마이그레이션 106)과 같은 값이어야 한다 (#283 리뷰).
+describe("할증 반올림 — DB numeric round 와 일치", () => {
+    it.each([
+        // [요금제, 분, 저장 할증률, 선결제액]
+        ["basic", 121, 0.1, 44366],
+        ["basic", 125, 0.1, 45834],
+        ["plus", 121, 0.1, 55459],
+        ["plus", 137, 0.1, 62791],
+        ["basic", 121, 0.3, 52433],
+    ] as const)("%s %i분 할증 %f → %i원", (plan, minutes, rate, amount) => {
+        expect(calcPrepayment(plan, minutes, true, rate).amount).toBe(amount);
+    });
+    it("부동소수 .5 경계도 올림한다", () => {
+        expect(withSurcharge(6250, 0.15)).toBe(7188);
+        expect(withSurcharge(40000, 0)).toBe(40000);
     });
 });

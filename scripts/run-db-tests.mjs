@@ -64,6 +64,7 @@ export const SUITES = [
         "오픈 이벤트 정원·결제·권한 경계 (#159)",
         [
             sql("test-opening-event.sql"),
+            sql("test-opening-coupon-rounding.sql"),
             nodeEnv("test-opening-event-concurrency.mjs"),
             node("test-opening-event-email.mjs"),
         ],
