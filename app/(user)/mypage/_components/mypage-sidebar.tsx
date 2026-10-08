@@ -9,6 +9,7 @@ import {
     CircleDollarSign,
     HelpCircle,
     LogOut,
+    Ticket,
     UserRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -22,6 +23,7 @@ const ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
     { href: "/mypage/notifications", label: "알림", icon: Bell },
     { href: "/mypage/profile", label: "회원 정보", icon: UserRound },
     { href: "/mypage/points", label: "내 포인트", icon: CircleDollarSign },
+    { href: "/mypage/coupons", label: "쿠폰함", icon: Ticket },
     { href: "/mypage/support", label: "고객센터", icon: HelpCircle },
 ];
 

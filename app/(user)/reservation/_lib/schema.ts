@@ -16,6 +16,7 @@ import { parseDurationMinutes } from "@/lib/pricing";
 import { isPastSlot, MIN_LEAD_MINUTES, reservationStartAt } from "./options";
 
 const required = "필수 입력 항목입니다.";
+const ADDRESS_TOO_LONG = "주소는 300자 이내로 입력해 주세요.";
 
 /** STEP1 · 이용자 / 진료 정보 */
 export const step1Schema = z.object({
@@ -35,7 +36,8 @@ export const step1Schema = z.object({
     relation: z.string().min(1, "관계를 선택해 주세요."),
     treatment: z.string().min(1, required),
     purpose: z.string().min(1, required),
-    // 거동·인지 상태는 매칭 전 파트너에게 제공되는 민감정보다 (처리방침 제5조 ④).
+    // 거동·인지 상태의 매칭 전 제공에는 별도 동의가 필요하다 (처리방침 제5조 ② [단계 1]·④⑥).
+    // 이 필수 입력 검증은 제3자 제공 동의 수집·접근 게이트를 구현하지 않는다.
     // 파트너가 수행 가능 여부를 판단하는 근거라 필수로 받는다.
     mobilityStatus: z.string().min(1, "거동 상태를 선택해 주세요."),
     cognitiveStatus: z.string().min(1, "인지 상태를 선택해 주세요."),
@@ -72,11 +74,12 @@ export const step2Schema = z.object({
             `서비스 제공시간 ${SERVICE_HOURS} 내에서 30분 단위로 선택해 주세요.`,
         ),
     duration: z.string().min(1, "시간을 선택해 주세요."),
-    departAddress: z.string().min(1, required),
+    // 기본 주소 + 상세주소(입력란 200자). 직접 호출로 길이 제한을 넘지 못하게 서버에서도 막는다.
+    departAddress: z.string().min(1, required).max(300, ADDRESS_TOO_LONG),
     // 병원명은 매칭 전 파트너에게 제공되는 단계 1 항목이다 (처리방침 제5조 ②).
     // 주소는 확정 후에만 제공되므로 이름을 따로 받는다.
     hospitalName: z.string().min(1, required),
-    hospitalAddress: z.string().min(1, required),
+    hospitalAddress: z.string().min(1, required).max(300, ADDRESS_TOO_LONG),
     // 주소 검색으로 고른 경우의 법정동코드 (#226). 직접 입력이면 빈 값이다.
     departRegionCode: z
         .string()

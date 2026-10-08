@@ -153,7 +153,7 @@ export function StepUserInfo() {
             />
 
             <Section>
-                <p className="text-description-foreground text-center text-sm">
+                <p className="text-description-foreground text-center text-sm leading-relaxed">
                     * 환자 정보는 마이페이지에서 관리할 수 있습니다.
                 </p>
                 <div className="mt-1 text-center">
@@ -224,7 +224,7 @@ export function StepUserInfo() {
                                 <FieldError>
                                     {errors.userBirth?.message}
                                 </FieldError>
-                                <p className="text-description-foreground mt-1.5 text-xs leading-relaxed">
+                                <p className="text-description-foreground mt-1.5 text-sm leading-relaxed">
                                     서비스 이용일 기준 만 19세 이상만 이용할 수
                                     있습니다.
                                 </p>
@@ -386,7 +386,7 @@ export function StepUserInfo() {
                                     {errors.notifyTarget?.message}
                                 </FieldError>
                                 {/* 자동 발송이 아니다 — 앱 알림은 예약자 계정으로만 간다 (#254) */}
-                                <p className="text-description-foreground mt-1.5 text-xs leading-relaxed">
+                                <p className="text-description-foreground mt-1.5 text-sm leading-relaxed">
                                     파트너가 현장에서 이 분께 직접 연락드려요.
                                     앱 알림은 지금 예약을 진행하는 분의 앱으로
                                     가요.
@@ -478,7 +478,8 @@ export function StepUserInfo() {
 
                         {/*
                          * 거동·인지 상태는 파트너가 수락 여부를 판단하는 근거라
-                         * 매칭 전에 제공된다 (개인정보처리방침 제5조 ④).
+                         * 매칭 전 제공에는 별도 동의가 필요하다 (처리방침 제5조 ② [단계 1]·④⑥).
+                         * 현재 입력 UI는 그 동의 수집을 구현하지 않는다. 보호자 전달 동의와도 다르다.
                          * 아래 '주의해야 할 점' 은 예약 확정 후에만 전달된다.
                          */}
                         <div className="mt-5 grid gap-5 md:grid-cols-2">
@@ -550,7 +551,7 @@ export function StepUserInfo() {
                             </h3>
                             <div className="mt-3 grid gap-5 md:grid-cols-2">
                                 <div>
-                                    <p className="text-foreground text-sm font-semibold">
+                                    <p className="text-foreground text-sm leading-relaxed font-semibold">
                                         서류 촬영 요청{" "}
                                         <span className="text-muted-foreground font-normal">
                                             (보호자에게 전달)
@@ -592,7 +593,7 @@ export function StepUserInfo() {
                                     />
                                 </div>
                             </div>
-                            <p className="text-description-foreground mt-3 text-xs">
+                            <p className="text-description-foreground mt-3 text-sm leading-relaxed">
                                 ※ 진단서, 검사결과지 등 민감정보가 포함된 서류는
                                 기본 제공되지 않으며, 요청 시에만 제공됩니다.
                             </p>

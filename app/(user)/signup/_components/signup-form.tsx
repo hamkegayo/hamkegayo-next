@@ -194,7 +194,7 @@ export function SignupForm({ next = "/" }: { next?: string }) {
                 <h1 className="text-foreground text-3xl font-extrabold">
                     {title}
                 </h1>
-                <p className="text-description-foreground mt-3">
+                <p className="text-description-foreground mt-3 leading-relaxed">
                     {description}
                 </p>
             </div>
@@ -220,7 +220,7 @@ export function SignupForm({ next = "/" }: { next?: string }) {
                             })}
                         />
                         {errors.loginId && (
-                            <p className="text-destructive text-sm">
+                            <p className="text-destructive text-sm leading-relaxed">
                                 {errors.loginId.message}
                             </p>
                         )}
@@ -267,7 +267,7 @@ export function SignupForm({ next = "/" }: { next?: string }) {
                         })}
                     />
                     {errors.phone && (
-                        <p className="text-destructive text-sm">
+                        <p className="text-destructive text-sm leading-relaxed">
                             {errors.phone.message}
                         </p>
                     )}
@@ -305,7 +305,7 @@ export function SignupForm({ next = "/" }: { next?: string }) {
                         </button>
                     </div>
                     {errors.password && (
-                        <p className="text-destructive text-sm">
+                        <p className="text-destructive text-sm leading-relaxed">
                             {errors.password.message}
                         </p>
                     )}
@@ -344,7 +344,7 @@ export function SignupForm({ next = "/" }: { next?: string }) {
                         </button>
                     </div>
                     {errors.passwordConfirm && (
-                        <p className="text-destructive text-sm">
+                        <p className="text-destructive text-sm leading-relaxed">
                             {errors.passwordConfirm.message}
                         </p>
                     )}
@@ -363,7 +363,7 @@ export function SignupForm({ next = "/" }: { next?: string }) {
                         })}
                     />
                     {errors.name && (
-                        <p className="text-destructive text-sm">
+                        <p className="text-destructive text-sm leading-relaxed">
                             {errors.name.message}
                         </p>
                     )}
@@ -393,14 +393,14 @@ export function SignupForm({ next = "/" }: { next?: string }) {
                                 href={item.href}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2"
+                                className="text-muted-foreground hover:text-foreground text-sm underline underline-offset-2"
                             >
                                 [보기]
                             </Link>
                         </div>
                     ))}
                     {agreementsError && (
-                        <p className="text-destructive text-sm">
+                        <p className="text-destructive text-sm leading-relaxed">
                             {agreementsError}
                         </p>
                     )}
@@ -420,7 +420,7 @@ export function SignupForm({ next = "/" }: { next?: string }) {
                 </button>
 
                 {/* 로그인 링크 */}
-                <p className="text-foreground text-center text-sm">
+                <p className="text-foreground text-center text-sm leading-relaxed">
                     이미 회원이신가요?{" "}
                     <Link
                         href={loginHref}

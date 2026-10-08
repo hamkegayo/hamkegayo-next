@@ -57,6 +57,10 @@ export function verifiedRegionCode(input: {
 }): string | null {
     const { address, base, code, token } = input;
     if (!base || !code || !token || !/^\d{10}$/.test(code)) return null;
-    if (!address.trim().startsWith(base.trim())) return null;
+    if (
+        address.trim() !== base.trim() &&
+        !address.trim().startsWith(base.trim() + " ")
+    )
+        return null;
     return verifyAddressRegion(base.trim(), code, token) ? code : null;
 }

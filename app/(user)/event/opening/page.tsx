@@ -5,7 +5,7 @@ export default function OpeningEventNoticePage() {
     return (
         <main className="mx-auto max-w-3xl space-y-6 px-6 py-12">
             <h1 className="text-2xl font-bold">
-                첫 1시간 이용 무료 이벤트 안내
+                25,000원 오픈 이벤트 쿠폰 안내
             </h1>
             <p>
                 실제 결제와 예약 확정 순으로 선착순 20명에게 적용합니다. 정원

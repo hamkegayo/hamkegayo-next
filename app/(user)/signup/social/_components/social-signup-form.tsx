@@ -87,7 +87,7 @@ export function SocialSignupForm({
                 <h1 className="text-foreground text-3xl font-extrabold">
                     가입 정보 확인
                 </h1>
-                <p className="text-description-foreground mt-3">
+                <p className="text-description-foreground mt-3 leading-relaxed">
                     서비스 이용에 필요한 정보와 동의를 완료해 주세요.
                 </p>
             </div>
@@ -100,7 +100,7 @@ export function SocialSignupForm({
                 <div className="space-y-2">
                     <Label htmlFor="social-email">이메일</Label>
                     <Input id="social-email" value={email} disabled />
-                    <p className="text-muted-foreground text-sm">
+                    <p className="text-description-foreground text-sm leading-relaxed">
                         소셜 계정에서 확인된 이메일은 이 화면에서 변경할 수
                         없어요.
                     </p>
@@ -115,7 +115,7 @@ export function SocialSignupForm({
                         {...register("name")}
                     />
                     {errors.name && (
-                        <p className="text-destructive text-sm">
+                        <p className="text-destructive text-sm leading-relaxed">
                             {errors.name.message}
                         </p>
                     )}
@@ -138,7 +138,7 @@ export function SocialSignupForm({
                         })}
                     />
                     {errors.phone && (
-                        <p className="text-destructive text-sm">
+                        <p className="text-destructive text-sm leading-relaxed">
                             {errors.phone.message}
                         </p>
                     )}
@@ -167,14 +167,14 @@ export function SocialSignupForm({
                                 href={item.href}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2"
+                                className="text-muted-foreground hover:text-foreground text-sm underline underline-offset-2"
                             >
                                 [보기]
                             </Link>
                         </div>
                     ))}
                     {agreementsError && (
-                        <p className="text-destructive text-sm">
+                        <p className="text-destructive text-sm leading-relaxed">
                             {agreementsError}
                         </p>
                     )}

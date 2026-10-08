@@ -3,10 +3,27 @@
  *
  * 서버에서만 호출한다. 승인키(JUSO_CONFM_KEY)는 브라우저로 내보내지 않는다.
  * 응답의 admCd 는 법정동코드(10자리)로, partner_activity_regions 와 같은 체계다.
- * 키가 없으면 enabled=false 를 돌려주고, 화면은 기존 직접 입력으로 동작한다.
+ * 키가 없으면 enabled=false 를 돌려주고 화면에서 검색 불가를 안내한다.
  */
 
 const ENDPOINT = "https://business.juso.go.kr/addrlink/addrLinkApi.do";
+const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"]);
+/**
+ * 기본은 공식 API다. JUSO_API_BASE_URL 은 E2E 모의 서버용으로 Playwright 에서만 지정한다.
+ * 설정 실수로 승인키가 외부 주소로 나가지 않게 루프백 주소만 받는다.
+ */
+export function addressApiEndpoint(): string {
+    const base = process.env.JUSO_API_BASE_URL?.trim();
+    if (!base) return ENDPOINT;
+    try {
+        const url = new URL("/addrlink/addrLinkApi.do", base);
+        return url.protocol === "http:" && LOOPBACK.has(url.hostname)
+            ? url.toString()
+            : ENDPOINT;
+    } catch {
+        return ENDPOINT;
+    }
+}
 const TIMEOUT_MS = 5000;
 /** juso 는 페이지 크기 10, 최대 20페이지까지 본다. 그 뒤로는 "더 보기"를 내리지 않는다 (#232 리뷰). */
 export const ADDRESS_PAGE_SIZE = 10;
@@ -73,7 +90,7 @@ export async function searchRoadAddress(
             ok: false,
             reason: "disabled",
             message:
-                "주소 검색을 사용할 수 없습니다. 주소를 직접 입력해 주세요.",
+                "주소 검색을 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",
         };
     const keyword = sanitizeAddressKeyword(rawKeyword);
     if (keyword.replace(/\s/g, "").length < 2)
@@ -91,7 +108,7 @@ export async function searchRoadAddress(
         };
     const appliedPage = page;
 
-    const url = new URL(ENDPOINT);
+    const url = new URL(addressApiEndpoint());
     url.search = new URLSearchParams({
         confmKey: key,
         currentPage: String(appliedPage),
@@ -151,7 +168,7 @@ export async function searchRoadAddress(
             ok: false,
             reason: "error",
             message:
-                "주소 검색 서버에 연결하지 못했습니다. 잠시 후 다시 시도하거나 직접 입력해 주세요.",
+                "주소 검색 서버에 연결하지 못했습니다. 잠시 후 다시 시도하거나 고객센터로 문의해 주세요.",
         };
     }
 }

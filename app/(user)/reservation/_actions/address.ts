@@ -9,7 +9,7 @@ import {
 } from "@/lib/juso.server";
 import { signAddressRegion } from "@/lib/address-token.server";
 
-/** 주소 검색 버튼을 보일지. 키가 없는 환경에서는 직접 입력만 쓴다. */
+/** 주소 검색 버튼을 보일지. 키가 없는 환경에서는 검색을 사용할 수 없음을 안내한다. */
 export async function addressSearchEnabled(): Promise<boolean> {
     return isAddressSearchEnabled();
 }
@@ -52,7 +52,7 @@ export async function searchReservationAddress(
             ok: false,
             reason: "limited",
             message:
-                "주소 검색을 너무 자주 했습니다. 잠시 후 다시 시도하거나 직접 입력해 주세요.",
+                "주소 검색을 너무 자주 했습니다. 잠시 후 다시 시도해 주세요.",
         };
     const res = await searchRoadAddress(keyword, page);
     if (!res.ok) return res;

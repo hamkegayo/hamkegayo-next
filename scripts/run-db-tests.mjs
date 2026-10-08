@@ -94,6 +94,10 @@ export const SUITES = [
             sql("test-exception-resolution.sql"),
         ],
     ],
+    [
+        "파트너 프로필 통합 저장·증빙 등록 취소 (#278)",
+        [sql("test-partner-profile-ux.sql")],
+    ],
     ["관리자 권한·접근통제·접속기록 (#50)", [npm("test:admin")]],
     [
         "예약 파트너 상세 · 공개 동의 · 경력 심사 (#173)",
@@ -149,7 +153,7 @@ export const SUITES = [
     // 재설정은 계정을 빼앗겼을 때 되찾는 경로다. 핵심은 **기존 세션이 죽는가** 이고,
     // 그건 GoTrue 의 동작이라 우리 코드 변경 없이도 사라질 수 있다.
     ["비밀번호 재설정·세션 실효 (#127)", [npm("test:reset")]],
-    // 개정 고지는 약관 제4조 ③ · 처리방침 제16조 ② 가 요구하는 절차다.
+    // 개정 고지: 약관 제4조 ③ · 처리방침 게시본(2026-09-06) 제16조 ② / Notion 원문(2026-09-10) 제16조 ③.
     ["약관 재동의 안내·중복 방지 (#91)", [npm("test:reconsent")]],
     // ⚠️ test:nicepay · test:payapi 는 넣지 않는다. NICEPAY 샌드박스 실호출이라
     //    외부 장애가 CI 실패로 둔갑한다 (테스트 가이드 3. 외부 연동 — https://app.notion.com/p/3f1169f76f9f819ca52ef036622c3fc1).

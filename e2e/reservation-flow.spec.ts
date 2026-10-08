@@ -10,6 +10,7 @@ import {
 } from "./support/accounts";
 import { mockNicepaySdk } from "./support/nicepay-sdk";
 import { totp } from "./support/totp";
+import { localSupabaseAdmin } from "./support/local-supabase";
 
 /** KST 기준 n일 뒤 "YYYY-MM-DD" */
 function kstDatePlus(days: number) {
@@ -27,8 +28,41 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
     const hospital = `${E2E_HOSPITAL_PREFIX}${runId % 1_000_000}`;
 
     const userContext = await browser.newContext();
+    await userContext.addInitScript(() => {
+        // 30초 자동 팝업 갱신이 예약 흐름의 접근성 트리를 가리지 않도록 당일 닫기를 설정한다.
+        localStorage.setItem(
+            "hamkegayo-opening-event-dismissed",
+            new Intl.DateTimeFormat("sv-SE", {
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+            }).format(new Date()),
+        );
+    });
     const user = await userContext.newPage();
     await mockNicepaySdk(user, E2E_PAYMENT.secretKey);
+    // API 응답 실패 후 쿠폰 선택 해제·상태 재조회만 모의한다. 실제 PG 경로는 이후 그대로 실행한다.
+    let unavailableAttempt = false;
+    await user.route("**/api/campaigns/opening/offer?*", async (route) => {
+        await route.fulfill({
+            json: !unavailableAttempt
+                ? { eligible: true, state: "AVAILABLE", discount: 25000 }
+                : { eligible: false, state: "PAUSED", discount: 25000 },
+        });
+    });
+    await user.route("**/api/payments/prepare", async (route) => {
+        if (route.request().postDataJSON()?.useOpeningEvent) {
+            unavailableAttempt = true;
+            await route.fulfill({
+                status: 409,
+                json: {
+                    code: "CAMPAIGN_UNAVAILABLE",
+                    error: "쿠폰 사용이 일시 중지되었습니다.",
+                },
+            });
+        } else await route.continue();
+    });
 
     await test.step("이용자: 로그인 후 예약 신청", async () => {
         await loginAsUser(user);
@@ -57,13 +91,37 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
         await user.locator("#arriveTime").selectOption({ label: "10시 00분" });
         await user.locator("#reserveTime").selectOption({ label: "10시 30분" });
         await user.locator("#duration").selectOption({ label: "2시간" });
+        await expect(user.locator("#departAddress")).toHaveAttribute(
+            "readonly",
+            "",
+        );
         await user
-            .locator("#departAddress")
-            .fill("서울특별시 종로구 세종대로 175");
+            .getByRole("button", { name: "주소 검색", exact: true })
+            .first()
+            .click();
+        await user
+            .getByPlaceholder("도로명, 건물명, 지번 (예: 올림픽로43길 88)")
+            .fill("세종대로 175");
+        await user.getByRole("button", { name: "검색", exact: true }).click();
+        await user
+            .getByRole("button", { name: /서울특별시 종로구 세종대로 175/ })
+            .click();
+        await user.locator("#departAddressDetail").fill("1층 안내데스크");
+        await expect(user.locator("#departAddress")).toHaveValue(
+            "서울특별시 종로구 세종대로 175",
+        );
         await user.locator("#hospitalName").fill(hospital);
         await user
-            .locator("#hospitalAddress")
-            .fill("서울특별시 서대문구 연세로 50");
+            .getByRole("button", { name: "주소 검색", exact: true })
+            .last()
+            .click();
+        await user
+            .getByPlaceholder("도로명, 건물명, 지번 (예: 올림픽로43길 88)")
+            .fill("연세로 50");
+        await user.getByRole("button", { name: "검색", exact: true }).click();
+        await user
+            .getByRole("button", { name: /서울특별시 서대문구 연세로 50/ })
+            .click();
         await user.locator("#transportTo").selectOption({ label: "택시" });
         await user.locator("#transportHome").selectOption({ label: "택시" });
         await user
@@ -107,6 +165,17 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
         const pay = user.getByRole("button", { name: "40,000원 결제하기" });
         await expect(pay).toBeVisible();
         await user.getByRole("checkbox", { name: /취소·환불 정책/ }).check();
+        await user.getByRole("checkbox", { name: /쿠폰.*25,000원/ }).check();
+        await user.getByRole("button", { name: "15,000원 결제하기" }).click();
+        await expect(
+            user
+                .getByRole("status")
+                .filter({ hasText: "현재 쿠폰 사용이 일시 중지되었습니다." }),
+        ).toBeVisible();
+        await expect(
+            user.getByRole("checkbox", { name: /쿠폰.*25,000원/ }),
+        ).toHaveCount(0);
+        await expect(pay).toBeEnabled();
         await pay.click();
 
         // 모의 결제창 → /api/payments/confirm(서명·금액 검증, 모의 PG 승인) → 완료 화면
@@ -129,5 +198,65 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
         await expect(admin.getByText("2단계 인증 완료")).toBeVisible();
         await expect(admin.getByText("예약 목록 조회").first()).toBeVisible();
         await adminContext.close();
+    });
+
+    await test.step("파트너: 실제 리포트 화면의 가이드 키보드 접근성", async () => {
+        // 이번 테스트가 결제한 예약만 완료 상태로 준비한다. 전역 정리가 연결 데이터까지 제거한다.
+        const db = localSupabaseAdmin();
+        const { data: reservation, error: reservationError } = await db
+            .from("reservations")
+            .select("id")
+            .eq("hospital_name", hospital)
+            .single();
+        if (reservationError) throw reservationError;
+        const { data: service, error: serviceError } = await db
+            .from("services")
+            .update({
+                status: "COMPLETED",
+                started_at: new Date(Date.now() - 7_200_000).toISOString(),
+                ended_at: new Date().toISOString(),
+            })
+            .eq("reservation_id", reservation.id)
+            .select("id")
+            .single();
+        if (serviceError) throw serviceError;
+
+        const context = await browser.newContext();
+        const page = await context.newPage();
+        await loginAsPartner(page);
+        await page.goto(`/partner/reports/${service.id}`);
+        const trigger = page.getByRole("button", { name: "작성 가이드 보기" });
+        await trigger.focus();
+        await page.keyboard.press("Enter");
+        const dialog = page.getByRole("dialog", { name: "리포트 작성 가이드" });
+        await expect(dialog).toBeVisible();
+        const close = dialog.getByRole("button", { name: "작성 가이드 닫기" });
+        const confirm = dialog.getByRole("button", { name: "확인했어요" });
+        await expect(close).toBeFocused();
+        await page.keyboard.press("Shift+Tab");
+        await expect(confirm).toBeFocused();
+        await page.keyboard.press("Tab");
+        await expect(close).toBeFocused();
+        // Chromium은 스크롤 영역도 Tab 대상으로 포함한다. 모든 이동이 대화상자 안에 머물러야 한다.
+        for (let i = 0; i < 8; i++) {
+            await page.keyboard.press("Tab");
+            await expect
+                .poll(() =>
+                    dialog.evaluate((element) =>
+                        element.contains(document.activeElement),
+                    ),
+                )
+                .toBe(true);
+        }
+        await page.keyboard.press("Escape");
+        await expect(dialog).not.toBeVisible();
+        await expect(trigger).toBeFocused();
+        await trigger.click();
+        await close.click();
+        await expect(trigger).toBeFocused();
+        await trigger.click();
+        await confirm.click();
+        await expect(trigger).toBeFocused();
+        await context.close();
     });
 });

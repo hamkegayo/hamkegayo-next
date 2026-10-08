@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import type { PartnerPublicProfile, WorkHistory } from "@/lib/partner-details";
+import { withdrawPartnerEvidence } from "./qualifications";
 
 export async function getPartnerPublicProfile(): Promise<PartnerPublicProfile | null> {
     const supabase = await createClient();
@@ -42,8 +43,9 @@ async function updateProfile(rpc: string, args: Record<string, unknown>) {
         if (error)
             return {
                 ok: false as const,
-                message:
-                    "저장하지 못했습니다. 입력 내용과 로그인 상태를 확인해 주세요.",
+                message: error.message.includes("evidence_retention_required")
+                    ? "심사·통지된 증빙은 직접 삭제할 수 없습니다. 보유기간·이의신청 메뉴 또는 고객센터로 수정·삭제를 요청해 주세요."
+                    : "저장하지 못했습니다. 입력 내용과 로그인 상태를 확인해 주세요.",
             };
         revalidatePath("/partner/profile");
         revalidatePath("/admin/qualifications");
@@ -90,5 +92,12 @@ export async function submitPartnerWorkHistory(input: Omit<WorkHistory, "id">) {
 }
 
 export async function deletePartnerWorkHistory(id: string) {
-    return updateProfile("delete_partner_work_history", { p_id: id });
+    try {
+        return await withdrawPartnerEvidence(id, "HISTORY");
+    } catch {
+        return {
+            ok: false as const,
+            message: "저장 요청에 실패했습니다. 다시 시도해 주세요.",
+        };
+    }
 }

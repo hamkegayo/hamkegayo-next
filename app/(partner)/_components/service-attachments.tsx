@@ -71,9 +71,9 @@ export function ServiceAttachments({
                             <span className="bg-brand/10 text-brand flex size-8 shrink-0 items-center justify-center rounded-lg">
                                 <FileText className="size-4" />
                             </span>
-                            <p className="text-foreground min-w-0 flex-1 truncate text-sm">
+                            <p className="text-foreground min-w-0 flex-1 truncate text-sm leading-relaxed">
                                 {a.filename}{" "}
-                                <span className="text-muted-foreground text-xs">
+                                <span className="text-muted-foreground text-sm">
                                     ({formatSize(a.size)})
                                 </span>
                             </p>
@@ -108,12 +108,12 @@ export function ServiceAttachments({
                 <span className="text-foreground text-sm font-bold">
                     {pending ? "처리 중…" : "사진 또는 파일을 선택하세요"}
                 </span>
-                <span className="text-muted-foreground text-xs">
+                <span className="text-muted-foreground text-sm">
                     JPG, PNG, PDF (최대 5MB) · 리포트 첨부로 함께 저장돼요
                 </span>
             </button>
             {/* 개인정보 최소화 — 업로드 전 안내 (#255 제안안) */}
-            <p className="text-muted-foreground mt-2 text-xs break-keep">
+            <p className="text-description-foreground mt-2 text-sm leading-relaxed break-keep">
                 이용자 얼굴, 진료 서류의 주민등록번호·계좌번호가 보이지 않게
                 가리고 올려 주세요.
             </p>

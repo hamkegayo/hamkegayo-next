@@ -42,6 +42,30 @@ export async function createReservation(
         };
     }
     const v = parsed.data;
+    const regionCodes = {
+        depart: verifiedRegionCode({
+            address: v.departAddress,
+            base: v.departRegionBase,
+            code: v.departRegionCode,
+            token: v.departRegionToken,
+        }),
+        hospital: verifiedRegionCode({
+            address: v.hospitalAddress,
+            base: v.hospitalRegionBase,
+            code: v.hospitalRegionCode,
+            token: v.hospitalRegionToken,
+        }),
+    };
+    for (const code of [regionCodes.depart, regionCodes.hospital]) {
+        if (!code) {
+            return {
+                ok: false,
+                reason: "validation",
+                message:
+                    "출발지와 병원 기본 주소를 주소 검색으로 다시 선택해 주세요.",
+            };
+        }
+    }
 
     const supabase = await createClient();
     const {
@@ -137,7 +161,7 @@ export async function createReservation(
             .single();
 
         if (!error && data) {
-            await recordRegionCodes(data.id, user.id, v);
+            await recordRegionCodes(data.id, user.id, regionCodes);
             // 활동 지역·시간이 맞는 파트너에게 새 요청 알림 (#255). 응답을 막지 않게 응답 후 처리한다.
             after(() =>
                 notifyPartnersOfNewRequest({
@@ -170,7 +194,7 @@ export async function createReservation(
 }
 
 /**
- * 주소 검색으로 고른 법정동코드를 서버 검증 후 기록한다 (#232 리뷰).
+ * createReservation 이 검증한 법정동코드를 기록한다 (#232 리뷰).
  *
  * 브라우저가 보낸 코드는 믿지 않는다. 서버가 서명한 "기준 주소 ↔ 코드" 토큰이 맞고
  * 최종 입력 주소가 그 기준 주소로 시작할 때만 인정한다. 고객 권한으로는 DB 트리거가
@@ -180,29 +204,8 @@ export async function createReservation(
 async function recordRegionCodes(
     reservationId: string,
     customerId: string,
-    v: {
-        departAddress: string;
-        hospitalAddress: string;
-        departRegionCode?: string;
-        departRegionToken?: string;
-        departRegionBase?: string;
-        hospitalRegionCode?: string;
-        hospitalRegionToken?: string;
-        hospitalRegionBase?: string;
-    },
+    { depart, hospital }: { depart: string | null; hospital: string | null },
 ): Promise<void> {
-    const depart = verifiedRegionCode({
-        address: v.departAddress,
-        base: v.departRegionBase,
-        code: v.departRegionCode,
-        token: v.departRegionToken,
-    });
-    const hospital = verifiedRegionCode({
-        address: v.hospitalAddress,
-        base: v.hospitalRegionBase,
-        code: v.hospitalRegionCode,
-        token: v.hospitalRegionToken,
-    });
     if (!depart && !hospital) return;
     try {
         const { error } = await createAdminClient()

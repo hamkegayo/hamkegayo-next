@@ -95,7 +95,8 @@ export function OpeningEventPopup({
                 <DialogTitle className="mt-6 text-3xl leading-tight font-extrabold break-keep sm:text-4xl">
                     첫 병원동행,
                     <br />
-                    <span className="text-brand">1시간 무료</span>로 시작하세요
+                    <span className="text-brand">25,000원 쿠폰</span>으로
+                    시작하세요
                 </DialogTitle>
                 <DialogDescription className="mt-3 text-base">
                     병원동행을 부담 없이 시작해 보세요.
@@ -118,10 +119,10 @@ export function OpeningEventPopup({
                 >
                     <p className="text-lg font-bold sm:text-xl">선착순 20명</p>
                     <p className="mt-3 text-3xl leading-tight font-extrabold tracking-tight sm:text-4xl">
-                        첫 1시간 이용 무료
+                        25,000원 할인 쿠폰
                     </p>
                     <p className="mt-2 text-lg font-bold">
-                        (Plus 25,000원 · Basic 20,000원 상당)
+                        Basic · Plus 공통 적용
                     </p>
                     <div
                         aria-hidden="true"

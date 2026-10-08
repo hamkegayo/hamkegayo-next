@@ -12,6 +12,7 @@ import {
     finalizeServiceCharge,
 } from "../../_lib/finalize-charge";
 import { formatMinutes } from "@/lib/pricing";
+import { noShowNotification } from "@/lib/no-show-notification";
 import type { ServiceTimeField } from "../../_lib/service-times";
 
 export type ServiceActionResult = { ok: true } | { ok: false; message: string };
@@ -231,8 +232,8 @@ export async function endServiceNoShow(
             const penalty = final.charge.total.toLocaleString();
 
             if (final.diff.additional > 0) {
-                // 출동비용 실비가 더해져 선결제를 넘는 경우다. 아직 실비가
-                // 정해지지 않아 현재 요금표에서는 발생하지 않는다.
+                // 노쇼는 쿠폰 할인 대상이 아니다. Basic 2시간 쿠폰 예약도
+                // 현금 선결제 15,000원보다 위약금 20,000원이 커 추가 5,000원이 발생한다.
                 await issueExtensionCharge({
                     reservationId: final.reservationId,
                     reservationCode: final.reservationCode,
@@ -251,12 +252,12 @@ export async function endServiceNoShow(
                 });
             }
 
-            // 문구가 결과와 어긋나면 안 된다. 위약금은 **선결제에서 차감**되는
-            // 것이지 따로 청구되는 것이 아니다(리뷰 확정).
-            const body =
-                final.diff.refund > 0
-                    ? `파트너가 예약시각부터 20분간 기다린 뒤 종료했습니다. 약관에 따른 위약금 ${penalty}원을 선결제 금액에서 차감하고, 잔액 ${final.diff.refund.toLocaleString()}원을 확인 후 환불해 드립니다.`
-                    : `파트너가 예약시각부터 20분간 기다린 뒤 종료했습니다. 약관에 따른 위약금 ${penalty}원이 선결제 금액에서 처리됩니다.`;
+            // 현금 선결제가 위약금보다 적으면 차액 추가결제 안내와 같은 결과를 알린다.
+            const body = noShowNotification(
+                final.charge.total,
+                final.prepaidAmount,
+                final.diff,
+            );
 
             await createNotification(final.customerId, {
                 type: "RESERVATION_CANCELLED",

@@ -48,7 +48,7 @@ export function EvidenceRetentionControls({
         }
     };
     return (
-        <div className="mt-3 space-y-2 text-xs">
+        <div className="text-description-foreground mt-3 space-y-2 text-sm leading-relaxed">
             <p>
                 증빙 원본은 최초 심사 결과 통지 후 30일간 보관하며, 진행 중인
                 이의신청은 처리 종료까지 파기를 보류합니다.

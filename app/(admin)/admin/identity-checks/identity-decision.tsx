@@ -50,8 +50,8 @@ export function IdentityDecision({
             <p
                 className={
                     hasPersonalData
-                        ? "text-destructive text-xs"
-                        : "text-muted-foreground text-xs"
+                        ? "text-destructive text-sm"
+                        : "text-muted-foreground text-sm"
                 }
             >
                 생년월일·주민번호 등 숫자는 적지 마세요. 사유는 접속기록과
