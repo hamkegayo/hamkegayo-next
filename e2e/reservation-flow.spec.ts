@@ -27,8 +27,41 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
     const hospital = `${E2E_HOSPITAL_PREFIX}${runId % 1_000_000}`;
 
     const userContext = await browser.newContext();
+    await userContext.addInitScript(() => {
+        // 30초 자동 팝업 갱신이 예약 흐름의 접근성 트리를 가리지 않도록 당일 닫기를 설정한다.
+        localStorage.setItem(
+            "hamkegayo-opening-event-dismissed",
+            new Intl.DateTimeFormat("sv-SE", {
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+            }).format(new Date()),
+        );
+    });
     const user = await userContext.newPage();
     await mockNicepaySdk(user, E2E_PAYMENT.secretKey);
+    // API 응답 실패 후 쿠폰 선택 해제·상태 재조회만 모의한다. 실제 PG 경로는 이후 그대로 실행한다.
+    let unavailableAttempt = false;
+    await user.route("**/api/campaigns/opening/offer?*", async (route) => {
+        await route.fulfill({
+            json: !unavailableAttempt
+                ? { eligible: true, state: "AVAILABLE", discount: 25000 }
+                : { eligible: false, state: "PAUSED", discount: 25000 },
+        });
+    });
+    await user.route("**/api/payments/prepare", async (route) => {
+        if (route.request().postDataJSON()?.useOpeningEvent) {
+            unavailableAttempt = true;
+            await route.fulfill({
+                status: 409,
+                json: {
+                    code: "CAMPAIGN_UNAVAILABLE",
+                    error: "쿠폰 사용이 일시 중지되었습니다.",
+                },
+            });
+        } else await route.continue();
+    });
 
     await test.step("이용자: 로그인 후 예약 신청", async () => {
         await loginAsUser(user);
@@ -107,6 +140,17 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
         const pay = user.getByRole("button", { name: "40,000원 결제하기" });
         await expect(pay).toBeVisible();
         await user.getByRole("checkbox", { name: /취소·환불 정책/ }).check();
+        await user.getByRole("checkbox", { name: /쿠폰.*25,000원/ }).check();
+        await user.getByRole("button", { name: "15,000원 결제하기" }).click();
+        await expect(
+            user.getByText("현재 쿠폰 사용이 일시 중지되었습니다.", {
+                exact: true,
+            }),
+        ).toBeVisible();
+        await expect(
+            user.getByRole("checkbox", { name: /쿠폰.*25,000원/ }),
+        ).toHaveCount(0);
+        await expect(pay).toBeEnabled();
         await pay.click();
 
         // 모의 결제창 → /api/payments/confirm(서명·금액 검증, 모의 PG 승인) → 완료 화면

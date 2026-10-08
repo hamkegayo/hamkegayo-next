@@ -13,14 +13,20 @@ import { getSessionProfile } from "../_lib/profile";
 
 export default async function CouponWalletPage() {
     const { user } = await getSessionProfile();
-    // 기존 인증 이메일 HMAC만 사용한다. 쿠폰함 조회는 선착순 자리를 확보하지 않는다.
-    await ensureOpeningEventEmail(user);
+    // 인증 이메일 HMAC가 없거나 바뀐 경우에만 등록한다. 조회로 정원을 확보하지 않는다.
+    const registered = await ensureOpeningEventEmail(user);
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("opening_event_coupon");
-    const coupon = data as OpeningCoupon | null;
+    const rawCoupon = data as OpeningCoupon | null;
+    const coupon =
+        rawCoupon &&
+        !registered &&
+        ["AVAILABLE", "HELD"].includes(rawCoupon.state)
+            ? { ...rawCoupon, state: "PAUSED" as const }
+            : rawCoupon;
     return (
         <div>
-            <AutoRefresh />
+            {coupon?.state === "HELD" && <AutoRefresh />}
             <h1 className="text-foreground text-2xl font-extrabold">쿠폰함</h1>
             {error || !coupon ? (
                 <p role="alert" className="mt-6 text-sm">

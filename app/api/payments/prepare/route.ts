@@ -130,7 +130,10 @@ export async function POST(request: NextRequest) {
 
     if (useOpeningEvent && !(await ensureOpeningEventEmail(user))) {
         return NextResponse.json(
-            { error: "이메일 인증과 이벤트 참여 조건을 확인해 주세요." },
+            {
+                error: "이메일 인증과 이벤트 참여 조건을 확인해 주세요.",
+                code: "CAMPAIGN_UNAVAILABLE",
+            },
             { status: 409 },
         );
     }

@@ -97,6 +97,27 @@ select pg_temp.assert((public.opening_event_offer('00000159-0001-4000-8000-00000
 select pg_temp.assert((select used_count=0 from public.opening_campaign),'wallet does not consume capacity');
 select public.reserve_opening_event('00000159-0002-4000-8000-000000000001');
 select pg_temp.assert(public.reserve_opening_event('00000159-0002-4000-8000-000000000001')=25000,'same payment reserve idempotent');
+savepoint review_states;
+update public.opening_campaign set active=false where id;
+select pg_temp.assert(public.opening_event_coupon()->>'state'='PAUSED','paused campaign overrides live hold');
+select pg_temp.assert((public.opening_event_offer('00000159-0001-4000-8000-000000000001')->>'eligible')::boolean=false,'paused held offer cannot be selected');
+do $$ begin
+  begin perform public.reserve_opening_event('00000159-0002-4000-8000-000000000001');
+  exception when check_violation then raise notice 'PASS: paused existing hold cannot prepare'; return; end;
+  raise exception 'FAIL: paused hold accepted';
+end $$;
+delete from public.opening_event_identities where customer_id='00000159-0000-4000-8000-000000000023';
+select set_config('request.jwt.claims','{"sub":"00000159-0000-4000-8000-000000000023","role":"authenticated"}',true);
+select pg_temp.assert(public.opening_event_coupon()->>'state'='PAUSED','missing identity still sees campaign pause');
+update public.opening_campaign set closed_at=now() where id;
+select pg_temp.assert(public.opening_event_coupon()->>'state'='CLOSED','missing identity still sees campaign closure');
+rollback to review_states;
+savepoint review_cancel;
+update public.reservations set status='CANCELLED' where id='00000159-0001-4000-8000-000000000001';
+select pg_temp.assert((select state='RELEASED' from public.opening_event_claims where payment_id='00000159-0002-4000-8000-000000000001'),'cancelled pending reservation immediately releases hold');
+select pg_temp.assert(public.opening_event_coupon()->>'state'='AVAILABLE','cancelled reservation is not shown as held');
+select pg_temp.assert((public.opening_event_offer('00000159-0001-4000-8000-000000000001')->>'eligible')::boolean=false,'cancelled reservation offer ineligible');
+rollback to review_cancel;
 select pg_temp.assert((select gross_amount-discount_amount=25000 and payout_amount=40000 from public.payments where id='00000159-0002-4000-8000-000000000001'),'Plus first hour free; normal partner payout');
 update public.opening_event_identities set identity_hash=(select identity_hash from public.opening_event_identities where customer_id='00000159-0000-4000-8000-000000000001') where customer_id='00000159-0000-4000-8000-000000000021';
 do $$ begin
@@ -129,8 +150,14 @@ select pg_temp.assert((select gross_amount-discount_amount=15000 and payout_amou
 update public.opening_event_claims set discount_amount=20000 where payment_id='00000159-0002-4000-8000-000000000002';
 update public.payments set campaign_discount_amount=20000,discount_amount=20000,commission_amount=-12000 where id='00000159-0002-4000-8000-000000000002';
 select pg_temp.assert(public.reserve_opening_event('00000159-0002-4000-8000-000000000002')=20000,'legacy hold keeps original amount');
-update public.opening_event_claims set discount_amount=25000 where payment_id='00000159-0002-4000-8000-000000000002';
-update public.payments set campaign_discount_amount=25000,discount_amount=25000,commission_amount=-17000 where id='00000159-0002-4000-8000-000000000002';
+-- 실제 prepare 재시도: 이전 PENDING을 취소하고 새 결제 행으로 확보한다.
+update public.payments set status='CANCELLED' where id='00000159-0002-4000-8000-000000000002';
+insert into public.payments(id,reservation_id,type,status,order_id,gross_amount,discount_amount,commission_amount,payout_amount,commission_rate)
+values('00000159-0002-4000-8000-000000000102','00000159-0001-4000-8000-000000000002','BASE','PENDING','TEST-EVENT-LEGACY-RETRY',40000,0,8000,32000,0.2);
+select pg_temp.assert(public.reserve_opening_event('00000159-0002-4000-8000-000000000102')=25000,'new payment retry gets current 25000 coupon');
+select pg_temp.assert((select state='RELEASED' and discount_amount=20000 from public.opening_event_claims where payment_id='00000159-0002-4000-8000-000000000002'),'retry preserves released historical amount');
+update public.opening_event_claims set discount_amount=25000 where payment_id='00000159-0002-4000-8000-000000000102';
+update public.payments set campaign_discount_amount=25000,discount_amount=25000,commission_amount=-17000 where id='00000159-0002-4000-8000-000000000102';
 select set_config('request.jwt.claims','{"sub":"00000159-0000-4000-8000-000000000021","role":"authenticated"}',true);
 select pg_temp.assert(public.opening_event_coupon()->>'state'='WAITING','full temporary holds do not mean exhaustion');
 select pg_temp.assert((select gross_amount-discount_amount=40000 and payout_amount=52000 from public.payments where id='00000159-0002-4000-8000-000000000003'),'weekend surcharge not discounted');
@@ -154,7 +181,7 @@ select pg_temp.assert((select sequence=1 from public.opening_event_claims where 
 update public.reservations set status='CANCELLED' where id='00000159-0001-4000-8000-000000000001';
 select pg_temp.assert((select state='USED' from public.opening_event_claims where payment_id='00000159-0002-4000-8000-000000000101'),'confirmed cancellation does not restore benefit');
 do $$ declare i integer; begin
-  for i in 2..20 loop perform public.finalize_payment(('00000159-0002-4000-8000-'||lpad(i::text,12,'0'))::uuid,'TEST-TID-'||i,now()); end loop;
+  for i in 2..20 loop if i=2 then perform public.finalize_payment('00000159-0002-4000-8000-000000000102','TEST-TID-2',now()); continue; end if; perform public.finalize_payment(('00000159-0002-4000-8000-'||lpad(i::text,12,'0'))::uuid,'TEST-TID-'||i,now()); end loop;
 end $$;
 select pg_temp.assert((select count(*)=20 and max(sequence)=20 from public.opening_event_claims where state='USED'),'exactly 20 confirmed users');
 select pg_temp.assert((select not enabled and remaining=0 from public.opening_event_status()),'exhaustion hides popup');
@@ -178,15 +205,45 @@ select set_config('request.jwt.claims','{"sub":"00000159-0000-4000-8000-00000000
 select public.admin_exclude_opening_event('00000159-0000-4000-8000-000000000023',true,'TEST STAFF EXCLUSION');
 select pg_temp.assert(exists(select 1 from public.opening_event_exclusions where customer_id='00000159-0000-4000-8000-000000000023'),'staff exclusion has separate auditable record');
 update public.opening_event_identities set excluded=true where customer_id='00000159-0000-4000-8000-000000000023';
-select public.register_opening_event_email('00000159-0000-4000-8000-000000000023',repeat('b',64));
+do $$ begin
+  begin perform public.register_opening_event_email('00000159-0000-4000-8000-000000000023',repeat('b',64));
+  exception when check_violation then raise notice 'PASS: excluded user does not refresh identity'; return; end;
+  raise exception 'FAIL: excluded user identity refreshed';
+end $$;
 select pg_temp.assert((select excluded from public.opening_event_identities where customer_id='00000159-0000-4000-8000-000000000023'),'email refresh preserves staff exclusion');
 
 -- 정상 1시간 종료: 할인은 고객에게 적용하고 파트너 1시간 지급액은 유지한다.
+-- Basic 2시간 노쇼: 현금 15,000 + 추가결제 5,000 = 할인 없는 노쇼 20,000.
+update public.reservations set final_amount=20000,billed_minutes=60 where id='00000159-0001-4000-8000-000000000008';
+update public.services set status='COMPLETED',no_show=true where reservation_id='00000159-0001-4000-8000-000000000008';
+select pg_temp.assert((select gross_amount-discount_amount=15000 and payout_amount=12000 from public.payments where id='00000159-0002-4000-8000-000000000008'),'2-hour no-show preserves cash 15000 and removes subsidy');
+select public.create_extension_payment('00000159-0001-4000-8000-000000000008',5000,'NO_SHOW','TEST-NO-SHOW-2H','TEST-NO-SHOW-2H-TOKEN',now()+interval '1 hour',150000);
+select public.finalize_extension_payment((select id from public.payments where order_id='TEST-NO-SHOW-2H'),'TEST-NO-SHOW-2H-TID');
+select pg_temp.assert((select sum(gross_amount-discount_amount)=20000 and sum(payout_amount)=16000 from public.payments where reservation_id='00000159-0001-4000-8000-000000000008' and status='PAID'),'2-hour no-show additional paid ledger totals 20000 and partner 16000');
+select pg_temp.assert((select sum(net)=16000 from public.settlements st join public.services s on s.id=st.service_id where s.reservation_id='00000159-0001-4000-8000-000000000008'),'2-hour no-show extension settlement totals 16000');
+select public.finalize_extension_payment((select id from public.payments where order_id='TEST-NO-SHOW-2H'),'TEST-NO-SHOW-2H-TID');
+select pg_temp.assert((select count(*)=2 from public.settlements st join public.services s on s.id=st.service_id where s.reservation_id='00000159-0001-4000-8000-000000000008'),'duplicate extension confirm does not duplicate settlement');
+savepoint review_registration;
+delete from public.opening_event_identities where customer_id='00000159-0000-4000-8000-000000000008';
+do $$ begin
+  begin perform public.register_opening_event_email('00000159-0000-4000-8000-000000000008',repeat('c',64));
+  exception when check_violation then raise notice 'PASS: completed customer not newly registered'; return; end;
+  raise exception 'FAIL: ineligible identity stored';
+end $$;
+select pg_temp.assert(not exists(select 1 from public.opening_event_identities where customer_id='00000159-0000-4000-8000-000000000008'),'ineligible wallet visits do not collect new HMAC');
+rollback to review_registration;
+-- 추가결제를 먼저 받은 후 서비스 완료하는 순서도 검증한다.
+update public.reservations set final_amount=45000 where id='00000159-0001-4000-8000-000000000010';
+select public.create_extension_payment('00000159-0001-4000-8000-000000000010',5000,'EXTENSION','TEST-EVENT-EXT-FIRST','TEST-EVENT-EXT-FIRST-TOKEN',now()+interval '1 hour',150000);
+select public.finalize_extension_payment((select id from public.payments where order_id='TEST-EVENT-EXT-FIRST'),'TEST-EVENT-EXT-FIRST-TID');
+select pg_temp.assert(not exists(select 1 from public.settlements st join public.services s on s.id=st.service_id where s.reservation_id='00000159-0001-4000-8000-000000000010'),'no settlement before completion');
+update public.services set status='COMPLETED' where reservation_id='00000159-0001-4000-8000-000000000010';
+select pg_temp.assert((select sum(net)=36000 from public.settlements st join public.services s on s.id=st.service_id where s.reservation_id='00000159-0001-4000-8000-000000000010'),'paid-before-complete extension included once');
 update public.reservations set final_amount=20000,billed_minutes=60 where id='00000159-0001-4000-8000-000000000002';
 update public.services set status='COMPLETED' where reservation_id='00000159-0001-4000-8000-000000000002';
-select pg_temp.assert((select net=32000 and amount=15000 and fee=-17000 from public.settlements where payment_id='00000159-0002-4000-8000-000000000002'),'event primary ledger uses paid base without double final charge');
+select pg_temp.assert((select net=32000 and amount=15000 and fee=-17000 from public.settlements where payment_id='00000159-0002-4000-8000-000000000102'),'event primary ledger uses paid base without double final charge');
 insert into public.refund_requests(reservation_id,payment_id,amount,status,reason)
-  values('00000159-0001-4000-8000-000000000002','00000159-0002-4000-8000-000000000002',15000,'APPROVED','TEST EVENT EARLY END');
+  values('00000159-0001-4000-8000-000000000002','00000159-0002-4000-8000-000000000102',15000,'APPROVED','TEST EVENT EARLY END');
 select public.record_settlement_refund((select id from public.refund_requests where reservation_id='00000159-0001-4000-8000-000000000002'));
 select pg_temp.assert((select sum(net)=16000 from public.settlements st join public.services s on s.id=st.service_id where s.reservation_id='00000159-0001-4000-8000-000000000002'),'early completion refund keeps one-hour partner payout');
 update public.reservations set final_amount=20000,billed_minutes=60 where id='00000159-0001-4000-8000-000000000004';

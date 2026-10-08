@@ -12,11 +12,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { formatUseDate, toHhmm } from "@/lib/format";
 import { useReservationStore, PLAN_INFO } from "../_store/reservation-store";
 import { OPENING_EVENT_TERMS } from "@/lib/opening-event";
-import {
-    OPENING_COUPON_MESSAGES,
-    type OpeningCouponState,
-} from "@/lib/opening-coupon";
+import { OPENING_COUPON_MESSAGES } from "@/lib/opening-coupon";
 import { StepBand } from "./step-band";
+import {
+    EMPTY_COUPON_OFFER,
+    loadCouponOffer,
+    type OpeningCouponOffer,
+} from "@/lib/opening-coupon-offer";
 
 /**
  * STEP7 · 선결제.
@@ -76,27 +78,15 @@ export function StepPayment() {
     const { data, patch, goStep } = useReservationStore();
     const plan = PLAN_INFO[data.plan || "basic"];
 
-    const [eventOffer, setEventOffer] = useState<{
-        eligible: boolean;
-        discount: number;
-        state: OpeningCouponState;
-    }>({ eligible: false, discount: 0, state: "HIDDEN" });
+    const [eventOffer, setEventOffer] =
+        useState<OpeningCouponOffer>(EMPTY_COUPON_OFFER);
     const [useOpeningEvent, setUseOpeningEvent] = useState(false);
     useEffect(() => {
         let cancelled = false;
         if (!data.reservationId) return;
-        void fetch(
-            `/api/campaigns/opening/offer?rid=${encodeURIComponent(data.reservationId)}`,
-            { cache: "no-store" },
-        )
-            .then((response) => response.json())
+        void loadCouponOffer(data.reservationId)
             .then((offer) => {
-                if (!cancelled)
-                    setEventOffer({
-                        eligible: offer.eligible === true,
-                        discount: Number(offer.discount) || 0,
-                        state: offer.state ?? "HIDDEN",
-                    });
+                if (!cancelled) setEventOffer(offer);
             })
             .catch(() => {});
         return () => {
@@ -177,17 +167,13 @@ export function StepPayment() {
                 toast.error(body.error ?? "결제를 시작할 수 없습니다.");
                 if (body.code === "CAMPAIGN_UNAVAILABLE") {
                     setUseOpeningEvent(false);
-                    const offerResponse = await fetch(
-                        `/api/campaigns/opening/offer?rid=${encodeURIComponent(data.reservationId)}`,
-                        { cache: "no-store" },
-                    );
-                    if (offerResponse.ok) {
-                        const offer = await offerResponse.json();
-                        setEventOffer({
-                            eligible: offer.eligible === true,
-                            discount: Number(offer.discount) || 0,
-                            state: offer.state ?? "HIDDEN",
-                        });
+                    setEventOffer(EMPTY_COUPON_OFFER);
+                    try {
+                        setEventOffer(
+                            await loadCouponOffer(data.reservationId),
+                        );
+                    } catch {
+                        /* 체크는 해제한 상태로 재시도 가능 */
                     }
                 }
                 // 결제창이 열리지 않았으니 다시 시도·이전 단계 이동이 가능해야 한다 (#259)
