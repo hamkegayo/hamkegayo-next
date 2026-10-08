@@ -127,9 +127,14 @@ export function baseAmountFor(plan: PlanCode, minutes: number): number {
     return Math.round((PLAN_INFO[plan].price * minutes) / 60);
 }
 
-/** 할증 전 금액 → 할증 후 금액(원) */
+/**
+ * 할증 전 금액 → 할증 후 금액(원).
+ * 부동소수 곱셈은 15% 같은 할증률에서 .5 경계를 내림한다(6250 × 1.15 = 7187.4999…).
+ * DB 검증식(numeric round, 마이그레이션 106)과 같게 만분율 정수로 계산해 반올림한다 (#283 리뷰).
+ */
 export function withSurcharge(amount: number, rate: number): number {
-    return Math.round(amount * (1 + rate));
+    const scaled = amount * (10000 + Math.round(rate * 10000));
+    return Math.sign(scaled) * Math.floor((Math.abs(scaled) + 5000) / 10000);
 }
 
 // =============================================================
