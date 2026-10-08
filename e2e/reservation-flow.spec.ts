@@ -10,6 +10,7 @@ import {
 } from "./support/accounts";
 import { mockNicepaySdk } from "./support/nicepay-sdk";
 import { totp } from "./support/totp";
+import { localSupabaseAdmin } from "./support/local-supabase";
 
 /** KST 기준 n일 뒤 "YYYY-MM-DD" */
 function kstDatePlus(days: number) {
@@ -129,5 +130,65 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
         await expect(admin.getByText("2단계 인증 완료")).toBeVisible();
         await expect(admin.getByText("예약 목록 조회").first()).toBeVisible();
         await adminContext.close();
+    });
+
+    await test.step("파트너: 실제 리포트 화면의 가이드 키보드 접근성", async () => {
+        // 이번 테스트가 결제한 예약만 완료 상태로 준비한다. 전역 정리가 연결 데이터까지 제거한다.
+        const db = localSupabaseAdmin();
+        const { data: reservation, error: reservationError } = await db
+            .from("reservations")
+            .select("id")
+            .eq("hospital_name", hospital)
+            .single();
+        if (reservationError) throw reservationError;
+        const { data: service, error: serviceError } = await db
+            .from("services")
+            .update({
+                status: "COMPLETED",
+                started_at: new Date(Date.now() - 7_200_000).toISOString(),
+                ended_at: new Date().toISOString(),
+            })
+            .eq("reservation_id", reservation.id)
+            .select("id")
+            .single();
+        if (serviceError) throw serviceError;
+
+        const context = await browser.newContext();
+        const page = await context.newPage();
+        await loginAsPartner(page);
+        await page.goto(`/partner/reports/${service.id}`);
+        const trigger = page.getByRole("button", { name: "작성 가이드 보기" });
+        await trigger.focus();
+        await page.keyboard.press("Enter");
+        const dialog = page.getByRole("dialog", { name: "리포트 작성 가이드" });
+        await expect(dialog).toBeVisible();
+        const close = dialog.getByRole("button", { name: "작성 가이드 닫기" });
+        const confirm = dialog.getByRole("button", { name: "확인했어요" });
+        await expect(close).toBeFocused();
+        await page.keyboard.press("Shift+Tab");
+        await expect(confirm).toBeFocused();
+        await page.keyboard.press("Tab");
+        await expect(close).toBeFocused();
+        // Chromium은 스크롤 영역도 Tab 대상으로 포함한다. 모든 이동이 대화상자 안에 머물러야 한다.
+        for (let i = 0; i < 8; i++) {
+            await page.keyboard.press("Tab");
+            await expect
+                .poll(() =>
+                    dialog.evaluate((element) =>
+                        element.contains(document.activeElement),
+                    ),
+                )
+                .toBe(true);
+        }
+        await page.keyboard.press("Escape");
+        await expect(dialog).not.toBeVisible();
+        await expect(trigger).toBeFocused();
+        await trigger.click();
+        await close.click();
+        await expect(trigger).toBeFocused();
+        await trigger.click();
+        await confirm.click();
+        await expect(trigger).toBeFocused();
+        await context.close();
     });
 });

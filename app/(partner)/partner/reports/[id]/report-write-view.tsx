@@ -24,6 +24,7 @@ import {
     type ReportPreviewData,
 } from "../../../_components/report-preview-modal";
 import { ReportGeneratedModal } from "../../../_components/report-generated-modal";
+import { ReportGuideModal } from "./report-guide-modal";
 
 function SummaryCol({ label, value }: { label: string; value: string }) {
     return (
@@ -70,6 +71,8 @@ export function ReportWriteView({ context }: { context: ReportContext }) {
     );
 
     const [previewOpen, setPreviewOpen] = useState(false);
+    const [guideOpen, setGuideOpen] = useState(false);
+    const guideTriggerRef = useRef<HTMLButtonElement>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [successOpen, setSuccessOpen] = useState(false);
     const [pending, startTransition] = useTransition();
@@ -184,7 +187,8 @@ export function ReportWriteView({ context }: { context: ReportContext }) {
                 </div>
                 <button
                     type="button"
-                    onClick={() => toast.info("작성 가이드는 준비 중입니다.")}
+                    ref={guideTriggerRef}
+                    onClick={() => setGuideOpen(true)}
                     className="border-border bg-background text-foreground hover:bg-muted inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-bold transition-colors"
                 >
                     <Info className="size-4" />
@@ -483,6 +487,11 @@ export function ReportWriteView({ context }: { context: ReportContext }) {
             </div>
 
             {/* 모달 */}
+            <ReportGuideModal
+                open={guideOpen}
+                returnFocus={guideTriggerRef}
+                onClose={() => setGuideOpen(false)}
+            />
             <ReportPreviewModal
                 open={previewOpen}
                 onClose={() => setPreviewOpen(false)}
