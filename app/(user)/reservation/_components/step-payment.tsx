@@ -12,6 +12,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { formatUseDate, toHhmm } from "@/lib/format";
 import { useReservationStore, PLAN_INFO } from "../_store/reservation-store";
 import { OPENING_EVENT_TERMS } from "@/lib/opening-event";
+import {
+    OPENING_COUPON_MESSAGES,
+    type OpeningCouponState,
+} from "@/lib/opening-coupon";
 import { StepBand } from "./step-band";
 
 /**
@@ -75,7 +79,8 @@ export function StepPayment() {
     const [eventOffer, setEventOffer] = useState<{
         eligible: boolean;
         discount: number;
-    }>({ eligible: false, discount: 0 });
+        state: OpeningCouponState;
+    }>({ eligible: false, discount: 0, state: "HIDDEN" });
     const [useOpeningEvent, setUseOpeningEvent] = useState(false);
     useEffect(() => {
         let cancelled = false;
@@ -90,6 +95,7 @@ export function StepPayment() {
                     setEventOffer({
                         eligible: offer.eligible === true,
                         discount: Number(offer.discount) || 0,
+                        state: offer.state ?? "HIDDEN",
                     });
             })
             .catch(() => {});
@@ -169,6 +175,21 @@ export function StepPayment() {
 
             if (!res.ok) {
                 toast.error(body.error ?? "결제를 시작할 수 없습니다.");
+                if (body.code === "CAMPAIGN_UNAVAILABLE") {
+                    setUseOpeningEvent(false);
+                    const offerResponse = await fetch(
+                        `/api/campaigns/opening/offer?rid=${encodeURIComponent(data.reservationId)}`,
+                        { cache: "no-store" },
+                    );
+                    if (offerResponse.ok) {
+                        const offer = await offerResponse.json();
+                        setEventOffer({
+                            eligible: offer.eligible === true,
+                            discount: Number(offer.discount) || 0,
+                            state: offer.state ?? "HIDDEN",
+                        });
+                    }
+                }
                 // 결제창이 열리지 않았으니 다시 시도·이전 단계 이동이 가능해야 한다 (#259)
                 setSubmitting(false);
                 // 선택이 풀렸거나 기한이 지난 경우 → 파트너 재선택으로
@@ -242,6 +263,22 @@ export function StepPayment() {
             />
 
             <Section>
+                {!eventOffer.eligible && eventOffer.state !== "HIDDEN" && (
+                    <p
+                        role="status"
+                        className="text-muted-foreground mx-auto mb-6 max-w-3xl rounded-xl border p-4 text-sm"
+                    >
+                        {OPENING_COUPON_MESSAGES[eventOffer.state]}{" "}
+                        <Link
+                            href="/mypage/coupons"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-brand underline"
+                        >
+                            쿠폰함 보기
+                        </Link>
+                    </p>
+                )}
                 {eventOffer.eligible && (
                     <div className="border-brand bg-brand/5 mx-auto mb-6 max-w-3xl rounded-xl border p-4 text-sm">
                         <label className="flex items-center gap-2 font-bold">
@@ -251,7 +288,7 @@ export function StepPayment() {
                                     setUseOpeningEvent(checked === true)
                                 }
                             />
-                            첫 1시간 무료 이벤트 적용 (
+                            쿠폰함의 오픈 이벤트 쿠폰 적용 (
                             {eventOffer.discount.toLocaleString()}원)
                         </label>
                         <p className="mt-2">
@@ -266,9 +303,17 @@ export function StepPayment() {
                             </Link>
                         </p>
                         <p className="text-muted-foreground mt-2">
-                            결제 전에 잔여 혜택을 다시 확인하며, 실제 예약 확정
-                            시 순번이 부여됩니다. 포인트와 중복 적용하지
-                            않습니다.
+                            쿠폰 보유만으로 혜택이 확보되지는 않습니다. 결제
+                            완료·예약 확정 선착순 20명에게 적용합니다. 포인트와
+                            중복 적용하지 않습니다.{" "}
+                            <Link
+                                href="/mypage/coupons"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-brand underline"
+                            >
+                                쿠폰함 보기
+                            </Link>
                         </p>
                         <details className="mt-2">
                             <summary className="cursor-pointer">
@@ -355,7 +400,7 @@ export function StepPayment() {
                             )}
                             {useOpeningEvent && (
                                 <div className="text-brand flex items-center justify-between">
-                                    <span>첫 1시간 무료 혜택</span>
+                                    <span>오픈 이벤트 쿠폰</span>
                                     <span className="font-semibold">
                                         −{eventOffer.discount.toLocaleString()}
                                         원

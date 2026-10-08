@@ -12,17 +12,8 @@ export async function GET(request: NextRequest) {
     const id = request.nextUrl.searchParams.get("rid");
     if (!id || !/^[a-f\d-]{36}$/i.test(id))
         return NextResponse.json({ eligible: false }, { status: 400 });
-    const { data: status } = await supabase.rpc("opening_event_status");
-    if (!status?.[0]?.enabled)
-        return NextResponse.json(
-            { eligible: false },
-            { headers: { "Cache-Control": "no-store" } },
-        );
-    if (!(await ensureOpeningEventEmail(user)))
-        return NextResponse.json(
-            { eligible: false },
-            { headers: { "Cache-Control": "no-store" } },
-        );
+    // 소진/일시 중지 후에도 기존 쿠폰 상태를 보여 준다. 등록 실패를 사용 가능으로 처리하지 않는다.
+    await ensureOpeningEventEmail(user);
     const { data, error } = await supabase.rpc("opening_event_offer", {
         p_reservation_id: id,
     });

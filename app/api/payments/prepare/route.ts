@@ -12,6 +12,7 @@ import {
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 import { ensureOpeningEventEmail } from "@/lib/opening-event-email.server";
+import { openingCouponError } from "@/lib/opening-coupon";
 
 /**
  * 선결제 준비 — 결제창을 열기 직전에 호출한다 (#53).
@@ -264,7 +265,7 @@ export async function POST(request: NextRequest) {
                 .eq("id", payment.id);
             return NextResponse.json(
                 {
-                    error: "이벤트 혜택을 확보하지 못했습니다. 자격·잔여 수량을 다시 확인해 주세요.",
+                    error: openingCouponError(campaignError.message),
                     code: "CAMPAIGN_UNAVAILABLE",
                 },
                 { status: 409 },
