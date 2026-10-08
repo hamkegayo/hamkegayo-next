@@ -172,7 +172,7 @@ export function StepHospitalInfo() {
             type="button"
             disabled={!searchEnabled}
             onClick={() => setSearchTarget(target)}
-            className="border-brand bg-background text-brand hover:bg-brand/5 inline-flex shrink-0 items-center gap-1 rounded-lg border px-3.5 text-sm font-bold disabled:opacity-50"
+            className="border-brand bg-background text-brand hover:bg-brand/5 inline-flex h-11 shrink-0 cursor-pointer items-center gap-1 rounded-lg border px-3.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
             <Search className="size-4" />
             주소 검색
@@ -192,39 +192,40 @@ export function StepHospitalInfo() {
                 {searchButton(target)}
             </div>
             <input type="hidden" {...register(addressField[target])} />
-            <label
-                htmlFor={`${target}AddressDetail`}
-                className="mt-3 block text-sm font-semibold"
-            >
-                상세주소 (선택)
-            </label>
-            <Input
-                id={`${target}AddressDetail`}
-                value={addresses[target].detail}
-                disabled={!addresses[target].base}
-                maxLength={200}
-                placeholder="동·호수, 층, 만남 장소 등"
-                onChange={(event) => {
-                    const detail = event.target.value;
-                    setAddresses((previous) => ({
-                        ...previous,
-                        [target]: { ...previous[target], detail },
-                    }));
-                    setValue(
-                        addressField[target],
-                        joinSelectedAddress(addresses[target].base, detail),
-                    );
-                    clearErrors(addressField[target]);
-                }}
-            />
-            <p className="text-description-foreground mt-2 text-sm leading-relaxed">
+            <FieldError>{errors[addressField[target]]?.message}</FieldError>
+            {/* 다른 항목과 같은 라벨·간격 규칙을 쓴다 (라벨 아래 8px, 항목 사이 안내 6px). */}
+            <div className="mt-4">
+                <FieldLabel htmlFor={`${target}AddressDetail`}>
+                    상세주소 (선택)
+                </FieldLabel>
+                <Input
+                    id={`${target}AddressDetail`}
+                    value={addresses[target].detail}
+                    disabled={!addresses[target].base}
+                    maxLength={200}
+                    placeholder="동·호수, 층, 만남 장소 등"
+                    onChange={(event) => {
+                        const detail = event.target.value;
+                        setAddresses((previous) => ({
+                            ...previous,
+                            [target]: { ...previous[target], detail },
+                        }));
+                        setValue(
+                            addressField[target],
+                            joinSelectedAddress(addresses[target].base, detail),
+                        );
+                        clearErrors(addressField[target]);
+                    }}
+                />
+            </div>
+            <p className="text-description-foreground mt-1.5 text-xs leading-relaxed">
                 기본 주소는 검색으로만 변경할 수 있습니다. 동·호수는 상세주소에
                 입력해 주세요.
             </p>
             {searchEnabled === false && (
                 <p
                     role="alert"
-                    className="text-destructive mt-2 text-sm leading-relaxed"
+                    className="text-destructive mt-1.5 text-sm leading-relaxed"
                 >
                     주소 검색을 이용할 수 없습니다. 잠시 후 다시 시도하거나
                     고객센터로 문의해 주세요.
@@ -421,9 +422,6 @@ export function StepHospitalInfo() {
                                     출발지 주소 (자택, 터미널, 지하철 역 등)
                                 </FieldLabel>
                                 {addressInput("depart")}
-                                <FieldError>
-                                    {errors.departAddress?.message}
-                                </FieldError>
                             </div>
 
                             <div>
@@ -451,9 +449,6 @@ export function StepHospitalInfo() {
                                     병원 주소
                                 </FieldLabel>
                                 {addressInput("hospital")}
-                                <FieldError>
-                                    {errors.hospitalAddress?.message}
-                                </FieldError>
                             </div>
                         </div>
                     </div>
