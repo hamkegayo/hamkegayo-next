@@ -20,6 +20,16 @@ function failure(status: number, error: string) {
     return Response.json({ error }, { status, headers: RESPONSE_HEADERS });
 }
 
+/**
+ * 네이버 프로필 email은 기본이 네이버ID@naver.com이지만 사용자가 외부 메일로 바꿀 수 있고
+ * 변경 주소의 소유 확인 여부는 문서에 없다. 네이버가 발급한 naver.com 주소만 검증된 이메일로 본다.
+ */
+function isNaverMailbox(email: string) {
+    return (
+        email.slice(email.lastIndexOf("@") + 1).toLowerCase() === "naver.com"
+    );
+}
+
 /** Supabase는 최상위 sub/email을 읽지만 네이버는 response 안에 반환한다. */
 export async function getNaverUserinfo(request: Request): Promise<Response> {
     const authorization = request.headers.get("authorization");
@@ -53,9 +63,15 @@ export async function getNaverUserinfo(request: Request): Promise<Response> {
 
         const { id, email, name } = parsed.data.response;
         // 이메일 미동의는 값을 만들어 채우지 않는다. Supabase가 가입을 거절한다.
-        // 네이버 응답에는 이메일 인증 여부가 없으므로 email_verified를 단정하지 않는다.
+        // 네이버 응답에는 이메일 인증 여부가 없다. naver.com 주소만 email_verified를 알리고,
+        // 외부 메일은 미검증으로 두어 Supabase의 인증 메일 확인을 거치게 한다.
         return Response.json(
-            { sub: id, ...(email && { email }), ...(name && { name }) },
+            {
+                sub: id,
+                ...(email && { email }),
+                ...(name && { name }),
+                ...(email && isNaverMailbox(email) && { email_verified: true }),
+            },
             { headers: RESPONSE_HEADERS },
         );
     } catch {

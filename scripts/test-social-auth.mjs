@@ -128,6 +128,29 @@ test("이메일 미제공을 임의 주소나 인증 완료로 채우지 않는�
     assert.deepEqual(await response.json(), { sub: "naver-user-id" });
 });
 
+test("naver.com 주소만 검증된 이메일로 알리고 외부·유사 도메인은 미검증으로 둔다", async (t) => {
+    let email;
+    const fetchMock = mock.method(globalThis, "fetch", async () =>
+        Response.json(profile({ email })),
+    );
+    t.after(() => fetchMock.mock.restore());
+    for (const [value, verified] of [
+        ["member@naver.com", true],
+        ["Member@NAVER.COM", true],
+        ["member@example.com", false],
+        ["member@gmail.com", false],
+        ["member@sub.naver.com", false],
+        ["member@navercom.com", false],
+        ["member@evilnaver.com", false],
+        ["member@naver.com.evil.example", false],
+    ]) {
+        email = value;
+        const body = await (await getNaverUserinfo(request())).json();
+        assert.equal(body.email, value);
+        assert.equal(body.email_verified, verified ? true : undefined, value);
+    }
+});
+
 test("네이버 오류·유효하지 않은 응답·네트워크 장애는 개인정보 없이 거절한다", async (t) => {
     let upstream;
     const fetchMock = mock.method(globalThis, "fetch", async () => {
