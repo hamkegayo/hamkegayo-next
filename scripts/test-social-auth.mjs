@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test, mock } from "node:test";
 
-import { safeInternalPath, SOCIAL_PROVIDERS } from "@/lib/auth/social.ts";
+import {
+    NAVER_LOGIN_ENABLED,
+    safeInternalPath,
+    SOCIAL_PROVIDERS,
+} from "@/lib/auth/social.ts";
 import { authPageWithNext } from "@/lib/auth/navigation.ts";
 
 import { getNaverUserinfo } from "@/lib/auth/naver-userinfo.ts";
@@ -40,6 +44,35 @@ test("기존 제공자 식별자와 내부 리디렉션 검증을 유지한다",
     assert.equal(safeInternalPath("//evil.example/path"), "/");
     assert.equal(safeInternalPath("https://evil.example/path"), "/");
     assert.equal(safeInternalPath("javascript:alert(1)"), "/");
+});
+
+test("네이버 로그인은 환경변수가 정확히 true일 때만 켜진다", async (t) => {
+    const key = "NEXT_PUBLIC_NAVER_LOGIN_ENABLED";
+    const saved = process.env[key];
+    t.after(() => {
+        if (saved === undefined) delete process.env[key];
+        else process.env[key] = saved;
+    });
+    for (const [value, enabled] of [
+        [undefined, false],
+        ["", false],
+        ["false", false],
+        ["1", false],
+        ["TRUE", false],
+        ["true", true],
+    ]) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+        // 모듈 상수는 로드 때 정해지므로 값마다 새로 불러온다.
+        const social = await import(
+            new URL(
+                `../lib/auth/social.ts?env=${value ?? "unset"}`,
+                import.meta.url,
+            ).href
+        );
+        assert.equal(social.NAVER_LOGIN_ENABLED, enabled, String(value));
+    }
+    assert.equal(typeof NAVER_LOGIN_ENABLED, "boolean");
 });
 
 test("기존 소셜 가입 RPC의 이메일 검증·권한 경계를 유지한다", () => {
