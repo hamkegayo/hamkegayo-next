@@ -1562,12 +1562,15 @@ async function main() {
 
     // =============================================================
     section("10. 자격 심사 담당 권한·사유·중복 처리 (#56)");
+    // 증빙 경로는 실행마다 새로 만든다. 삭제하면 partner_evidence_deletions 에
+    // 경로가 남아, 같은 경로는 다음 실행에서 RLS 가 객체를 숨긴다 (Object not found).
+    const proofPath = `${partnerId}/test-56-${crypto.randomUUID()}.pdf`;
     const qualification = await admin
         .from("partner_qualifications")
         .insert({
             partner_id: partnerId,
             type: "TEST-56",
-            path: `${partnerId}/test-56.pdf`,
+            path: proofPath,
             filename: "test-56.pdf",
             size: 1,
         })
@@ -1575,7 +1578,6 @@ async function main() {
         .single();
     if (qualification.error) throw qualification.error;
     const qualificationId = qualification.data.id;
-    const proofPath = `${partnerId}/test-56.pdf`;
     const proofUpload = await admin.storage
         .from("partner-qualifications")
         .upload(proofPath, Buffer.from("%PDF-1.4\nTEST-56\n%%EOF"), {
@@ -1634,7 +1636,7 @@ async function main() {
     });
     check(
         "심사 담당이 사유를 남기면 파일 경로 반환",
-        fileRead.data === `${partnerId}/test-56.pdf`,
+        fileRead.data === proofPath,
         fileRead.error?.message,
     );
     const loggedFile = await adminClient.rpc("can_read_qualification_file", {
