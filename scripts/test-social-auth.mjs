@@ -531,13 +531,22 @@ test("카카오 연결 해제: 라우트는 요청만 넘기고 미들웨어는 
     assert.ok(middleware.includes("path === KAKAO_UNLINK_PATH"));
 });
 
-test("탈퇴는 계정 잠금 뒤 소셜 연결을 해제해 같은 소셜 계정으로 다시 가입할 수 있게 한다 (#293)", () => {
+test("탈퇴 시 소셜 연결 해제는 DB 트리거가 탈퇴 트랜잭션 안에서 한다 (#293)", () => {
     const action = readFileSync(
         new URL("../app/(user)/mypage/_actions/withdraw.ts", import.meta.url),
         "utf8",
     );
-    const lock = action.indexOf("await lockAuthAccount(user.id);");
-    const release = action.indexOf("await releaseSocialIdentities(user.id);");
-    assert.ok(lock > 0 && release > lock, "잠금 뒤에 소셜 연결을 해제한다");
-    assert.ok(action.includes('"release_withdrawn_social_identities"'));
+    assert.ok(
+        !action.includes("release_withdrawn_social_identities"),
+        "서버 액션에서 따로 부르지 않는다(실패해도 다시 시도할 길이 없다)",
+    );
+    const migration = readFileSync(
+        new URL(
+            "../supabase/migrations/20260708000109_withdrawn_social_release_trigger.sql",
+            import.meta.url,
+        ),
+        "utf8",
+    );
+    assert.match(migration, /after update of status on public.profiles/);
+    assert.match(migration, /new.status = 'WITHDRAWN'/);
 });

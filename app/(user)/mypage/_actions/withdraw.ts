@@ -19,9 +19,10 @@ import { createAdminClient } from "@/utils/supabase/admin";
  *    ② auth 정리 — 로그인 자체를 막고 이메일 주소를 비운다. 실패해도
  *       ①이 이미 계정을 잠갔으므로 탈퇴는 성립한다. 다시 가입할 때
  *       같은 주소를 못 쓰는 문제만 남아 로그로 남기고 넘어간다.
- *    ③ 소셜 연결 해제 (#293) — 카카오·네이버 로그인 연결과 제공자 프로필을
- *       지운다. 남겨 두면 같은 소셜 계정으로 로그인할 때 잠긴 탈퇴 계정으로
- *       들어가 다시 가입할 수 없다. 실패해도 탈퇴는 성립하므로 로그만 남긴다.
+ *
+ *  소셜 로그인 연결(카카오·네이버)은 ①에서 함께 지워진다(#293). profiles 가
+ *  WITHDRAWN 으로 바뀌는 순간 DB 트리거(마이그레이션 109)가 같은 트랜잭션에서
+ *  지우므로, 같은 소셜 계정으로 다시 로그인하면 새 계정으로 가입된다.
  *
  *  순서가 반대면 안 된다. auth 를 먼저 건드리고 ①이 실패하면 개인정보는
  *  그대로인데 본인은 접근할 수 없는 상태가 된다.
@@ -49,21 +50,6 @@ const BLOCKER_MESSAGE: Record<string, string> = {
  *  같은 주소로 다시 가입할 수 있어야 한다. 그대로 두면 탈퇴가 주소를
  *  영구히 묶는다.
  */
-/**
- * 소셜 로그인 연결을 지운다 (#293). 같은 카카오·네이버 계정으로 다시 로그인하면
- * 새 계정으로 가입된다. 이메일 로그인 연결은 남긴다(이메일은 ②에서 이미 비웠다).
- * 개인정보처리방침 제4조 — 분쟁 대응에 필요한 최소 정보만 분리 보관한다.
- */
-async function releaseSocialIdentities(userId: string): Promise<void> {
-    const { error } = await createAdminClient().rpc(
-        "release_withdrawn_social_identities",
-        { p_user_id: userId },
-    );
-    if (error) {
-        console.error("[withdraw] 소셜 연결 해제 실패:", userId, error.code);
-    }
-}
-
 async function lockAuthAccount(userId: string): Promise<void> {
     const admin = createAdminClient();
     const { error } = await admin.auth.admin.updateUserById(userId, {
@@ -111,7 +97,6 @@ export async function withdrawMember(reason?: string): Promise<WithdrawResult> {
     }
 
     await lockAuthAccount(user.id);
-    await releaseSocialIdentities(user.id);
     await supabase.auth.signOut();
 
     return { ok: true };
