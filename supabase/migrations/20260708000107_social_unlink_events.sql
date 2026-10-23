@@ -10,7 +10,8 @@
 -- 개인정보처리방침 제11조 ① — 처리 목적 달성 시 지체 없이 파기(누락 방지 목적)
 -- 개인정보처리방침 제12조 ① — 동의철회 요청
 -- 개인정보처리방침 제13조 — 접근권한 관리 및 접근통제
--- 기록 보유기간은 방침 원문이 정하지 않아 미정이다(#291).
+-- 기록 보유기간은 방침 원문이 정하지 않아 미정이다(#291, 결정 전에는 파기 배치를 두지 않는다).
+-- 메모는 이 테이블에만 남는다(접속기록에는 남지 않음). 연락처 등 개인정보를 적지 않도록 화면에서 안내한다.
 -- =============================================================
 
 create table if not exists public.social_unlink_events (
@@ -102,9 +103,9 @@ comment on function public.admin_social_unlink_summary() is
   '관리자 홈의 미처리 연결 해제 건수(#291). 개인정보를 반환하지 않는다.';
 
 -- ---------- 목록 ----------
-create or replace function public.admin_list_social_unlinks(
-  p_status text default 'OPEN'
-)
+-- 한 번 호출로 미처리 전부(오래된 건 먼저, 최대 200)와 최근 처리 완료 20건(처리 순)을 돌려준다.
+-- 접속기록은 호출당 1건이다.
+create or replace function public.admin_list_social_unlinks()
 returns table (
   id            uuid,
   provider      text,
@@ -126,23 +127,23 @@ begin
   if not public.is_admin() then
     raise exception 'forbidden' using errcode = '42501';
   end if;
-  if p_status is not null and p_status not in ('OPEN', 'RESOLVED') then
-    raise exception 'invalid_status' using errcode = '22023';
-  end if;
   perform public.log_access('SOCIAL_UNLINK_LIST', 'social_unlink_events');
   return query
   select e.id, e.provider, e.referrer_type, e.status, e.user_id,
          p.name, p.email, p.status::text, e.memo, e.received_at, e.resolved_at
-    from public.social_unlink_events e
-    left join public.profiles p on p.id = e.user_id
-   where p_status is null or e.status = p_status
-   order by e.received_at desc
-   limit 100;
+    from (
+      (select o.* from public.social_unlink_events o
+        where o.status = 'OPEN' order by o.received_at asc limit 200)
+      union all
+      (select r.* from public.social_unlink_events r
+        where r.status = 'RESOLVED' order by r.resolved_at desc limit 20)
+    ) e
+    left join public.profiles p on p.id = e.user_id;
 end;
 $$;
 
-comment on function public.admin_list_social_unlinks(text) is
-  '연결 해제 기록과 연결된 회원 이름·이메일을 반환하고 관리자 접속기록을 남긴다(#291).';
+comment on function public.admin_list_social_unlinks() is
+  '미처리 연결 해제(오래된 순)와 최근 처리 완료 20건을 회원 이름·이메일과 함께 반환하고 접속기록을 남긴다(#291).';
 
 -- ---------- 처리 완료 ----------
 create or replace function public.admin_resolve_social_unlink(
@@ -157,7 +158,8 @@ as $$
 declare
   v_user uuid;
 begin
-  if not public.is_admin() then
+  -- 쓰기는 JWT 가 아니라 현재 권한으로 재확인한다(마이그레이션 21 의 9절, 제13조).
+  if not public.is_admin_live() then
     raise exception 'forbidden' using errcode = '42501';
   end if;
   if char_length(btrim(coalesce(p_memo, ''))) not between 2 and 1000 then
@@ -172,7 +174,11 @@ begin
     raise exception 'not_open' using errcode = 'P0002';
   end if;
 
-  perform public.log_access('SOCIAL_UNLINK_RESOLVE', 'social_unlink_events', p_id, v_user);
+  -- access_logs.subject_id 는 profiles 를 참조한다. 가입을 마치지 않아 프로필이 없는 계정은 null 로 남긴다.
+  perform public.log_access(
+    'SOCIAL_UNLINK_RESOLVE', 'social_unlink_events', p_id,
+    (select p.id from public.profiles p where p.id = v_user)
+  );
 end;
 $$;
 
@@ -180,8 +186,8 @@ comment on function public.admin_resolve_social_unlink(uuid, text) is
   '연결 해제 기록을 처리 완료로 바꾸고 접속기록을 남긴다(#291). 회원 데이터는 바꾸지 않는다.';
 
 revoke all on function public.admin_social_unlink_summary() from public, anon;
-revoke all on function public.admin_list_social_unlinks(text) from public, anon;
+revoke all on function public.admin_list_social_unlinks() from public, anon;
 revoke all on function public.admin_resolve_social_unlink(uuid, text) from public, anon;
 grant execute on function public.admin_social_unlink_summary() to authenticated;
-grant execute on function public.admin_list_social_unlinks(text) to authenticated;
+grant execute on function public.admin_list_social_unlinks() to authenticated;
 grant execute on function public.admin_resolve_social_unlink(uuid, text) to authenticated;

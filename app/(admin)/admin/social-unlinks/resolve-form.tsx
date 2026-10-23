@@ -12,7 +12,8 @@ export function ResolveForm({ id }: { id: string }) {
     return (
         <div className="mt-4 space-y-2">
             <label className="block text-sm" htmlFor={`unlink-${id}`}>
-                처리 메모 (2-1000자, 접속기록에 남습니다)
+                처리 메모 (2-1000자, 이 기록에 남습니다. 연락처 등 개인정보는
+                적지 마세요)
             </label>
             <textarea
                 id={`unlink-${id}`}
@@ -20,7 +21,7 @@ export function ResolveForm({ id }: { id: string }) {
                 onChange={(event) => setMemo(event.target.value)}
                 maxLength={1000}
                 disabled={pending}
-                placeholder="예) 회원탈퇴 절차로 처리함 / 진행 중 예약이 있어 고객에게 안내 후 처리 예정"
+                placeholder="예) 회원 확인함 / 고객문의 채널로 안내함"
                 className="bg-background w-full rounded-lg border p-3 text-sm"
             />
             <button

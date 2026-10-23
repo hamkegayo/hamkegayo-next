@@ -341,7 +341,7 @@ function unlinkDeps(overrides = {}) {
                 calls.record.push(event);
                 return true;
             },
-            notify: (event) => calls.notify.push(event),
+            notify: (event, result) => calls.notify.push({ ...event, ...result }),
             ...overrides,
         },
     };
@@ -374,7 +374,10 @@ test("카카오 연결 해제: 올바른 키의 POST·GET 은 기록하고 새 �
         { userId: "2910000001", referrerType: "UNLINK_FROM_APPS" },
         { userId: "2910000002", referrerType: "ACCOUNT_DELETE" },
     ]);
-    assert.equal(calls.notify.length, 2);
+    assert.deepEqual(
+        calls.notify.map((n) => n.recorded),
+        [true, true],
+    );
 
     const dup = unlinkDeps({ record: async () => false });
     await handleKakaoUnlink(
@@ -403,11 +406,17 @@ test("카카오 연결 해제: 키가 없거나 틀리면 401, 서버 키 미설
     assert.equal(calls.record.length, 0);
 });
 
-test("카카오 연결 해제: 형식 오류·기록 실패도 200 으로 답한다", async () => {
+test("카카오 연결 해제: 형식 오류·기록 실패도 200 으로 답하고, 개인정보 없이 로그를 남기며 실패는 알린다", async (t) => {
+    const logs = [];
+    const errorMock = mock.method(console, "error", (...args) => {
+        logs.push(args.map(String).join(" "));
+    });
+    t.after(() => errorMock.mock.restore());
+
     const { calls, deps } = unlinkDeps();
     for (const body of [
+        "user_id=2910000009&referrer_type=SOMETHING_NEW",
         "user_id=abc&referrer_type=UNLINK_FROM_APPS",
-        "user_id=1&referrer_type=SOMETHING",
         "referrer_type=UNLINK_FROM_APPS",
         "",
     ]) {
@@ -415,18 +424,28 @@ test("카카오 연결 해제: 형식 오류·기록 실패도 200 으로 답한
         assert.equal(res.status, 200, body);
     }
     assert.equal(calls.record.length, 0);
+    assert.equal(logs.length, 4, "형식 거절마다 로그를 남긴다");
+    assert.ok(logs[0].includes("SOMETHING_NEW"), "거절된 사유 값을 남긴다");
 
     const failing = unlinkDeps({
         record: async () => {
-            throw new Error("db down");
+            throw Object.assign(new Error("db down"), { code: "42P01" });
         },
     });
     const res = await handleKakaoUnlink(
-        unlinkRequest({ body: "user_id=1&referrer_type=ACCOUNT_DELETE" }),
+        unlinkRequest({ body: "user_id=2910000001&referrer_type=ACCOUNT_DELETE" }),
         failing.deps,
     );
     assert.equal(res.status, 200);
-    assert.equal(failing.calls.notify.length, 0);
+    assert.deepEqual(failing.calls.notify, [
+        { userId: "2910000001", referrerType: "ACCOUNT_DELETE", recorded: false },
+    ]);
+    const failLog = logs.at(-1);
+    assert.ok(failLog.includes("ACCOUNT_DELETE") && failLog.includes("42P01"));
+    for (const line of logs) {
+        assert.ok(!line.includes("291000000"), "회원번호를 로그에 남기지 않는다");
+        assert.ok(!line.includes(ADMIN_KEY), "어드민 키를 로그에 남기지 않는다");
+    }
 });
 
 test("카카오 연결 해제: 라우트는 요청만 넘기고 미들웨어는 세션 없이 통과시킨다", () => {

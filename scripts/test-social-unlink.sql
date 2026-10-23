@@ -20,13 +20,17 @@ $$;
 
 insert into auth.users(id,email) values
   ('00000291-0000-4000-8000-000000000001','unlink-admin@example.invalid'),
-  ('00000291-0000-4000-8000-000000000002','unlink-member@example.invalid');
+  ('00000291-0000-4000-8000-000000000002','unlink-member@example.invalid'),
+  -- 카카오 인증만 하고 가입 완료 전에 이탈해 프로필이 없는 계정
+  ('00000291-0000-4000-8000-000000000003','unlink-noprofile@example.invalid');
 insert into public.profiles(id,name,role,email) values
   ('00000291-0000-4000-8000-000000000001','Unlink Admin','ADMIN','unlink-admin@example.invalid'),
   ('00000291-0000-4000-8000-000000000002','Unlink Member','USER','unlink-member@example.invalid');
 insert into auth.identities(provider_id,user_id,identity_data,provider,created_at,updated_at) values
   ('2910000001','00000291-0000-4000-8000-000000000002',
-   '{"sub":"2910000001","email":"unlink-member@example.invalid"}','kakao',now(),now());
+   '{"sub":"2910000001","email":"unlink-member@example.invalid"}','kakao',now(),now()),
+  ('2910000003','00000291-0000-4000-8000-000000000003',
+   '{"sub":"2910000003","email":"unlink-noprofile@example.invalid"}','kakao',now(),now());
 
 -- 클라이언트는 적재 함수와 테이블에 접근할 수 없다
 select pg_temp.assert(
@@ -48,6 +52,7 @@ select pg_temp.assert(public.record_social_unlink('kakao','2910000001','UNLINK_F
 select pg_temp.assert(not public.record_social_unlink('kakao','2910000001','UNLINK_FROM_APPS'), 'retransmission ignored');
 select pg_temp.assert(public.record_social_unlink('kakao','2910000001','ACCOUNT_DELETE'), 'different referrer recorded');
 select pg_temp.assert(public.record_social_unlink('kakao','2919999999','UNLINK_FROM_APPS'), 'unknown member recorded');
+select pg_temp.assert(public.record_social_unlink('kakao','2910000003','UNLINK_FROM_APPS'), 'profile-less account recorded');
 select pg_temp.denied($q$select public.record_social_unlink('kakao','abc','UNLINK_FROM_APPS')$q$, 'non-numeric user id rejected');
 select pg_temp.denied($q$select public.record_social_unlink('kakao','2910000001','SOMETHING')$q$, 'unknown referrer rejected');
 select pg_temp.denied($q$select public.record_social_unlink('naver','2910000001','UNLINK_FROM_APPS')$q$, 'unsupported provider rejected');
@@ -80,7 +85,6 @@ select pg_temp.assert(
     where referrer_type='UNLINK_FROM_APPS' and user_id='00000291-0000-4000-8000-000000000002')
     = 'unlink-member@example.invalid',
   'list shows matched member');
-select pg_temp.denied($q$select public.admin_list_social_unlinks('DONE')$q$, 'invalid status rejected');
 select pg_temp.denied($q$select public.admin_resolve_social_unlink(
   (select id from public.admin_list_social_unlinks() where user_id is null limit 1),'x')$q$, 'short memo rejected');
 reset role;
@@ -105,6 +109,43 @@ select pg_temp.assert(
   exists(select 1 from public.access_logs where action='SOCIAL_UNLINK_RESOLVE'
            and target_id=(select id from t_ev) and subject_id='00000291-0000-4000-8000-000000000002'),
   'resolve writes access log with member');
+
+-- 프로필 없는 계정 건도 처리 완료되고, 접속기록의 정보주체는 비운다
+create temp table t_np as
+  select id from public.social_unlink_events where provider_user_id='2910000003' and status='OPEN';
+grant select on t_np to authenticated;
+set local role authenticated;
+select public.admin_resolve_social_unlink((select id from t_np), '가입 미완료 계정 확인함');
+reset role;
+select pg_temp.assert(
+  (select status from public.social_unlink_events where id=(select id from t_np)) = 'RESOLVED'
+  and exists(select 1 from public.access_logs where action='SOCIAL_UNLINK_RESOLVE'
+               and target_id=(select id from t_np) and subject_id is null),
+  'profile-less account resolved with null subject');
+
+-- 목록은 호출당 접속기록 1건, 처리 완료 건은 처리 순서로 나온다
+select pg_temp.assert(
+  (select count(*) from public.access_logs where action='SOCIAL_UNLINK_LIST'
+     and actor_id='00000291-0000-4000-8000-000000000001') = 1,
+  'list logged once so far');
+set local role authenticated;
+select pg_temp.assert(
+  (select array_agg(status order by status) from (select distinct status from public.admin_list_social_unlinks()) x)
+    = array['OPEN','RESOLVED'],
+  'single call returns open and resolved');
+reset role;
+select pg_temp.assert(
+  (select count(*) from public.access_logs where action='SOCIAL_UNLINK_LIST'
+     and actor_id='00000291-0000-4000-8000-000000000001') = 2,
+  'one access log per list call');
+
+-- 권한을 회수당한 관리자는 JWT 가 남아 있어도 처리할 수 없다(is_admin_live)
+update public.profiles set status='SUSPENDED' where id='00000291-0000-4000-8000-000000000001';
+set local role authenticated;
+select pg_temp.denied($q$select public.admin_resolve_social_unlink(
+  (select id from public.social_unlink_events where status='OPEN' limit 1),'권한 회수 후 처리')$q$, 'suspended admin cannot resolve');
+reset role;
+update public.profiles set status='ACTIVE' where id='00000291-0000-4000-8000-000000000001';
 
 -- 처리 완료 뒤 같은 사유가 다시 오면 새 미처리 건이 된다
 set local role service_role;

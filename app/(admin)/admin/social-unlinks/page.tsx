@@ -21,25 +21,24 @@ type Row = {
 };
 
 /**
- * 카카오 연결 해제 알림 (#291). 기록과 확인만 한다. 회원 데이터는 자동으로 바꾸지 않으며,
- * 운영자가 회원을 확인해 기존 회원탈퇴 절차로 처리한 뒤 처리 완료로 표시한다.
- * 목록 조회는 접속기록에 남는다.
+ * 카카오 연결 해제 알림 (#291). 기록과 확인만 한다. 회원 데이터는 자동으로 바꾸지 않는다.
+ * 연결 해제 건을 어떻게 처리할지(회원 의사 확인·탈퇴 등)는 결정 대기 중이라 확정된 절차처럼
+ * 안내하지 않는다(#292 리뷰). 목록은 한 번 호출하고 접속기록 1건을 남긴다.
  */
 export default async function SocialUnlinksPage() {
     const supabase = await createClient();
-    const [open, resolved] = await Promise.all([
-        supabase.rpc("admin_list_social_unlinks", { p_status: "OPEN" }),
-        supabase.rpc("admin_list_social_unlinks", { p_status: "RESOLVED" }),
-    ]);
-    if (open.error || resolved.error)
+    const { data, error } = await supabase.rpc("admin_list_social_unlinks");
+    if (error)
         return (
             <p role="alert">
                 관리자 권한과 2단계 인증이 필요합니다. 목록을 불러오지
                 못했습니다.
             </p>
         );
-    const openRows = (open.data ?? []) as Row[];
-    const resolvedRows = ((resolved.data ?? []) as Row[]).slice(0, 20);
+    const rows = (data ?? []) as Row[];
+    // RPC 가 미처리는 오래된 순, 처리 완료는 최근 처리 순(20건)으로 준다.
+    const openRows = rows.filter((row) => row.status === "OPEN");
+    const resolvedRows = rows.filter((row) => row.status === "RESOLVED");
     const label = (type: string) =>
         KAKAO_UNLINK_LABEL[type as KakaoUnlinkReferrer] ?? type;
 
@@ -52,8 +51,8 @@ export default async function SocialUnlinksPage() {
             <p className="text-description-foreground mt-2 text-sm leading-relaxed break-keep">
                 사용자가 카카오 쪽에서 서비스 연결을 끊거나 카카오계정을
                 탈퇴하면 기록됩니다. 회원 데이터는 자동으로 바꾸지 않았습니다.
-                회원을 확인해 회원탈퇴 절차로 처리하고, 진행 중인 예약이나
-                결제가 있으면 먼저 고객에게 안내한 뒤 처리 완료로 표시해 주세요.
+                회원을 확인하고 운영 기준에 따라 조치한 뒤 처리 완료로 표시해
+                주세요. 미처리 건은 오래된 순으로 보입니다.
             </p>
 
             <h2 className="mt-8 text-lg font-bold">미처리</h2>
