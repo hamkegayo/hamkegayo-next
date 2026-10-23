@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test, mock } from "node:test";
 
-import { safeInternalPath, SOCIAL_PROVIDERS } from "@/lib/auth/social.ts";
+import {
+    isSocialProviderEnabled,
+    safeInternalPath,
+    SOCIAL_PROVIDERS,
+} from "@/lib/auth/social.ts";
 import { authPageWithNext } from "@/lib/auth/navigation.ts";
 
 import { getNaverUserinfo } from "@/lib/auth/naver-userinfo.ts";
@@ -42,6 +46,65 @@ test("기존 제공자 식별자와 내부 리디렉션 검증을 유지한다",
     assert.equal(safeInternalPath("javascript:alert(1)"), "/");
 });
 
+test("네이버 로그인은 환경변수가 정확히 true일 때만 켜진다", async (t) => {
+    const key = "NEXT_PUBLIC_NAVER_LOGIN_ENABLED";
+    const saved = process.env[key];
+    t.after(() => {
+        if (saved === undefined) delete process.env[key];
+        else process.env[key] = saved;
+    });
+    for (const [value, enabled] of [
+        [undefined, false],
+        ["", false],
+        ["false", false],
+        ["1", false],
+        ["TRUE", false],
+        ["true", true],
+    ]) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+        // 모듈 상수는 로드 때 정해지므로 값마다 새로 불러온다.
+        const social = await import(
+            new URL(
+                `../lib/auth/social.ts?env=${value ?? "unset"}`,
+                import.meta.url,
+            ).href
+        );
+        assert.equal(social.NAVER_LOGIN_ENABLED, enabled, String(value));
+    }
+});
+
+test("카카오는 항상 열고 네이버는 플래그를 켠 경우에만 연다", () => {
+    assert.equal(isSocialProviderEnabled("kakao", false), true);
+    assert.equal(isSocialProviderEnabled("kakao", true), true);
+    assert.equal(isSocialProviderEnabled("naver", false), false);
+    assert.equal(isSocialProviderEnabled("naver", true), true);
+});
+
+test("로그인 화면의 네이버 시작 가드·버튼 비활성·문구가 같은 판정을 쓴다", () => {
+    const form = readFileSync(
+        new URL("../app/(user)/login/_components/login-form.tsx", import.meta.url),
+        "utf8",
+    );
+    assert.doesNotMatch(form, /NAVER_LOGIN_ENABLED/);
+    assert.ok(form.includes("if (!isSocialProviderEnabled(provider)) return;"));
+    assert.match(form, /disabled=\{\s*!isSocialProviderEnabled\("naver"\) \|\|/);
+    assert.match(form, /\{isSocialProviderEnabled\("naver"\)\s*\? "네이버 로그인"/);
+});
+
+test("userinfo 라우트는 요청만 넘겨 컨텍스트가 플래그로 읽히지 않는다", () => {
+    const route = readFileSync(
+        new URL("../app/api/auth/naver/userinfo/route.ts", import.meta.url),
+        "utf8",
+    );
+    assert.ok(
+        route.includes(
+            "GET = (request: Request) => getNaverUserinfo(request)",
+        ),
+    );
+    assert.ok(!route.includes("GET = getNaverUserinfo;"));
+});
+
 test("기존 소셜 가입 RPC의 이메일 검증·권한 경계를 유지한다", () => {
     const migration = readFileSync(
         new URL(
@@ -70,6 +133,8 @@ const request = (authorization = `Bearer ${token}`) =>
     new Request("https://example.com/api/auth/naver/userinfo", {
         headers: authorization ? { Authorization: authorization } : {},
     });
+// 네이버 로그인을 켠 환경의 동작을 검사한다. 꺼진 환경은 아래에서 따로 본다.
+const userinfo = (req) => getNaverUserinfo(req, true);
 const profile = (response = {}) => ({
     resultcode: "00",
     response: { id: "naver-user-id", email: "member@example.com", ...response },
@@ -91,7 +156,7 @@ test("네이버 중첩 프로필은 필요한 최상위 claims만 반환한다",
         );
     });
     t.after(() => fetchMock.mock.restore());
-    const response = await getNaverUserinfo(request());
+    const response = await userinfo(request());
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("cache-control"), "no-store");
     assert.deepEqual(await response.json(), {
@@ -99,6 +164,23 @@ test("네이버 중첩 프로필은 필요한 최상위 claims만 반환한다",
         email: "member@example.com",
         name: "회원",
     });
+});
+
+test("네이버 로그인을 켜지 않은 환경은 네이버 API를 호출하지 않고 503으로 거절한다", async (t) => {
+    const fetchMock = mock.method(globalThis, "fetch", async () => {
+        throw new Error("must not call");
+    });
+    t.after(() => fetchMock.mock.restore());
+    for (const response of [
+        await getNaverUserinfo(request(), false),
+        // 테스트 환경은 플래그를 주지 않으므로 기본값도 꺼짐이어야 한다.
+        await getNaverUserinfo(request()),
+    ]) {
+        assert.equal(response.status, 503);
+        assert.equal(response.headers.get("cache-control"), "no-store");
+        assert.ok(!(await response.text()).includes(token));
+    }
+    assert.equal(fetchMock.mock.callCount(), 0);
 });
 
 test("토큰이 없거나 잘못되면 네이버 API를 호출하지 않는다", async (t) => {
@@ -112,7 +194,7 @@ test("토큰이 없거나 잘못되면 네이버 API를 호출하지 않는다",
         "Bearer invalid token",
         `Bearer ${"a".repeat(4096)}`,
     ]) {
-        const response = await getNaverUserinfo(request(authorization));
+        const response = await userinfo(request(authorization));
         assert.equal(response.status, 401);
         assert.equal(response.headers.get("cache-control"), "no-store");
     }
@@ -124,8 +206,31 @@ test("이메일 미제공을 임의 주소나 인증 완료로 채우지 않는�
         Response.json(profile({ email: undefined })),
     );
     t.after(() => fetchMock.mock.restore());
-    const response = await getNaverUserinfo(request());
+    const response = await userinfo(request());
     assert.deepEqual(await response.json(), { sub: "naver-user-id" });
+});
+
+test("naver.com 주소만 검증된 이메일로 알리고 외부·유사 도메인은 미검증으로 둔다", async (t) => {
+    let email;
+    const fetchMock = mock.method(globalThis, "fetch", async () =>
+        Response.json(profile({ email })),
+    );
+    t.after(() => fetchMock.mock.restore());
+    for (const [value, verified] of [
+        ["member@naver.com", true],
+        ["Member@NAVER.COM", true],
+        ["member@example.com", false],
+        ["member@gmail.com", false],
+        ["member@sub.naver.com", false],
+        ["member@navercom.com", false],
+        ["member@evilnaver.com", false],
+        ["member@naver.com.evil.example", false],
+    ]) {
+        email = value;
+        const body = await (await userinfo(request())).json();
+        assert.equal(body.email, value);
+        assert.equal(body.email_verified, verified ? true : undefined, value);
+    }
 });
 
 test("네이버 오류·유효하지 않은 응답·네트워크 장애는 개인정보 없이 거절한다", async (t) => {
@@ -149,7 +254,7 @@ test("네이버 오류·유효하지 않은 응답·네트워크 장애는 개�
         [new Error(`provider secret ${token}`), 502],
     ]) {
         upstream = result;
-        const response = await getNaverUserinfo(request());
+        const response = await userinfo(request());
         assert.equal(response.status, status);
         assert.equal(response.headers.get("cache-control"), "no-store");
         const body = await response.text();
