@@ -4,7 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/utils/supabase/server";
 
-/** 카카오 연결 해제 건을 처리 완료로 표시한다 (#291). 회원 데이터는 바꾸지 않는다. */
+/**
+ * 카카오 연결 해제 건을 처리 완료한다 (#291). 기록은 파기되고 메모는 접속기록에 남는다.
+ * 회원 데이터는 바꾸지 않는다.
+ */
 export async function resolveSocialUnlink(input: { id: string; memo: string }) {
     const memo = input.memo.trim();
     if (memo.length < 2 || memo.length > 1000)

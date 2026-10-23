@@ -10,20 +10,18 @@ import { ResolveForm } from "./resolve-form";
 type Row = {
     id: string;
     referrer_type: string;
-    status: string;
     user_id: string | null;
     member_name: string | null;
     member_email: string | null;
     member_status: string | null;
-    memo: string | null;
     received_at: string;
-    resolved_at: string | null;
 };
 
 /**
  * 카카오 연결 해제 알림 (#291). 기록과 확인만 한다. 회원 데이터는 자동으로 바꾸지 않는다.
- * 연결 해제 건을 어떻게 처리할지(회원 의사 확인·탈퇴 등)는 결정 대기 중이라 확정된 절차처럼
- * 안내하지 않는다(#292 리뷰). 목록은 한 번 호출하고 접속기록 1건을 남긴다.
+ * 처리 기준(2026-10-23 결정 A): 고객문의 채널로 회원의 탈퇴 의사를 확인한 뒤 처리한다
+ * (개인정보처리방침 제12조 ③). 처리 완료하면 기록은 지체 없이 파기되고(제11조 ①)
+ * 처리 메모는 접속기록에만 남는다. 목록은 한 번 호출하고 접속기록 1건을 남긴다.
  */
 export default async function SocialUnlinksPage() {
     const supabase = await createClient();
@@ -36,9 +34,6 @@ export default async function SocialUnlinksPage() {
             </p>
         );
     const rows = (data ?? []) as Row[];
-    // RPC 가 미처리는 오래된 순, 처리 완료는 최근 처리 순(20건)으로 준다.
-    const openRows = rows.filter((row) => row.status === "OPEN");
-    const resolvedRows = rows.filter((row) => row.status === "RESOLVED");
     const label = (type: string) =>
         KAKAO_UNLINK_LABEL[type as KakaoUnlinkReferrer] ?? type;
 
@@ -50,17 +45,31 @@ export default async function SocialUnlinksPage() {
             <h1 className="mt-4 text-2xl font-bold">카카오 연결 해제</h1>
             <p className="text-description-foreground mt-2 text-sm leading-relaxed break-keep">
                 사용자가 카카오 쪽에서 서비스 연결을 끊거나 카카오계정을
-                탈퇴하면 기록됩니다. 회원 데이터는 자동으로 바꾸지 않았습니다.
-                회원을 확인하고 운영 기준에 따라 조치한 뒤 처리 완료로 표시해
-                주세요. 미처리 건은 오래된 순으로 보입니다.
+                탈퇴하면 기록됩니다. 연결 해제만으로 탈퇴를 요청한 것으로 보지
+                않으며, 회원 데이터는 자동으로 바꾸지 않았습니다.
             </p>
+            <ol className="text-description-foreground mt-3 list-decimal space-y-1 pl-5 text-sm leading-relaxed break-keep">
+                <li>
+                    고객문의 채널(이메일·카카오톡)로 회원에게 연락해 탈퇴 의사를
+                    확인합니다.
+                </li>
+                <li>
+                    탈퇴를 원하면 서비스 안의 회원탈퇴 기능을 안내합니다.
+                    카카오계정 탈퇴 등으로 로그인할 수 없는 회원이 탈퇴를
+                    요청하면 개발 담당에게 처리를 요청합니다.
+                </li>
+                <li>
+                    확인을 마치면 결과를 메모로 남기고 처리 완료합니다. 기록은
+                    바로 파기되고 메모는 접속기록에만 남습니다.
+                </li>
+            </ol>
 
-            <h2 className="mt-8 text-lg font-bold">미처리</h2>
-            {openRows.length === 0 ? (
+            <h2 className="mt-8 text-lg font-bold">미처리 (오래된 순)</h2>
+            {rows.length === 0 ? (
                 <p className="mt-3 leading-relaxed">미처리 건이 없습니다.</p>
             ) : (
                 <ul className="mt-3 space-y-4">
-                    {openRows.map((row) => (
+                    {rows.map((row) => (
                         <li
                             key={row.id}
                             className="bg-background rounded-xl border p-5"
@@ -77,26 +86,6 @@ export default async function SocialUnlinksPage() {
                                     : "연결된 회원이 없습니다(가입 미완료이거나 이미 정리된 계정)."}
                             </p>
                             <ResolveForm id={row.id} />
-                        </li>
-                    ))}
-                </ul>
-            )}
-
-            <h2 className="mt-10 text-lg font-bold">최근 처리 완료</h2>
-            {resolvedRows.length === 0 ? (
-                <p className="mt-3 leading-relaxed">처리한 건이 없습니다.</p>
-            ) : (
-                <ul className="divide-border mt-3 divide-y text-sm">
-                    {resolvedRows.map((row) => (
-                        <li key={row.id} className="py-3">
-                            <p className="font-semibold">
-                                {label(row.referrer_type)} ·{" "}
-                                {row.member_name ?? "회원 없음"}
-                            </p>
-                            <p className="text-muted-foreground mt-0.5">
-                                처리 {kstDateTime(row.resolved_at ?? "")} ·{" "}
-                                {row.memo}
-                            </p>
                         </li>
                     ))}
                 </ul>

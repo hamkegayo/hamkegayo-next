@@ -33,7 +33,7 @@ export async function sendKakaoUnlinkAlert(
         const body = recorded
             ? `${label} 알림을 받았습니다 (${at}).
     회원 데이터는 자동으로 바꾸지 않았습니다. 관리자 화면에서 회원을 확인하고
-    운영 기준에 따라 조치한 뒤 처리 완료로 표시해 주세요.`
+    고객문의 채널로 탈퇴 의사를 확인한 뒤 처리 완료해 주세요.`
             : `${label} 알림을 받았지만 기록에 실패했습니다 (${at}).
     카카오는 이 알림을 다시 보내지 않습니다. 서버 로그의 [kakao-unlink] 항목과
     마이그레이션 적용·Supabase 연결 상태를 확인해 주세요.`;

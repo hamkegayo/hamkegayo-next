@@ -12,7 +12,7 @@ export function ResolveForm({ id }: { id: string }) {
     return (
         <div className="mt-4 space-y-2">
             <label className="block text-sm" htmlFor={`unlink-${id}`}>
-                처리 메모 (2-1000자, 이 기록에 남습니다. 연락처 등 개인정보는
+                처리 메모 (2-1000자, 접속기록에 남습니다. 연락처 등 개인정보는
                 적지 마세요)
             </label>
             <textarea
@@ -21,7 +21,7 @@ export function ResolveForm({ id }: { id: string }) {
                 onChange={(event) => setMemo(event.target.value)}
                 maxLength={1000}
                 disabled={pending}
-                placeholder="예) 회원 확인함 / 고객문의 채널로 안내함"
+                placeholder="예) 이메일로 탈퇴 의사 확인, 본인 탈퇴 안내함 / 계속 이용 의사 확인함"
                 className="bg-background w-full rounded-lg border p-3 text-sm"
             />
             <button
@@ -31,7 +31,9 @@ export function ResolveForm({ id }: { id: string }) {
                     startTransition(async () => {
                         const result = await resolveSocialUnlink({ id, memo });
                         if (result.ok)
-                            toast.success("처리 완료로 표시했습니다.");
+                            toast.success(
+                                "처리 완료했습니다. 기록은 파기됐습니다.",
+                            );
                         else toast.error(result.message);
                     })
                 }
