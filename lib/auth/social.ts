@@ -11,6 +11,14 @@ export type SocialProvider = keyof typeof SOCIAL_PROVIDERS;
 export const NAVER_LOGIN_ENABLED =
     process.env.NEXT_PUBLIC_NAVER_LOGIN_ENABLED === "true";
 
+/** 카카오는 항상 열려 있고 네이버는 위 환경변수로 켠 환경에서만 연다. */
+export function isSocialProviderEnabled(
+    provider: SocialProvider,
+    naverEnabled = NAVER_LOGIN_ENABLED,
+) {
+    return provider !== "naver" || naverEnabled;
+}
+
 export const NAVER_USERINFO_PATH = "/api/auth/naver/userinfo";
 
 export function safeInternalPath(value: string | null | undefined): string {

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { NAVER_LOGIN_ENABLED } from "./social";
+
 const NAVER_PROFILE_URL = "https://openapi.naver.com/v1/nid/me";
 const RESPONSE_HEADERS = {
     "Cache-Control": "no-store",
@@ -25,13 +27,19 @@ function failure(status: number, error: string) {
  * 변경 주소의 소유 확인 여부는 문서에 없다. 네이버가 발급한 naver.com 주소만 검증된 이메일로 본다.
  */
 function isNaverMailbox(email: string) {
-    return (
-        email.slice(email.lastIndexOf("@") + 1).toLowerCase() === "naver.com"
-    );
+    return email.toLowerCase().endsWith("@naver.com");
 }
 
-/** Supabase는 최상위 sub/email을 읽지만 네이버는 response 안에 반환한다. */
-export async function getNaverUserinfo(request: Request): Promise<Response> {
+/**
+ * Supabase는 최상위 sub/email을 읽지만 네이버는 response 안에 반환한다.
+ * `enabled`는 네이버 로그인을 켠 환경인지다. 꺼져 있으면 Supabase에 provider만 켜져 있어도
+ * 프로필을 넘기지 않는다. 라우트는 두 번째 인자에 컨텍스트를 넘기므로 직접 연결하지 말고 감싸서 쓴다.
+ */
+export async function getNaverUserinfo(
+    request: Request,
+    enabled = NAVER_LOGIN_ENABLED,
+): Promise<Response> {
+    if (!enabled) return failure(503, "provider_disabled");
     const authorization = request.headers.get("authorization");
     if (
         !authorization ||
