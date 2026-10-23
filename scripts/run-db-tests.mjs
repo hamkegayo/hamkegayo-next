@@ -148,6 +148,10 @@ export const SUITES = [
         "카카오 연결 해제 기록 · 재전송 중복 · 관리자 조회/처리 · 접근 기록 (#291)",
         [sql("test-social-unlink.sql")],
     ],
+    [
+        "탈퇴 회원 소셜 연결 해제 · 탈퇴 회원만 · 이메일 연결 유지 (#293)",
+        [sql("test-withdrawn-social-release.sql")],
+    ],
     ["정산 계좌 열람 통제 (#51)", [npm("test:payout")]],
     [
         "이메일 인증 연락처 변경 · 목적/대상/일회 소비 (#64)",

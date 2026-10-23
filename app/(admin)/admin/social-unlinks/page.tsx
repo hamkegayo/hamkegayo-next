@@ -83,7 +83,7 @@ export default async function SocialUnlinksPage() {
                             <p className="mt-2 text-sm leading-relaxed">
                                 {row.user_id
                                     ? `회원 ${row.member_name ?? "(프로필 없음)"} · ${row.member_email ?? "-"} · 상태 ${row.member_status ?? "-"}`
-                                    : "연결된 회원이 없습니다(가입 미완료이거나 이미 정리된 계정)."}
+                                    : "연결된 회원이 없습니다. 가입을 마치지 않았거나, 이미 탈퇴해 소셜 연결이 정리된 회원입니다(탈퇴 회원은 따로 조치할 것이 없습니다)."}
                             </p>
                             <ResolveForm id={row.id} />
                         </li>
