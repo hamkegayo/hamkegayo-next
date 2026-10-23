@@ -4,6 +4,7 @@ import {
     AlertTriangle,
     ClipboardCheck,
     ScrollText,
+    UserX,
     Wallet,
 } from "lucide-react";
 
@@ -39,6 +40,8 @@ const ACTION_LABEL: Record<string, string> = {
     PAYMENT_INCIDENT_STATUS: "결제 사고 상태 변경",
     PAYMENT_INCIDENT_CONTACT: "결제 사고 고객 안내 기록",
     PARTNER_ACCOUNT_ISSUE: "파트너 계정 발급",
+    SOCIAL_UNLINK_LIST: "카카오 연결 해제 목록 조회",
+    SOCIAL_UNLINK_RESOLVE: "카카오 연결 해제 처리",
 };
 
 function formatAt(iso: string): string {
@@ -73,6 +76,13 @@ export default async function AdminHome() {
             value: overview.openPaymentIncidents,
             href: "/admin/payments",
             unavailable: overview.paymentIncidentSummaryUnavailable,
+        },
+        {
+            icon: UserX,
+            label: "미처리 카카오 연결 해제",
+            value: overview.openSocialUnlinks,
+            href: "/admin/social-unlinks",
+            unavailable: overview.socialUnlinkSummaryUnavailable,
         },
     ];
 

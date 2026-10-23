@@ -1,12 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { NAVER_USERINFO_PATH } from "@/lib/auth/social";
+import { KAKAO_UNLINK_PATH, NAVER_USERINFO_PATH } from "@/lib/auth/social";
 
 import { updateSession } from "@/utils/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
-    // Supabase Auth 서버가 네이버 토큰으로 호출한다. 사이트 세션 쿠키를 요구하지 않는다.
-    if (request.nextUrl.pathname === NAVER_USERINFO_PATH) {
+    // Supabase Auth 서버(네이버 토큰)와 카카오 웹훅 서버(어드민 키)가 호출한다.
+    // 사이트 세션 쿠키를 요구하지 않는다.
+    const path = request.nextUrl.pathname;
+    if (path === NAVER_USERINFO_PATH || path === KAKAO_UNLINK_PATH) {
         return NextResponse.next();
     }
     return await updateSession(request);

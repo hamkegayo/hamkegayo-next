@@ -21,6 +21,9 @@ export type AdminOverview = {
     /** 미처리 중 최상 심각도 */
     criticalPaymentIncidents: number;
     paymentIncidentSummaryUnavailable: boolean;
+    /** 미처리 카카오 연결 해제 (#291) */
+    openSocialUnlinks: number;
+    socialUnlinkSummaryUnavailable: boolean;
     /** 최근 접속기록 */
     recentAccess: {
         id: number;
@@ -38,6 +41,8 @@ const EMPTY: AdminOverview = {
     openPaymentIncidents: 0,
     criticalPaymentIncidents: 0,
     paymentIncidentSummaryUnavailable: false,
+    openSocialUnlinks: 0,
+    socialUnlinkSummaryUnavailable: false,
     recentAccess: [],
 };
 
@@ -49,29 +54,37 @@ export async function getAdminOverview(): Promise<AdminOverview> {
         } = await supabase.auth.getUser();
         if (!user) return EMPTY;
 
-        const [profile, quals, settlements, reservations, incidents, logs] =
-            await Promise.all([
-                supabase
-                    .from("profiles")
-                    .select("name")
-                    .eq("id", user.id)
-                    .maybeSingle(),
-                supabase
-                    .from("partner_qualifications")
-                    .select("id", { count: "exact", head: true })
-                    .eq("status", "PENDING"),
-                supabase
-                    .from("settlements")
-                    .select("id", { count: "exact", head: true })
-                    .neq("status", "PAID"),
-                supabase.rpc("admin_list_reservations", { p_limit: 200 }),
-                supabase.rpc("admin_payment_incident_summary"),
-                supabase
-                    .from("access_logs")
-                    .select("id, action, occurred_at, reason")
-                    .order("occurred_at", { ascending: false })
-                    .limit(10),
-            ]);
+        const [
+            profile,
+            quals,
+            settlements,
+            reservations,
+            incidents,
+            logs,
+            unlinks,
+        ] = await Promise.all([
+            supabase
+                .from("profiles")
+                .select("name")
+                .eq("id", user.id)
+                .maybeSingle(),
+            supabase
+                .from("partner_qualifications")
+                .select("id", { count: "exact", head: true })
+                .eq("status", "PENDING"),
+            supabase
+                .from("settlements")
+                .select("id", { count: "exact", head: true })
+                .neq("status", "PAID"),
+            supabase.rpc("admin_list_reservations", { p_limit: 200 }),
+            supabase.rpc("admin_payment_incident_summary"),
+            supabase
+                .from("access_logs")
+                .select("id, action, occurred_at, reason")
+                .order("occurred_at", { ascending: false })
+                .limit(10),
+            supabase.rpc("admin_social_unlink_summary"),
+        ]);
 
         const incidentSummary = (incidents.data?.[0] ?? null) as {
             open_count?: number;
@@ -90,6 +103,9 @@ export async function getAdminOverview(): Promise<AdminOverview> {
                 incidentSummary?.critical_count ?? 0,
             ),
             paymentIncidentSummaryUnavailable,
+            openSocialUnlinks: Number(unlinks.data ?? 0),
+            socialUnlinkSummaryUnavailable:
+                Boolean(unlinks.error) || unlinks.data == null,
             recentAccess: (logs.data ?? []).map((r) => ({
                 id: r.id as number,
                 action: r.action as string,
@@ -98,6 +114,10 @@ export async function getAdminOverview(): Promise<AdminOverview> {
             })),
         };
     } catch {
-        return { ...EMPTY, paymentIncidentSummaryUnavailable: true };
+        return {
+            ...EMPTY,
+            paymentIncidentSummaryUnavailable: true,
+            socialUnlinkSummaryUnavailable: true,
+        };
     }
 }
