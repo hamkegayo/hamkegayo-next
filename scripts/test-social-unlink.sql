@@ -1,4 +1,4 @@
--- 카카오 연결 해제 웹훅 기록 (#291) — 적재 권한·회원 매칭·재전송 중복·관리자 조회/처리(=파기)·접속기록.
+-- 카카오 연결 해제 웹훅 기록 (#291) — 적재 권한·회원 매칭·같은 미처리 건에 합침·관리자 조회/처리(=파기)·접속기록.
 begin;
 create function pg_temp.assert(p_ok boolean, p_label text) returns void language plpgsql as $$
 begin
@@ -47,10 +47,10 @@ select pg_temp.denied($q$select * from public.admin_list_social_unlinks()$q$, 'm
 select pg_temp.denied($q$select public.admin_resolve_social_unlink(gen_random_uuid(),'회원 확인함')$q$, 'member cannot resolve');
 reset role;
 
--- 적재: 회원 매칭, 재전송 중복, 사유가 다르면 별도 건, 모르는 회원번호는 회원 없이 기록
+-- 적재: 회원 매칭, 같은 미처리 건에 합침, 사유가 다르면 별도 건, 모르는 회원번호는 회원 없이 기록
 set local role service_role;
 select pg_temp.assert(public.record_social_unlink('kakao','2910000001','UNLINK_FROM_APPS'), 'first event recorded');
-select pg_temp.assert(not public.record_social_unlink('kakao','2910000001','UNLINK_FROM_APPS'), 'retransmission ignored');
+select pg_temp.assert(not public.record_social_unlink('kakao','2910000001','UNLINK_FROM_APPS'), 'same open event merged');
 select pg_temp.assert(public.record_social_unlink('kakao','2910000001','ACCOUNT_DELETE'), 'different referrer recorded');
 select pg_temp.assert(public.record_social_unlink('kakao','2919999999','UNLINK_FROM_APPS'), 'unknown member recorded');
 select pg_temp.assert(public.record_social_unlink('kakao','2910000003','UNLINK_FROM_APPS'), 'profile-less account recorded');

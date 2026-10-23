@@ -7,7 +7,8 @@
 --    확인한 뒤 처리한다. 연결 해제만으로 탈퇴를 요청한 것으로 보지 않는다.
 --  - 보유기간(2026-10-23 결정 A): 처리 완료 시 기록을 지체 없이 파기한다.
 --    처리 이력은 접속기록(SOCIAL_UNLINK_RESOLVE: 대상 id·회원·처리 메모)에만 남는다.
---  - 같은 이벤트가 재전송돼도 미처리 건은 하나만 남긴다.
+--  - 같은 회원·같은 사유의 미처리 건이 남아 있는 동안 다시 온 연결 해제(해제 -> 재연결 -> 재해제)는
+--    그 미처리 건에 합친다. 카카오는 연결 해제 웹훅을 다시 보내지 않는다.
 --  - 조회·처리는 관리자 RPC 로만 열고 접속기록을 남긴다.
 --
 -- 개인정보처리방침 제11조 ① — 처리 목적 달성 시 지체 없이 파기
@@ -32,7 +33,7 @@ create table if not exists public.social_unlink_events (
 comment on table public.social_unlink_events is
   '미처리 소셜 제공자 연결 해제 기록(#291). 처리 완료 시 행을 파기하고 이력은 접속기록에만 남긴다. 조회는 관리자 RPC 로만.';
 
--- 재전송 중복 방지: 미처리 건은 (제공자, 회원번호, 사유)당 하나
+-- 같은 미처리 건에 합침: 미처리 건은 (제공자, 회원번호, 사유)당 하나
 create unique index if not exists uq_social_unlink_events
   on public.social_unlink_events (provider, provider_user_id, referrer_type);
 create index if not exists idx_social_unlink_events_received

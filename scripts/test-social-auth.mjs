@@ -332,7 +332,7 @@ test("Supabase access_denied와 함께 온 구체적인 이메일 오류를 우�
 // ---------- 카카오 연결 해제 웹훅 (#291) ----------
 const ADMIN_KEY = "test-admin-key-0123456789";
 function unlinkDeps(overrides = {}) {
-    const calls = { record: [], notify: [] };
+    const calls = { record: [], alerts: [], deferred: [] };
     return {
         calls,
         deps: {
@@ -341,32 +341,64 @@ function unlinkDeps(overrides = {}) {
                 calls.record.push(event);
                 return true;
             },
-            notify: (event, result) => calls.notify.push({ ...event, ...result }),
+            alert: async (alert) => {
+                calls.alerts.push(alert);
+            },
+            // 응답 뒤 작업을 모아 두었다가 테스트에서 실행한다.
+            defer: (task) => calls.deferred.push(task),
+            retryDelaysMs: [0, 0],
             ...overrides,
         },
     };
 }
-const unlinkRequest = (
-    { method = "POST", auth = `KakaoAK ${ADMIN_KEY}`, body, query = "" } = {},
-) =>
+const runDeferred = async (calls) => {
+    for (const task of calls.deferred.splice(0)) await task();
+};
+const unlinkRequest = ({
+    method = "POST",
+    auth = `KakaoAK ${ADMIN_KEY}`,
+    body,
+    query = "",
+} = {}) =>
     new Request(`https://example.com/api/auth/kakao/unlink${query}`, {
         method,
         headers: {
             ...(auth ? { Authorization: auth } : {}),
-            ...(body ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
+            ...(body
+                ? { "Content-Type": "application/x-www-form-urlencoded" }
+                : {}),
         },
         body: method === "POST" ? body : undefined,
     });
+const captureErrors = (t) => {
+    const logs = [];
+    const errorMock = mock.method(console, "error", (...args) => {
+        logs.push(args.map(String).join(" "));
+    });
+    t.after(() => errorMock.mock.restore());
+    return logs;
+};
+const assertNoPersonalData = (logs) => {
+    for (const line of logs) {
+        assert.ok(!line.includes("291000000"), "회원번호를 로그에 남기지 않는다");
+        assert.ok(!line.includes(ADMIN_KEY), "어드민 키를 로그에 남기지 않는다");
+    }
+};
 
-test("카카오 연결 해제: 올바른 키의 POST·GET 은 기록하고 새 건만 알린다", async () => {
+test("카카오 연결 해제: 올바른 키의 POST·GET 은 기록하고, 새 건만 응답 뒤에 알린다", async () => {
     const { calls, deps } = unlinkDeps();
     const post = await handleKakaoUnlink(
-        unlinkRequest({ body: "app_id=1&user_id=2910000001&referrer_type=UNLINK_FROM_APPS" }),
+        unlinkRequest({
+            body: "app_id=1&user_id=2910000001&referrer_type=UNLINK_FROM_APPS",
+        }),
         deps,
     );
     assert.equal(post.status, 200);
     const get = await handleKakaoUnlink(
-        unlinkRequest({ method: "GET", query: "?app_id=1&user_id=2910000002&referrer_type=ACCOUNT_DELETE" }),
+        unlinkRequest({
+            method: "GET",
+            query: "?app_id=1&user_id=2910000002&referrer_type=ACCOUNT_DELETE",
+        }),
         deps,
     );
     assert.equal(get.status, 200);
@@ -374,22 +406,32 @@ test("카카오 연결 해제: 올바른 키의 POST·GET 은 기록하고 새 �
         { userId: "2910000001", referrerType: "UNLINK_FROM_APPS" },
         { userId: "2910000002", referrerType: "ACCOUNT_DELETE" },
     ]);
-    assert.deepEqual(
-        calls.notify.map((n) => n.recorded),
-        [true, true],
-    );
+    assert.equal(calls.alerts.length, 0, "알림은 응답 뒤에 보낸다");
+    await runDeferred(calls);
+    assert.deepEqual(calls.alerts, [
+        { kind: "recorded", referrerType: "UNLINK_FROM_APPS" },
+        { kind: "recorded", referrerType: "ACCOUNT_DELETE" },
+    ]);
 
-    const dup = unlinkDeps({ record: async () => false });
+    const merged = unlinkDeps({ record: async () => false });
     await handleKakaoUnlink(
-        unlinkRequest({ body: "user_id=2910000001&referrer_type=UNLINK_FROM_APPS" }),
-        dup.deps,
+        unlinkRequest({
+            body: "user_id=2910000001&referrer_type=UNLINK_FROM_APPS",
+        }),
+        merged.deps,
     );
-    assert.equal(dup.calls.notify.length, 0, "재전송은 알리지 않는다");
+    await runDeferred(merged.calls);
+    assert.equal(merged.calls.alerts.length, 0, "같은 미처리 건에 합친 건은 알리지 않는다");
 });
 
 test("카카오 연결 해제: 키가 없거나 틀리면 401, 서버 키 미설정이면 503 이고 기록하지 않는다", async () => {
     const { calls, deps } = unlinkDeps();
-    for (const auth of ["", "KakaoAK wrong", `Bearer ${ADMIN_KEY}`, `KakaoAK ${ADMIN_KEY}x`]) {
+    for (const auth of [
+        "",
+        "KakaoAK wrong",
+        `Bearer ${ADMIN_KEY}`,
+        `KakaoAK ${ADMIN_KEY}x`,
+    ]) {
         const res = await handleKakaoUnlink(
             unlinkRequest({ auth, body: "user_id=1&referrer_type=UNLINK_FROM_APPS" }),
             deps,
@@ -404,15 +446,11 @@ test("카카오 연결 해제: 키가 없거나 틀리면 401, 서버 키 미설
         assert.equal(res.status, 503);
     }
     assert.equal(calls.record.length, 0);
+    assert.equal(calls.deferred.length, 0);
 });
 
-test("카카오 연결 해제: 형식 오류·기록 실패도 200 으로 답하고, 개인정보 없이 로그를 남기며 실패는 알린다", async (t) => {
-    const logs = [];
-    const errorMock = mock.method(console, "error", (...args) => {
-        logs.push(args.map(String).join(" "));
-    });
-    t.after(() => errorMock.mock.restore());
-
+test("카카오 연결 해제: 형식 오류는 200 과 로그, 모르는 사유는 관리자에게도 알린다", async (t) => {
+    const logs = captureErrors(t);
     const { calls, deps } = unlinkDeps();
     for (const body of [
         "user_id=2910000009&referrer_type=SOMETHING_NEW",
@@ -423,29 +461,62 @@ test("카카오 연결 해제: 형식 오류·기록 실패도 200 으로 답하
         const res = await handleKakaoUnlink(unlinkRequest({ body }), deps);
         assert.equal(res.status, 200, body);
     }
+    await runDeferred(calls);
     assert.equal(calls.record.length, 0);
     assert.equal(logs.length, 4, "형식 거절마다 로그를 남긴다");
     assert.ok(logs[0].includes("SOMETHING_NEW"), "거절된 사유 값을 남긴다");
+    assert.deepEqual(
+        calls.alerts,
+        [{ kind: "unknown_referrer", referrerValue: "SOMETHING_NEW" }],
+        "user_id 가 정상인 모르는 사유만 알린다",
+    );
+    assertNoPersonalData(logs);
+});
 
-    const failing = unlinkDeps({
+test("카카오 연결 해제: 기록 실패는 200 으로 답하고 응답 뒤에 다시 기록하며, 끝내 실패하면 알린다", async (t) => {
+    const logs = captureErrors(t);
+    const db = Object.assign(new Error("db down"), { code: "42P01" });
+
+    // 일시 장애: 두 번째 시도에서 기록되면 기록 알림만 보낸다
+    let attempts = 0;
+    const flaky = unlinkDeps({
         record: async () => {
-            throw Object.assign(new Error("db down"), { code: "42P01" });
+            attempts += 1;
+            if (attempts === 1) throw db;
+            return true;
         },
     });
     const res = await handleKakaoUnlink(
         unlinkRequest({ body: "user_id=2910000001&referrer_type=ACCOUNT_DELETE" }),
-        failing.deps,
+        flaky.deps,
     );
     assert.equal(res.status, 200);
-    assert.deepEqual(failing.calls.notify, [
-        { userId: "2910000001", referrerType: "ACCOUNT_DELETE", recorded: false },
+    assert.equal(attempts, 1, "응답 전에는 한 번만 시도한다");
+    await runDeferred(flaky.calls);
+    assert.equal(attempts, 2);
+    assert.deepEqual(flaky.calls.alerts, [
+        { kind: "recorded", referrerType: "ACCOUNT_DELETE" },
     ]);
-    const failLog = logs.at(-1);
-    assert.ok(failLog.includes("ACCOUNT_DELETE") && failLog.includes("42P01"));
-    for (const line of logs) {
-        assert.ok(!line.includes("291000000"), "회원번호를 로그에 남기지 않는다");
-        assert.ok(!line.includes(ADMIN_KEY), "어드민 키를 로그에 남기지 않는다");
-    }
+
+    // 계속 실패: 기본 1회 + 재시도 2회 뒤 실패 알림
+    let failures = 0;
+    const down = unlinkDeps({
+        record: async () => {
+            failures += 1;
+            throw db;
+        },
+    });
+    await handleKakaoUnlink(
+        unlinkRequest({ body: "user_id=2910000001&referrer_type=ACCOUNT_DELETE" }),
+        down.deps,
+    );
+    await runDeferred(down.calls);
+    assert.equal(failures, 3);
+    assert.deepEqual(down.calls.alerts, [
+        { kind: "record_failed", referrerType: "ACCOUNT_DELETE" },
+    ]);
+    assert.ok(logs.some((l) => l.includes("ACCOUNT_DELETE") && l.includes("42P01")));
+    assertNoPersonalData(logs);
 });
 
 test("카카오 연결 해제: 라우트는 요청만 넘기고 미들웨어는 세션 없이 통과시킨다", () => {
@@ -455,7 +526,7 @@ test("카카오 연결 해제: 라우트는 요청만 넘기고 미들웨어는 
     );
     assert.ok(route.includes("GET = (request: Request) => handleKakaoUnlink(request, deps())"));
     assert.ok(route.includes("POST = (request: Request) => handleKakaoUnlink(request, deps())"));
-    assert.ok(route.includes("after("), "메일은 응답 뒤에 보낸다");
+    assert.ok(route.includes("defer: (task) => after(task)"), "메일·재시도는 응답 뒤에 한다");
     const middleware = readFileSync(new URL("../middleware.ts", import.meta.url), "utf8");
     assert.ok(middleware.includes("path === KAKAO_UNLINK_PATH"));
 });

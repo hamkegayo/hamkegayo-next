@@ -24,9 +24,9 @@ function deps(): KakaoUnlinkDeps {
             if (error) throw error;
             return data === true;
         },
-        // 카카오의 3초 응답 제한을 지키도록 메일은 응답 뒤에 보낸다.
-        notify: (event, result) =>
-            after(() => sendKakaoUnlinkAlert(event, result)),
+        alert: sendKakaoUnlinkAlert,
+        // 카카오의 3초 응답 제한을 지키도록 메일·재시도는 응답 뒤에 한다.
+        defer: (task) => after(task),
     };
 }
 
