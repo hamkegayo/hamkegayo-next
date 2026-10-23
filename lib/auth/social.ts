@@ -5,10 +5,24 @@ export const SOCIAL_PROVIDERS = {
 
 export type SocialProvider = keyof typeof SOCIAL_PROVIDERS;
 
-// 인증 메일 발송 문제 해결 및 실제 로그인 검증 후 다시 활성화한다.
-export const NAVER_LOGIN_ENABLED = false;
+// 제공자 설정과 실계정 로그인 검증을 마친 환경에서만 켠다. 스테이징만 true로 두고
+// 운영은 비워 둔다(운영 Supabase에 네이버 provider가 생기기 전까지 꺼 둔다).
+// NEXT_PUBLIC_ 값은 빌드 때 번들에 들어가므로 바꾼 뒤에는 재배포해야 한다.
+export const NAVER_LOGIN_ENABLED =
+    process.env.NEXT_PUBLIC_NAVER_LOGIN_ENABLED === "true";
+
+/** 카카오는 항상 열려 있고 네이버는 위 환경변수로 켠 환경에서만 연다. */
+export function isSocialProviderEnabled(
+    provider: SocialProvider,
+    naverEnabled = NAVER_LOGIN_ENABLED,
+) {
+    return provider !== "naver" || naverEnabled;
+}
 
 export const NAVER_USERINFO_PATH = "/api/auth/naver/userinfo";
+
+/** 카카오 연결 해제 웹훅 (#291). 미들웨어에서도 쓰므로 node 모듈 없는 이 파일에 둔다. */
+export const KAKAO_UNLINK_PATH = "/api/auth/kakao/unlink";
 
 export function safeInternalPath(value: string | null | undefined): string {
     if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";

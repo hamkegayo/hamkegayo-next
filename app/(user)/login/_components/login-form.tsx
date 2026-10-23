@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-    NAVER_LOGIN_ENABLED,
     SOCIAL_PROVIDERS,
+    isSocialProviderEnabled,
     safeInternalPath,
     type SocialProvider,
 } from "@/lib/auth/social";
@@ -158,7 +158,7 @@ export function LoginForm({
     };
 
     const socialLogin = async (provider: SocialProvider) => {
-        if (provider === "naver" && !NAVER_LOGIN_ENABLED) return;
+        if (!isSocialProviderEnabled(provider)) return;
         if (socialSubmitting) return;
         setSocialSubmitting(provider);
         const supabase = createClient();
@@ -370,7 +370,7 @@ export function LoginForm({
                             type="button"
                             onClick={() => socialLogin("naver")}
                             disabled={
-                                !NAVER_LOGIN_ENABLED ||
+                                !isSocialProviderEnabled("naver") ||
                                 socialSubmitting !== null
                             }
                             aria-busy={socialSubmitting === "naver"}
@@ -386,7 +386,7 @@ export function LoginForm({
                                     N
                                 </span>
                             )}
-                            {NAVER_LOGIN_ENABLED
+                            {isSocialProviderEnabled("naver")
                                 ? "네이버 로그인"
                                 : "네이버 로그인 (점검 중)"}
                         </button>
