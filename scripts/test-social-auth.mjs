@@ -10,6 +10,7 @@ import {
 import { authPageWithNext } from "@/lib/auth/navigation.ts";
 
 import { getNaverUserinfo } from "@/lib/auth/naver-userinfo.ts";
+import { handleKakaoUnlink } from "@/lib/auth/kakao-unlink.ts";
 import {
     knownOAuthError,
     oauthErrorFromLocation,
@@ -326,4 +327,116 @@ test("Supabase access_denied와 함께 온 구체적인 이메일 오류를 우�
         providerOAuthError(new URLSearchParams("error=access_denied")),
         "access_denied",
     );
+});
+
+// ---------- 카카오 연결 해제 웹훅 (#291) ----------
+const ADMIN_KEY = "test-admin-key-0123456789";
+function unlinkDeps(overrides = {}) {
+    const calls = { record: [], notify: [] };
+    return {
+        calls,
+        deps: {
+            adminKey: ADMIN_KEY,
+            record: async (event) => {
+                calls.record.push(event);
+                return true;
+            },
+            notify: (event) => calls.notify.push(event),
+            ...overrides,
+        },
+    };
+}
+const unlinkRequest = (
+    { method = "POST", auth = `KakaoAK ${ADMIN_KEY}`, body, query = "" } = {},
+) =>
+    new Request(`https://example.com/api/auth/kakao/unlink${query}`, {
+        method,
+        headers: {
+            ...(auth ? { Authorization: auth } : {}),
+            ...(body ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
+        },
+        body: method === "POST" ? body : undefined,
+    });
+
+test("카카오 연결 해제: 올바른 키의 POST·GET 은 기록하고 새 건만 알린다", async () => {
+    const { calls, deps } = unlinkDeps();
+    const post = await handleKakaoUnlink(
+        unlinkRequest({ body: "app_id=1&user_id=2910000001&referrer_type=UNLINK_FROM_APPS" }),
+        deps,
+    );
+    assert.equal(post.status, 200);
+    const get = await handleKakaoUnlink(
+        unlinkRequest({ method: "GET", query: "?app_id=1&user_id=2910000002&referrer_type=ACCOUNT_DELETE" }),
+        deps,
+    );
+    assert.equal(get.status, 200);
+    assert.deepEqual(calls.record, [
+        { userId: "2910000001", referrerType: "UNLINK_FROM_APPS" },
+        { userId: "2910000002", referrerType: "ACCOUNT_DELETE" },
+    ]);
+    assert.equal(calls.notify.length, 2);
+
+    const dup = unlinkDeps({ record: async () => false });
+    await handleKakaoUnlink(
+        unlinkRequest({ body: "user_id=2910000001&referrer_type=UNLINK_FROM_APPS" }),
+        dup.deps,
+    );
+    assert.equal(dup.calls.notify.length, 0, "재전송은 알리지 않는다");
+});
+
+test("카카오 연결 해제: 키가 없거나 틀리면 401, 서버 키 미설정이면 503 이고 기록하지 않는다", async () => {
+    const { calls, deps } = unlinkDeps();
+    for (const auth of ["", "KakaoAK wrong", `Bearer ${ADMIN_KEY}`, `KakaoAK ${ADMIN_KEY}x`]) {
+        const res = await handleKakaoUnlink(
+            unlinkRequest({ auth, body: "user_id=1&referrer_type=UNLINK_FROM_APPS" }),
+            deps,
+        );
+        assert.equal(res.status, 401, auth);
+    }
+    for (const adminKey of [undefined, "", "   "]) {
+        const res = await handleKakaoUnlink(
+            unlinkRequest({ body: "user_id=1&referrer_type=UNLINK_FROM_APPS" }),
+            { ...deps, adminKey },
+        );
+        assert.equal(res.status, 503);
+    }
+    assert.equal(calls.record.length, 0);
+});
+
+test("카카오 연결 해제: 형식 오류·기록 실패도 200 으로 답한다", async () => {
+    const { calls, deps } = unlinkDeps();
+    for (const body of [
+        "user_id=abc&referrer_type=UNLINK_FROM_APPS",
+        "user_id=1&referrer_type=SOMETHING",
+        "referrer_type=UNLINK_FROM_APPS",
+        "",
+    ]) {
+        const res = await handleKakaoUnlink(unlinkRequest({ body }), deps);
+        assert.equal(res.status, 200, body);
+    }
+    assert.equal(calls.record.length, 0);
+
+    const failing = unlinkDeps({
+        record: async () => {
+            throw new Error("db down");
+        },
+    });
+    const res = await handleKakaoUnlink(
+        unlinkRequest({ body: "user_id=1&referrer_type=ACCOUNT_DELETE" }),
+        failing.deps,
+    );
+    assert.equal(res.status, 200);
+    assert.equal(failing.calls.notify.length, 0);
+});
+
+test("카카오 연결 해제: 라우트는 요청만 넘기고 미들웨어는 세션 없이 통과시킨다", () => {
+    const route = readFileSync(
+        new URL("../app/api/auth/kakao/unlink/route.ts", import.meta.url),
+        "utf8",
+    );
+    assert.ok(route.includes("GET = (request: Request) => handleKakaoUnlink(request, deps())"));
+    assert.ok(route.includes("POST = (request: Request) => handleKakaoUnlink(request, deps())"));
+    assert.ok(route.includes("after("), "메일은 응답 뒤에 보낸다");
+    const middleware = readFileSync(new URL("../middleware.ts", import.meta.url), "utf8");
+    assert.ok(middleware.includes("path === KAKAO_UNLINK_PATH"));
 });

@@ -21,6 +21,9 @@ export function isSocialProviderEnabled(
 
 export const NAVER_USERINFO_PATH = "/api/auth/naver/userinfo";
 
+/** 카카오 연결 해제 웹훅 (#291). 미들웨어에서도 쓰므로 node 모듈 없는 이 파일에 둔다. */
+export const KAKAO_UNLINK_PATH = "/api/auth/kakao/unlink";
+
 export function safeInternalPath(value: string | null | undefined): string {
     if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
 
