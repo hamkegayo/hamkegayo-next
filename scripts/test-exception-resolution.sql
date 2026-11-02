@@ -5,7 +5,8 @@ insert into auth.users(id,email) values('00000082-0000-4000-8000-000000000999','
 insert into public.profiles(id,name,role) values('00000082-0000-4000-8000-000000000999','Resolution Partner','PARTNER'),('00000082-0000-4000-8000-000000000998','Resolution Admin','ADMIN');
 insert into public.partner_accounts(profile_id,login_id) values('00000082-0000-4000-8000-000000000999','resolution-partner');
 insert into public.admin_accounts(profile_id,duty) values('00000082-0000-4000-8000-000000000998','정산');
-update public.opening_campaign set active=false,integration_ready=false,closed_at=null,used_count=3 where id;
+-- #297 종료 시각은 실행일과 무관하게 미래로 두고, 종료 후 처리는 아래에서 ends_at 을 옮겨 확인한다.
+update public.opening_campaign set active=false,integration_ready=false,closed_at=null,used_count=3,ends_at=now()+interval '30 days' where id;
 do $$ declare i integer; uid uuid; rid uuid; pid uuid; sid uuid; gross integer; discount integer; campaign integer;
 begin
  for i in 1..5 loop
@@ -53,6 +54,20 @@ select public.admin_mark_service_unavailable('TEST-RESOLUTION-1','Provider unava
 select pg_temp.denied($q$select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000001','UNAVAILABLE',1,0,'Provider unavailable','PRIVATE-EVIDENCE-1',true)$q$);
 select pg_temp.denied($q$select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000002','PARTIAL',26000,20800,'Test decision','')$q$);
 select pg_temp.denied($q$select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000003','UNAVAILABLE',0,0,'Test decision','Test evidence',true)$q$);
+-- #297 행사 종료 후에는 혜택을 재사용할 수 없으므로 제공 불가 판정에 복원을 요구하지도 허용하지도 않는다.
+reset role;
+savepoint review_ended_plan;
+update public.opening_campaign set ends_at=now() where id;
+set local role authenticated;
+select pg_temp.assert(not (public.admin_get_service_exception('00000082-0003-4000-8000-000000000001','Test access')->>'eventRestorable')::boolean,'ended event hides benefit restoration');
+select pg_temp.denied($q$select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000001','UNAVAILABLE',0,0,'Provider unavailable','PRIVATE-EVIDENCE-1',true)$q$);
+select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000001','UNAVAILABLE',0,0,'Provider unavailable','PRIVATE-EVIDENCE-1',false);
+reset role;
+select pg_temp.assert((select not restore_benefit from public.service_exception_resolutions where service_id='00000082-0003-4000-8000-000000000001'),'ended event allows unavailable decision without restoration');
+rollback to review_ended_plan;
+set local role authenticated;
+select pg_temp.assert((public.admin_get_service_exception('00000082-0003-4000-8000-000000000001','Test access')->>'eventRestorable')::boolean,'open event offers benefit restoration');
+select pg_temp.denied($q$select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000001','UNAVAILABLE',0,0,'Provider unavailable','PRIVATE-EVIDENCE-1',false)$q$);
 select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000001','UNAVAILABLE',0,0,'Provider unavailable','PRIVATE-EVIDENCE-1',true);
 select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000002','PARTIAL',26000,20800,'Actual partial service','PRIVATE-EVIDENCE-2');
 select public.admin_plan_service_exception('00000082-0003-4000-8000-000000000003','EMERGENCY',32500,24700,'Actual emergency service','PRIVATE-EVIDENCE-3');
@@ -73,6 +88,16 @@ select pg_temp.denied($q$select public.record_service_exception_resolution('0000
 select pg_temp.assert((select resolved_at is null from public.service_exception_resolutions where service_id='00000082-0003-4000-8000-000000000001'),'notification failure retains hold');
 select pg_temp.assert(not exists(select 1 from public.payments where order_id='EX-00000082-0002-4000-8000-000000000001'),'notification failure rolls back refund');
 drop trigger test_resolution_notice on public.notifications;
+-- #297 복원을 계획한 뒤 행사가 끝나면 확정 때 복원하지 않고 결정에도 미복원으로 남긴다.
+savepoint review_ended_resolution;
+update public.opening_campaign set ends_at=now() where id;
+select public.record_service_exception_resolution('00000082-0003-4000-8000-000000000001','00000082-0000-4000-8000-000000000998',
+  (select jsonb_agg(jsonb_build_object('paymentId',p.id,'orderId',p.order_id,'transactionId',p.transaction_id,'cash',t.cash,'balance',t.target_balance))
+     from public.service_exception_transactions t join public.payments p on p.id=t.payment_id where t.service_id='00000082-0003-4000-8000-000000000001'));
+select pg_temp.assert((select state='USED' and restored_at is null from public.opening_event_claims where payment_id='00000082-0002-4000-8000-000000000001'),'benefit not restored after the event ends');
+select pg_temp.assert((select resolved_at is not null and not restore_benefit from public.service_exception_resolutions where service_id='00000082-0003-4000-8000-000000000001'),'resolution records no restoration after the event ends');
+select pg_temp.assert((select used_count=3 from public.opening_campaign),'used count unchanged after the event ends');
+rollback to review_ended_resolution;
 -- 실제 PG 호출 없이 서버 검증 결과를 모사한다.
 do $$ declare i integer; sid uuid; rid uuid; verified jsonb;
 begin
