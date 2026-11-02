@@ -5,6 +5,7 @@ import { EventControls } from "./event-controls";
 import { kstDateTime } from "@/lib/format";
 import { ClaimRestore } from "./claim-restore";
 import { ExclusionControls } from "./exclusion-controls";
+import { OPENING_EVENT_DISCOUNT_LABEL } from "@/lib/opening-event";
 
 type EventRow = {
     id: string;
@@ -21,7 +22,11 @@ type EventRow = {
 type EventStatus = {
     active: boolean;
     ready: boolean;
+    /** 관리자 종료(closed_at)만 뜻한다. */
     closed: boolean;
+    /** 종료 시각 경과 또는 관리자 종료 (#297). */
+    ended: boolean;
+    ends_at: string;
     capacity: number;
     used: number;
     held: number;
@@ -57,9 +62,24 @@ export default async function OpeningCampaignPage({
             <h1 className="text-2xl font-extrabold">오픈 이벤트</h1>
             <p className="text-muted-foreground mt-2 text-sm">
                 고객 취소·노쇼·탈퇴는 혜택을 복원하지 않습니다. 회사·파트너
-                귀책은 전액 환불 확인 후 사유를 기록해 복원합니다. 이메일 HMAC은
-                표시하지 않습니다.
+                귀책은 전액 환불 확인 후 사유를 기록해 복원하며, 행사 종료
+                후에는 복원하지 않습니다. 이메일 HMAC은 표시하지 않습니다.
             </p>
+            <p className="mt-3 text-sm">
+                쿠폰액 {OPENING_EVENT_DISCOUNT_LABEL}(할증 미적용) · 결제 확정
+                마감 <strong>{kstDateTime(event.ends_at) ?? "—"}</strong> (KST)
+                이전 확정분까지
+            </p>
+            {event.ended && !event.closed && (
+                <p
+                    role="status"
+                    className="bg-muted mt-3 rounded-xl p-4 text-sm"
+                >
+                    종료 시각이 지나 행사가 종료되었습니다. 신규 확보·결제
+                    확정·혜택 복원을 하지 않으며, 관련 결제·취소·환불 처리가
+                    끝나면 이메일 HMAC이 자동 파기됩니다.
+                </p>
+            )}
             {!event.ready && (
                 <p className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
                     이메일 인증·고지·혜택 환불 검증 완료 전 고객 팝업과 실제
@@ -89,8 +109,9 @@ export default async function OpeningCampaignPage({
                 active={event.active}
                 ready={event.ready}
                 closed={event.closed}
+                ended={event.ended}
             />
-            {!event.closed && <ExclusionControls />}
+            {!event.ended && <ExclusionControls />}
             <form className="mt-6 flex gap-3">
                 <label className="sr-only" htmlFor="campaign-search">
                     예약번호 검색
@@ -158,7 +179,7 @@ export default async function OpeningCampaignPage({
                                         "복원 완료"
                                     ) : row.state === "USED" &&
                                       row.reservation_status === "CANCELLED" &&
-                                      !event.closed ? (
+                                      !event.ended ? (
                                         <ClaimRestore id={row.id} />
                                     ) : (
                                         "—"

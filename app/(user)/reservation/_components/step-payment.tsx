@@ -11,7 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatUseDate, toHhmm } from "@/lib/format";
 import { useReservationStore, PLAN_INFO } from "../_store/reservation-store";
-import { OPENING_EVENT_TERMS } from "@/lib/opening-event";
+import {
+    OPENING_EVENT_CAPACITY,
+    OPENING_EVENT_CHANGE_NOTICE,
+    OPENING_EVENT_DEADLINE_LABEL,
+    OPENING_EVENT_TERMS,
+} from "@/lib/opening-event";
 import { OPENING_COUPON_MESSAGES } from "@/lib/opening-coupon";
 import { StepBand } from "./step-band";
 import {
@@ -289,9 +294,12 @@ export function StepPayment() {
                             </Link>
                         </p>
                         <p className="text-muted-foreground mt-2">
-                            쿠폰 보유만으로 혜택이 확보되지는 않습니다. 결제
-                            완료·예약 확정 선착순 20명에게 적용합니다. 포인트와
-                            중복 적용하지 않습니다.{" "}
+                            쿠폰 보유만으로 혜택이 확보되지는 않습니다.{" "}
+                            {OPENING_EVENT_DEADLINE_LABEL}까지 결제 완료·예약
+                            확정 선착순 {OPENING_EVENT_CAPACITY}명에게
+                            적용합니다. 이 시각까지 결제가 확정되지 않으면
+                            쿠폰이 적용되지 않습니다. 포인트와 중복 적용하지
+                            않습니다.{" "}
                             <Link
                                 href="/mypage/coupons"
                                 target="_blank"
@@ -300,6 +308,9 @@ export function StepPayment() {
                             >
                                 쿠폰함 보기
                             </Link>
+                        </p>
+                        <p className="text-muted-foreground mt-2">
+                            {OPENING_EVENT_CHANGE_NOTICE}
                         </p>
                         <details className="mt-2">
                             <summary className="cursor-pointer">

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 import { trackBeginCheckoutGA } from "@/lib/analytics";
+import { OPENING_COUPON_CONFIRM_MESSAGES } from "@/lib/opening-coupon";
 import { useReservationStore } from "../_store/reservation-store";
 import { resumeReservation } from "../_actions/payment";
 import { IntroModal } from "./intro-modal";
@@ -27,6 +28,8 @@ const PAY_ERROR_MESSAGE: Record<string, string> = {
     UNKNOWN_ORDER: "결제 정보를 찾을 수 없습니다. 고객센터로 문의해 주세요.",
     CONFIRM_FAILED:
         "결제는 취소되었습니다. 예약이 확정되지 않았으니 다시 시도해 주세요.",
+    // 오픈 이벤트 쿠폰이 결제 확정 시점에 거부된 경우 (#297). 결제 화면은 쿠폰 선택이 풀린 채 다시 열린다.
+    ...OPENING_COUPON_CONFIRM_MESSAGES,
     PAYMENT_NOT_PENDING: "이미 처리된 결제입니다.",
     RESERVATION_DATE_OUT_OF_RANGE:
         "PG사 기준에 따라 결제일을 1일째로 계산해 60일 이내 날짜만 결제할 수 있습니다. 기존 예약을 취소하고 날짜를 다시 선택해 주세요.",

@@ -14,7 +14,10 @@ import {
 } from "@/components/ui/dialog";
 import { ContactLink } from "./contact-link";
 import {
+    OPENING_EVENT_CAPACITY,
     OPENING_EVENT_CHANNEL,
+    OPENING_EVENT_DEADLINE_LABEL,
+    OPENING_EVENT_DISCOUNT_LABEL,
     OPENING_EVENT_DISMISS_KEY,
     OPENING_EVENT_TERMS,
     openingEventLocalDate,
@@ -95,7 +98,7 @@ export function OpeningEventPopup({
                 <DialogTitle className="mt-6 text-3xl leading-tight font-extrabold break-keep sm:text-4xl">
                     첫 병원동행,
                     <br />
-                    <span className="text-brand">25,000원 쿠폰</span>으로
+                    <span className="text-brand">1시간 무료 쿠폰</span>으로
                     시작하세요
                 </DialogTitle>
                 <DialogDescription className="mt-3 text-base">
@@ -117,12 +120,17 @@ export function OpeningEventPopup({
                         maskComposite: "intersect",
                     }}
                 >
-                    <p className="text-lg font-bold sm:text-xl">선착순 20명</p>
+                    <p className="text-lg font-bold sm:text-xl">
+                        선착순 {OPENING_EVENT_CAPACITY}명
+                    </p>
                     <p className="mt-3 text-3xl leading-tight font-extrabold tracking-tight sm:text-4xl">
-                        25,000원 할인 쿠폰
+                        첫 1시간 무료 쿠폰
                     </p>
                     <p className="mt-2 text-lg font-bold">
-                        Basic · Plus 공통 적용
+                        {OPENING_EVENT_DISCOUNT_LABEL} 할인
+                    </p>
+                    <p className="mt-1 text-sm font-semibold">
+                        {OPENING_EVENT_DEADLINE_LABEL}까지 결제 확정분
                     </p>
                     <div
                         aria-hidden="true"
@@ -186,7 +194,8 @@ export function OpeningEventPopup({
                 </div>
                 <p className="text-muted-foreground mt-3 text-center text-xs">
                     상담 신청이나 버튼 클릭이 아닌 실제 예약 확정 순으로 혜택이
-                    적용됩니다.
+                    적용됩니다. 선착순 인원이 모두 사용하면 기간 중이라도
+                    종료됩니다.
                 </p>
                 <details className="text-muted-foreground mt-4 text-xs leading-relaxed">
                     <summary className="text-foreground cursor-pointer font-bold">

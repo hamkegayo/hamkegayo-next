@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { getPaymentGateway, parseAuthResult } from "@/lib/payments/nicepay";
 import { reportIncident } from "@/lib/payments/incident";
+import { openingCouponConfirmFailure } from "@/lib/opening-coupon";
 import { PaymentGatewayError } from "@/lib/payments/types";
 import {
     ADVANCE_RESERVATION_ERROR_CODE,
@@ -334,21 +335,35 @@ export async function POST(request: NextRequest) {
         // ---------- ⑦ 돈은 받았는데 확정에 실패했다. 승인을 되돌린다 ----------
         // 취소가 성공하면 고객 손해는 없다. 취소마저 실패하면 cancelApproved 가
         // CANCEL_FAILED 로 따로 알린다.
-        await reportIncident({
-            kind: "FINALIZE_FAILED",
-            orderId: auth.orderId,
-            paymentId: payment.id,
-            reservationCode: reservation.code,
-            amount: expected,
-            detail: {
-                transactionId: approved.transactionId,
-                dbError: finalizeError.message,
-            },
-        });
+        //  오픈 이벤트 종료 시각 이후의 확정은 예정된 쿠폰 적용 실패다 (#297).
+        //  사고로 알리지 않고 승인만 취소한다. failPayment(FAILED) 가 쿠폰 확보를
+        //  해제하므로 고객은 쿠폰 없이 다시 결제할 수 있다.
+        const couponFailure = isExtension
+            ? null
+            : openingCouponConfirmFailure(finalizeError.message);
+        if (couponFailure === "COUPON_ENDED") {
+            console.warn(
+                `[payments/confirm] 이벤트 종료 후 결제 확정 — 쿠폰 미적용으로 승인 취소 order=${auth.orderId}`,
+            );
+        } else {
+            await reportIncident({
+                kind: "FINALIZE_FAILED",
+                orderId: auth.orderId,
+                paymentId: payment.id,
+                reservationCode: reservation.code,
+                amount: expected,
+                detail: {
+                    transactionId: approved.transactionId,
+                    dbError: finalizeError.message,
+                },
+            });
+        }
         await cancelApproved(
             approved.transactionId,
             auth.orderId,
-            "예약 확정 실패로 자동 취소",
+            couponFailure === "COUPON_ENDED"
+                ? "이벤트 기간 종료로 쿠폰 미적용 자동 취소"
+                : "예약 확정 실패로 자동 취소",
             payment.id,
             expected,
         );
@@ -363,7 +378,7 @@ export async function POST(request: NextRequest) {
                   status: "fail",
                   code: reservation.code,
               })
-            : fail(request, "CONFIRM_FAILED", rid);
+            : fail(request, couponFailure ?? "CONFIRM_FAILED", rid);
     }
 
     if (isExtension) {
