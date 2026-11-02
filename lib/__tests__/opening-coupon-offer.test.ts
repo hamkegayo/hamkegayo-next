@@ -10,7 +10,23 @@ import { noShowNotification } from "../no-show-notification";
 
 afterEach(() => vi.unstubAllGlobals());
 describe("coupon review regressions", () => {
-    it("Basic two-hour no-show requires 5000 after cash prepayment 15000", () => {
+    it("Basic two-hour no-show with the 20,000 coupon needs no additional payment", () => {
+        // #297: 현금 선결제 20,000 = 할인 없는 노쇼 1시간 20,000
+        const prepaid = openingEventCustomerAmount(40000, 20000);
+        const total = openingEventCustomerAmount(20000, 20000, true);
+        expect(calcSettlementDiff(prepaid, total)).toEqual({
+            additional: 0,
+            refund: 0,
+        });
+        expect(
+            noShowNotification(
+                total,
+                prepaid,
+                calcSettlementDiff(prepaid, total),
+            ),
+        ).toContain("선결제 금액에서 처리됩니다");
+    });
+    it("#276 Basic 25,000 coupon two-hour no-show requires 5000 after cash prepayment 15000", () => {
         const prepaid = openingEventCustomerAmount(40000, 25000);
         const total = openingEventCustomerAmount(20000, 25000, true);
         expect(calcSettlementDiff(prepaid, total)).toEqual({
@@ -53,16 +69,14 @@ describe("coupon review regressions", () => {
     it("uses the same parser for initial load and unavailable refresh", async () => {
         vi.stubGlobal(
             "fetch",
-            vi
-                .fn()
-                .mockResolvedValue({
-                    ok: true,
-                    json: async () => ({
-                        eligible: false,
-                        state: "EXHAUSTED",
-                        discount: 25000,
-                    }),
+            vi.fn().mockResolvedValue({
+                ok: true,
+                json: async () => ({
+                    eligible: false,
+                    state: "EXHAUSTED",
+                    discount: 25000,
                 }),
+            }),
         );
         expect(await loadCouponOffer("reservation")).toEqual({
             eligible: false,

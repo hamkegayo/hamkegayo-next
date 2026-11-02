@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { getPaymentGateway, parseAuthResult } from "@/lib/payments/nicepay";
 import { reportIncident } from "@/lib/payments/incident";
+import { openingCouponConfirmFailure } from "@/lib/opening-coupon";
 import { PaymentGatewayError } from "@/lib/payments/types";
 import {
     ADVANCE_RESERVATION_ERROR_CODE,
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
     const { data: payment } = await admin
         .from("payments")
         .select(
-            "id, reservation_id, type, status, gross_amount, discount_amount, token_expires_at, reservations!inner(id, code, status, confirmed_partner_id, payment_deadline, use_date)",
+            "id, reservation_id, type, status, gross_amount, discount_amount, campaign_discount_amount, token_expires_at, reservations!inner(id, code, status, confirmed_partner_id, payment_deadline, use_date)",
         )
         .eq("order_id", auth.orderId)
         .maybeSingle();
@@ -255,6 +256,28 @@ export async function POST(request: NextRequest) {
             : fail(request, "PAYMENT_EXPIRED", rid);
     }
 
+    //  오픈 이벤트 쿠폰 결제는 행사 종료 후 확정할 수 없다 (#297).
+    //  승인 전에 걸러 "승인 후 즉시 취소" 왕복을 줄인다. 종료 여부는 DB(ends_at·closed_at)가
+    //  판단하고, 이 검사와 확정 사이의 경합은 확정 트리거(⑥·⑦)가 최종으로 막는다.
+    if (!isExtension && payment.campaign_discount_amount > 0) {
+        const { data: campaign } = await admin.rpc("opening_event_status");
+        const ended =
+            (campaign as { ended?: boolean }[] | null)?.[0]?.ended === true;
+        if (ended) {
+            console.warn(
+                `[payments/confirm] 이벤트 종료 후 쿠폰 결제 — 승인 전 중단 order=${auth.orderId}`,
+            );
+            await netCancelQuietly(auth.orderId);
+            await failPayment(
+                admin,
+                payment.id,
+                "이벤트 종료 후 쿠폰 결제",
+                auth.orderId,
+            );
+            return fail(request, "COUPON_ENDED", rid);
+        }
+    }
+
     // ---------- ⑤ PG 승인 — 여기서 돈이 빠진다 ----------
     let approved;
     try {
@@ -334,21 +357,35 @@ export async function POST(request: NextRequest) {
         // ---------- ⑦ 돈은 받았는데 확정에 실패했다. 승인을 되돌린다 ----------
         // 취소가 성공하면 고객 손해는 없다. 취소마저 실패하면 cancelApproved 가
         // CANCEL_FAILED 로 따로 알린다.
-        await reportIncident({
-            kind: "FINALIZE_FAILED",
-            orderId: auth.orderId,
-            paymentId: payment.id,
-            reservationCode: reservation.code,
-            amount: expected,
-            detail: {
-                transactionId: approved.transactionId,
-                dbError: finalizeError.message,
-            },
-        });
+        //  오픈 이벤트 종료 시각 이후의 확정은 예정된 쿠폰 적용 실패다 (#297).
+        //  사고로 알리지 않고 승인만 취소한다. failPayment(FAILED) 가 쿠폰 확보를
+        //  해제하므로 고객은 쿠폰 없이 다시 결제할 수 있다.
+        const couponFailure = isExtension
+            ? null
+            : openingCouponConfirmFailure(finalizeError.message);
+        if (couponFailure === "COUPON_ENDED") {
+            console.warn(
+                `[payments/confirm] 이벤트 종료 후 결제 확정 — 쿠폰 미적용으로 승인 취소 order=${auth.orderId}`,
+            );
+        } else {
+            await reportIncident({
+                kind: "FINALIZE_FAILED",
+                orderId: auth.orderId,
+                paymentId: payment.id,
+                reservationCode: reservation.code,
+                amount: expected,
+                detail: {
+                    transactionId: approved.transactionId,
+                    dbError: finalizeError.message,
+                },
+            });
+        }
         await cancelApproved(
             approved.transactionId,
             auth.orderId,
-            "예약 확정 실패로 자동 취소",
+            couponFailure === "COUPON_ENDED"
+                ? "이벤트 기간 종료로 쿠폰 미적용 자동 취소"
+                : "예약 확정 실패로 자동 취소",
             payment.id,
             expected,
         );
@@ -363,7 +400,7 @@ export async function POST(request: NextRequest) {
                   status: "fail",
                   code: reservation.code,
               })
-            : fail(request, "CONFIRM_FAILED", rid);
+            : fail(request, couponFailure ?? "CONFIRM_FAILED", rid);
     }
 
     if (isExtension) {

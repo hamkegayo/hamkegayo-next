@@ -43,12 +43,16 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
     const user = await userContext.newPage();
     await mockNicepaySdk(user, E2E_PAYMENT.secretKey);
     // API 응답 실패 후 쿠폰 선택 해제·상태 재조회만 모의한다. 실제 PG 경로는 이후 그대로 실행한다.
+    // Basic 예약이므로 쿠폰액은 Basic 최초 1시간 20,000원이다 (#297).
     let unavailableAttempt = false;
+    let campaignEnded = false;
     await user.route("**/api/campaigns/opening/offer?*", async (route) => {
         await route.fulfill({
-            json: !unavailableAttempt
-                ? { eligible: true, state: "AVAILABLE", discount: 25000 }
-                : { eligible: false, state: "PAUSED", discount: 25000 },
+            json: campaignEnded
+                ? { eligible: false, state: "CLOSED", discount: 20000 }
+                : !unavailableAttempt
+                  ? { eligible: true, state: "AVAILABLE", discount: 20000 }
+                  : { eligible: false, state: "PAUSED", discount: 20000 },
         });
     });
     await user.route("**/api/payments/prepare", async (route) => {
@@ -165,16 +169,49 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
         const pay = user.getByRole("button", { name: "40,000원 결제하기" });
         await expect(pay).toBeVisible();
         await user.getByRole("checkbox", { name: /취소·환불 정책/ }).check();
-        await user.getByRole("checkbox", { name: /쿠폰.*25,000원/ }).check();
-        await user.getByRole("button", { name: "15,000원 결제하기" }).click();
+        await user.getByRole("checkbox", { name: /쿠폰.*20,000원/ }).check();
+        await user.getByRole("button", { name: "20,000원 결제하기" }).click();
         await expect(
             user
                 .getByRole("status")
                 .filter({ hasText: "현재 쿠폰 사용이 일시 중지되었습니다." }),
         ).toBeVisible();
         await expect(
-            user.getByRole("checkbox", { name: /쿠폰.*25,000원/ }),
+            user.getByRole("checkbox", { name: /쿠폰.*20,000원/ }),
         ).toHaveCount(0);
+        await expect(pay).toBeEnabled();
+
+        // #297 종료 시각 이후의 결제 확정은 쿠폰 때문에 거부되고, 승인 라우트가 PG 승인을
+        // 취소한 뒤 COUPON_ENDED 로 돌려보낸다. 그 응답만 모의해 안내와 쿠폰 없는 재결제를 확인한다.
+        const { data: pending, error: pendingError } =
+            await localSupabaseAdmin()
+                .from("reservations")
+                .select("id")
+                .eq("hospital_name", hospital)
+                .single();
+        if (pendingError) throw pendingError;
+        await user.route("**/api/payments/confirm", async (route) => {
+            campaignEnded = true;
+            await route.fulfill({
+                status: 303,
+                headers: {
+                    location: `/reservation?pay=fail&code=COUPON_ENDED&rid=${pending.id}`,
+                },
+            });
+        });
+        await pay.click();
+        await expect(
+            user.getByText("이벤트가 종료되어 쿠폰이 적용되지 않았습니다.", {
+                exact: false,
+            }),
+        ).toBeVisible({ timeout: 30_000 });
+        await expect(
+            user
+                .getByRole("status")
+                .filter({ hasText: "이벤트가 종료되었습니다." }),
+        ).toBeVisible();
+        await user.unroute("**/api/payments/confirm");
+        await user.getByRole("checkbox", { name: /취소·환불 정책/ }).check();
         await expect(pay).toBeEnabled();
         await pay.click();
 
