@@ -13,6 +13,8 @@ type Detail = {
     endedAt: string;
     cashPaid: number;
     eventUsed: boolean;
+    /** 사용한 혜택을 복원할 수 있는지. 행사 종료 후에는 false (#297). */
+    eventRestorable?: boolean;
     decision: {
         decision: string;
         final_cash: number;
@@ -70,7 +72,10 @@ export function ExceptionConsole({ serviceId }: { serviceId: string }) {
             setFinalCash(
                 initialDecision === "UNAVAILABLE" ? "0" : String(data.cashPaid),
             );
-            setRestore(initialDecision === "UNAVAILABLE" && data.eventUsed);
+            setRestore(
+                initialDecision === "UNAVAILABLE" &&
+                    (data.eventRestorable ?? data.eventUsed),
+            );
         }
     }
     async function run(action: () => Promise<void>) {
@@ -180,7 +185,8 @@ export function ExceptionConsole({ serviceId }: { serviceId: string }) {
                                         setDecision(e.target.value);
                                         setRestore(
                                             e.target.value === "UNAVAILABLE" &&
-                                                detail.eventUsed,
+                                                (detail.eventRestorable ??
+                                                    detail.eventUsed),
                                         );
                                         if (e.target.value === "UNAVAILABLE")
                                             setFinalCash("0");
@@ -244,19 +250,26 @@ export function ExceptionConsole({ serviceId }: { serviceId: string }) {
                                     }
                                 />
                             </label>
-                            {decision === "UNAVAILABLE" && detail.eventUsed && (
-                                <label className="block">
-                                    <input
-                                        type="checkbox"
-                                        checked={restore}
-                                        onChange={(e) =>
-                                            setRestore(e.target.checked)
-                                        }
-                                    />{" "}
-                                    제공 불가 증빙 확인 · 사용한 이벤트 혜택
-                                    복원 (행사 종료 후에는 복원 불가)
-                                </label>
-                            )}
+                            {decision === "UNAVAILABLE" &&
+                                detail.eventUsed &&
+                                ((detail.eventRestorable ?? true) ? (
+                                    <label className="block">
+                                        <input
+                                            type="checkbox"
+                                            checked={restore}
+                                            onChange={(e) =>
+                                                setRestore(e.target.checked)
+                                            }
+                                        />{" "}
+                                        제공 불가 증빙 확인 · 사용한 이벤트 혜택
+                                        복원 (행사 종료 후에는 복원 불가)
+                                    </label>
+                                ) : (
+                                    <p>
+                                        행사가 종료되어 사용한 이벤트 혜택은
+                                        복원하지 않습니다.
+                                    </p>
+                                ))}
                             <p>
                                 현금 환불 예정:{" "}
                                 {Math.max(

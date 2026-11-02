@@ -3,7 +3,8 @@
 begin;
 create function pg_temp.assert(ok boolean,label text) returns void language plpgsql as $$
 begin if ok is distinct from true then raise exception 'FAIL: %',label; end if; raise notice 'PASS: %',label; end $$;
-update public.opening_campaign set active=true,integration_ready=true,closed_at=null,used_count=0,capacity=20 where id;
+-- #297 정원은 10 고정, 종료 시각은 실행일과 무관하게 미래로 둔다.
+update public.opening_campaign set active=true,integration_ready=true,closed_at=null,used_count=0,ends_at=now()+interval '30 days' where id;
 delete from public.opening_event_claims where state='HELD';
 
 insert into auth.users(id,email) values('00000283-0000-4000-8000-000000000999','round-partner@example.invalid');
@@ -30,8 +31,9 @@ begin
   end loop;
 end $$;
 
-select pg_temp.assert(public.reserve_opening_event('00000283-0002-4000-8000-000000000001')=25000,'basic 121분 할증 10% TS 금액으로 쿠폰 확보');
-select pg_temp.assert(public.reserve_opening_event('00000283-0002-4000-8000-000000000002')=25000,'plus 125분 할증 10% TS 금액으로 쿠폰 확보');
+-- #297 쿠폰액은 할증과 무관한 서비스별 고정액이다(Basic 20,000 / Plus 25,000).
+select pg_temp.assert(public.reserve_opening_event('00000283-0002-4000-8000-000000000001')=20000,'basic 121분 할증 10% TS 금액으로 Basic 쿠폰 확보');
+select pg_temp.assert(public.reserve_opening_event('00000283-0002-4000-8000-000000000002')=25000,'plus 125분 할증 10% TS 금액으로 Plus 쿠폰 확보');
 do $$ begin
   begin perform public.reserve_opening_event('00000283-0002-4000-8000-000000000003');
   exception when check_violation then raise notice 'PASS: TS 와 다른 금액은 거절'; return; end;

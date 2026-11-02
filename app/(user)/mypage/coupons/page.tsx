@@ -5,7 +5,11 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { createClient } from "@/utils/supabase/server";
 import { openingEventEmailStatus } from "@/lib/opening-event-email.server";
 import { OpeningEventRegister } from "@/components/opening-event-register";
-import { OPENING_EVENT_TERMS } from "@/lib/opening-event";
+import {
+    OPENING_EVENT_CHANGE_NOTICE,
+    OPENING_EVENT_DEADLINE_LABEL,
+    OPENING_EVENT_TERMS,
+} from "@/lib/opening-event";
 import {
     OPENING_COUPON_MESSAGES,
     type OpeningCoupon,
@@ -27,12 +31,26 @@ export default async function CouponWalletPage() {
         ["AVAILABLE", "HELD"].includes(rawCoupon.state)
             ? { ...rawCoupon, state: "PAUSED" as const }
             : rawCoupon;
+    // 종료 후에는 식별값을 새로 등록하지 않고, 파기로 미등록이 된 회원도 '확인 중'에 머물지 않는다 (#297).
+    // '확인 중' 안내는 등록하면 쿠폰이 보일 수 있는 상태(HIDDEN)에서만 쓴다.
+    const ended = rawCoupon?.ended ?? rawCoupon?.state === "CLOSED";
+    const registering = emailStatus === "missing" && !ended;
+    const checking = registering && rawCoupon?.state === "HIDDEN";
+    // 혜택 안내(금액·자동 적용·기한·변경 안내)는 쿠폰을 쓸 수 있는 상태에서만 보인다 (#298 리뷰).
+    // 확보·사용한 쿠폰은 실제 확보액을 보여 준다.
+    const usable =
+        coupon !== null &&
+        ["AVAILABLE", "HELD", "WAITING"].includes(coupon.state);
+    const claimedDiscount =
+        coupon && (coupon.state === "HELD" || coupon.state === "USED")
+            ? coupon.discount
+            : null;
     return (
         <div>
             {coupon?.state === "HELD" && <AutoRefresh />}
-            {emailStatus === "missing" && <OpeningEventRegister />}
+            {registering && <OpeningEventRegister />}
             <h1 className="text-foreground text-2xl font-extrabold">쿠폰함</h1>
-            {emailStatus === "missing" && !error ? (
+            {checking && !error ? (
                 <p role="status" className="text-muted-foreground mt-6">
                     쿠폰을 확인하고 있습니다.
                 </p>
@@ -50,15 +68,48 @@ export default async function CouponWalletPage() {
                         <Ticket className="size-5" />
                         오픈 이벤트 쿠폰
                     </div>
-                    <p className="text-foreground mt-4 text-3xl font-extrabold">
-                        {coupon.discount.toLocaleString()}원
-                    </p>
+                    {claimedDiscount !== null ? (
+                        <p className="text-foreground mt-4 text-3xl font-extrabold">
+                            {claimedDiscount.toLocaleString()}원
+                        </p>
+                    ) : (
+                        usable && (
+                            <>
+                                <p className="text-foreground mt-4 text-3xl font-extrabold">
+                                    첫 1시간 무료
+                                </p>
+                                {coupon.discounts && (
+                                    <p className="text-foreground mt-2 font-bold">
+                                        Basic{" "}
+                                        {coupon.discounts.basic.toLocaleString()}
+                                        원 · Plus{" "}
+                                        {coupon.discounts.plus.toLocaleString()}
+                                        원
+                                    </p>
+                                )}
+                                <p className="text-muted-foreground mt-1 text-sm">
+                                    예약한 서비스에 맞춰 자동 적용됩니다.
+                                </p>
+                            </>
+                        )
+                    )}
+                    {usable && (
+                        <p className="text-muted-foreground mt-1 text-sm">
+                            {OPENING_EVENT_DEADLINE_LABEL}까지 결제가 확정된
+                            예약에 적용
+                        </p>
+                    )}
                     <p
                         role="status"
                         className="text-muted-foreground mt-3 text-sm leading-relaxed"
                     >
                         {OPENING_COUPON_MESSAGES[coupon.state]}
                     </p>
+                    {usable && (
+                        <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm leading-relaxed text-amber-900">
+                            {OPENING_EVENT_CHANGE_NOTICE}
+                        </p>
+                    )}
                     {coupon.state === "AVAILABLE" && (
                         <Link
                             href="/reservation"

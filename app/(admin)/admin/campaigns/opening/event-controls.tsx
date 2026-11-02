@@ -7,10 +7,13 @@ export function EventControls({
     active,
     ready,
     closed,
+    ended,
 }: {
     active: boolean;
     ready: boolean;
     closed: boolean;
+    /** 종료 시각 경과 또는 관리자 종료. 종료 후에는 다시 활성화하지 않는다 (#297). */
+    ended: boolean;
 }) {
     const [reason, setReason] = useState("");
     const [pending, start] = useTransition();
@@ -30,7 +33,7 @@ export function EventControls({
                 disabled={
                     pending ||
                     closed ||
-                    (!active && !ready) ||
+                    (!active && (!ready || ended)) ||
                     reason.trim().length < 5
                 }
                 className="bg-brand text-brand-foreground rounded-lg px-4 py-2 font-bold disabled:opacity-40"
