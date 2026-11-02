@@ -195,37 +195,44 @@ end $$;
 revoke all on function public.admin_set_opening_event(boolean,text) from public, anon;
 grant execute on function public.admin_set_opening_event(boolean,text) to authenticated;
 
--- 본인 쿠폰함. 확보·사용한 쿠폰은 실제 확보액을, 그 밖에는 예약 서비스가 정해지지 않았으므로
--- discount 를 비우고 서비스별 금액(discounts)을 함께 돌려준다. 종료 시각이 지나면 CLOSED.
+-- 본인 쿠폰함. 확보·사용한 쿠폰은 실제 확보액을 돌려준다. 그 밖에는 예약 서비스가 정해지지 않아
+-- 서비스별 금액(discounts)을 함께 주고, discount 에는 서비스별 최소 할인액을 숫자로 둔다.
+-- discount 를 숫자로 두는 것은 이 마이그레이션 전 앱의 쿠폰함이 숫자를 기대하기 때문이며(배포 순서와 무관하게
+-- 깨지지 않게), 최소액이라 과다 안내가 되지 않는다. 새 화면은 discounts 를 쓴다.
+-- 종료(ended) 후 CLOSED 는 참여 이력(식별 행 또는 확보·사용 기록)이 있는 회원에게만 안내하고 나머지는 HIDDEN 이다.
 create or replace function public.opening_event_coupon()
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare c public.opening_campaign%rowtype; identity public.opening_event_identities%rowtype;
-  claim public.opening_event_claims%rowtype; coupon_state text; held integer;
+  claim public.opening_event_claims%rowtype; coupon_state text; held integer; ended boolean;
   discounts jsonb := jsonb_build_object('basic',public.opening_event_discount('basic'),'plus',public.opening_event_discount('plus'));
+  base_discount integer := least(public.opening_event_discount('basic'),public.opening_event_discount('plus'));
 begin
-  if not exists(select 1 from public.profiles where id=auth.uid() and role='USER' and status='ACTIVE') then
-    return jsonb_build_object('state','HIDDEN','discount',null::integer,'discounts',discounts); end if;
   select * into c from public.opening_campaign where id;
-  if not found then return jsonb_build_object('state','HIDDEN','discount',null::integer,'discounts',discounts); end if;
+  ended := c.id is null or c.closed_at is not null or now()>=c.ends_at;
+  if c.id is null or not exists(select 1 from public.profiles where id=auth.uid() and role='USER' and status='ACTIVE') then
+    return jsonb_build_object('state','HIDDEN','discount',base_discount,'discounts',discounts,'ended',ended); end if;
   select * into identity from public.opening_event_identities where customer_id=auth.uid();
   select * into claim from public.opening_event_claims
     where (customer_id=auth.uid() or identity_hash=identity.identity_hash)
       and (state='USED' or (state='HELD' and expires_at>now() and public.opening_event_live_hold(payment_id)))
     order by case state when 'USED' then 0 else 1 end,held_at desc limit 1;
   if claim.state='USED' then
-    return jsonb_build_object('state',claim.state,'discount',claim.discount_amount,'discounts',discounts,
+    return jsonb_build_object('state',claim.state,'discount',claim.discount_amount,'discounts',discounts,'ended',ended,
       'reservationId',case when claim.customer_id=auth.uid() then claim.reservation_id else null end,
       'remaining',greatest(c.capacity-c.used_count,0));
   end if;
-  -- 식별 행 등록이 중지된 회원도 캠페인 중지/종료 안내를 볼 수 있다.
-  if c.closed_at is not null or now()>=c.ends_at then
-    return jsonb_build_object('state','CLOSED','discount',null::integer,'discounts',discounts); end if;
+  -- 종료는 영구 상태다. 처음부터 대상이 아니던 회원에게까지 종료 안내를 계속 보이지 않는다.
+  if ended then
+    return jsonb_build_object('state',case when identity.customer_id is not null
+        or exists(select 1 from public.opening_event_claims where customer_id=auth.uid()) then 'CLOSED' else 'HIDDEN' end,
+      'discount',base_discount,'discounts',discounts,'ended',true); end if;
+  -- 식별 행 등록이 중지된 회원도 일시 중지 안내를 볼 수 있다.
   if not c.active or not c.integration_ready then
-    return jsonb_build_object('state','PAUSED','discount',null::integer,'discounts',discounts); end if;
+    return jsonb_build_object('state','PAUSED','discount',base_discount,'discounts',discounts,'ended',false); end if;
   if not public.opening_event_customer_eligible(auth.uid()) then
-    return jsonb_build_object('state','HIDDEN','discount',null::integer,'discounts',discounts); end if;
+    return jsonb_build_object('state','HIDDEN','discount',base_discount,'discounts',discounts,'ended',false); end if;
   if claim.state='HELD' then
-    return jsonb_build_object('state','HELD','discount',claim.discount_amount,'discounts',discounts,
+    return jsonb_build_object('state','HELD','discount',claim.discount_amount,'discounts',discounts,'ended',false,
       'reservationId',case when claim.customer_id=auth.uid() then claim.reservation_id else null end,
       'remaining',greatest(c.capacity-c.used_count,0));
   end if;
@@ -233,7 +240,7 @@ begin
     and public.opening_event_live_hold(payment_id);
   coupon_state:=case when c.used_count>=c.capacity then 'EXHAUSTED'
     when c.used_count+held>=c.capacity then 'WAITING' else 'AVAILABLE' end;
-  return jsonb_build_object('state',coupon_state,'discount',null::integer,'discounts',discounts,
+  return jsonb_build_object('state',coupon_state,'discount',base_discount,'discounts',discounts,'ended',false,
     'remaining',greatest(c.capacity-c.used_count,0));
 end $$;
 revoke all on function public.opening_event_coupon() from public,anon;
@@ -425,11 +432,12 @@ revoke all on function public.admin_get_service_exception(uuid,text) from public
 grant execute on function public.admin_get_service_exception(uuid,text) to authenticated;
 
 -- 082 의 예외 확정. 복원을 계획한 뒤 행사가 끝났으면 복원하지 않고 결정에도 미복원으로 남긴다.
--- 고객 요약(restored)·관리자 화면이 실제 처리와 같게 보인다. 그 밖의 처리는 082 와 같다.
+-- 고객 요약(restored)·관리자 화면이 실제 처리와 같게 보이고, 확정 접근 로그에 복원 생략을 남긴다.
+-- 그 밖의 처리는 082 와 같다.
 create or replace function public.record_service_exception_resolution(p_service uuid,p_actor uuid,p_verified jsonb)
 returns void language plpgsql security definer set search_path='' as $$
 declare s public.services; d public.service_exception_resolutions; tx record; v jsonb;
- base_id uuid; refunded integer; net_cash integer; customer uuid;
+ base_id uuid; refunded integer; net_cash integer; customer uuid; restore_skipped boolean:=false;
 begin
  if not exists(select 1 from public.profiles p join public.admin_accounts a on a.profile_id=p.id
    join auth.users u on u.id=p.id
@@ -487,6 +495,7 @@ begin
   perform 1 from public.opening_campaign where id for update;
   if public.opening_event_ended() then
    update public.service_exception_resolutions set restore_benefit=false where service_id=s.id;
+   restore_skipped:=true;
   else
    update public.opening_event_claims set state='RELEASED',restored_at=now(),restored_by=p_actor,
     restored_reason=d.reason||' / 증빙: '||d.evidence_reference,restored_sequence=sequence,restored_confirmed_at=confirmed_at,sequence=null,confirmed_at=null
@@ -502,7 +511,8 @@ begin
  -- 서버 JWT에는 auth.uid()가 없으므로 실제 검증 담당자를 명시해 기록한다.
  insert into public.access_logs(actor_id,actor_role,subject_id,action,target_table,target_id,reason)
  values(p_actor,'ADMIN',s.partner_id,'SERVICE_EXCEPTION_RESOLVE','services',s.id,
-  d.reason||' / 증빙: '||d.evidence_reference||' / 현금: '||d.final_cash||' / 지급: '||d.partner_payout);
+  d.reason||' / 증빙: '||d.evidence_reference||' / 현금: '||d.final_cash||' / 지급: '||d.partner_payout
+   ||case when restore_skipped then ' / 혜택 복원: 행사 종료로 생략(계획 시 복원 선택)' else '' end);
 end $$;
 revoke all on function public.record_service_exception_resolution(uuid,uuid,jsonb) from public,anon,authenticated;
 grant execute on function public.record_service_exception_resolution(uuid,uuid,jsonb) to service_role;

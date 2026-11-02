@@ -17,7 +17,10 @@ const won = (amount: number) => `${amount.toLocaleString("ko-KR")}원`;
 /** "Basic 20,000원 · Plus 25,000원" */
 export const OPENING_EVENT_DISCOUNT_LABEL = `Basic ${won(OPENING_EVENT_DISCOUNT.basic)} · Plus ${won(OPENING_EVENT_DISCOUNT.plus)}`;
 
-/** #276 의 공통 25,000원에서 Basic 할인액이 줄어든 변경 안내 (#297). */
+/**
+ * #276 의 공통 25,000원에서 Basic 할인액이 줄어든 변경 안내 (#297).
+ * 적용일은 운영 릴리즈 PR 에서 정해 이 문구에 넣는다 (#298 리뷰).
+ */
 export const OPENING_EVENT_CHANGE_NOTICE = `쿠폰 할인액이 서비스별 최초 1시간 요금으로 바뀌어 Basic은 25,000원에서 ${won(OPENING_EVENT_DISCOUNT.basic)}으로 변경되었습니다(Plus ${won(OPENING_EVENT_DISCOUNT.plus)} 유지). 변경 전에 결제가 확정된 예약은 확정 당시 할인액을 유지합니다.`;
 
 export const OPENING_EVENT_TERMS = [

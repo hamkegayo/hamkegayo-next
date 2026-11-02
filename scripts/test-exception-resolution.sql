@@ -97,6 +97,8 @@ select public.record_service_exception_resolution('00000082-0003-4000-8000-00000
 select pg_temp.assert((select state='USED' and restored_at is null from public.opening_event_claims where payment_id='00000082-0002-4000-8000-000000000001'),'benefit not restored after the event ends');
 select pg_temp.assert((select resolved_at is not null and not restore_benefit from public.service_exception_resolutions where service_id='00000082-0003-4000-8000-000000000001'),'resolution records no restoration after the event ends');
 select pg_temp.assert((select used_count=3 from public.opening_campaign),'used count unchanged after the event ends');
+select pg_temp.assert(exists(select 1 from public.access_logs where action='SERVICE_EXCEPTION_RESOLVE' and target_id='00000082-0003-4000-8000-000000000001'
+  and reason like '%혜택 복원: 행사 종료로 생략%'),'skipped restoration is audited');
 rollback to review_ended_resolution;
 -- 실제 PG 호출 없이 서버 검증 결과를 모사한다.
 do $$ declare i integer; sid uuid; rid uuid; verified jsonb;
@@ -122,6 +124,7 @@ begin
  end loop;
 end $$;
 select pg_temp.assert((select state='RELEASED' and restored_by='00000082-0000-4000-8000-000000000998' and restored_at is not null from public.opening_event_claims where payment_id='00000082-0002-4000-8000-000000000001'),'benefit restored after full cash refund');
+select pg_temp.assert(not exists(select 1 from public.access_logs where reason like '%혜택 복원: 행사 종료로 생략%' and target_id='00000082-0003-4000-8000-000000000001'),'restoration before the end is not logged as skipped');
 select pg_temp.assert((select used_count=2 and not active and not integration_ready from public.opening_campaign where id),'campaign activation unchanged and partial/emergency benefit not restored');
 select pg_temp.assert((select count(*) from public.opening_event_claims where reservation_id in ('00000082-0001-4000-8000-000000000002','00000082-0001-4000-8000-000000000003') and state='USED' and restored_at is null)=2,'partial/emergency retain event use');
 select pg_temp.assert((select sum(amount)=0 from public.points where payment_id='00000082-0002-4000-8000-000000000005'),'zero cash full refund restores actual used points');

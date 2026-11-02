@@ -95,6 +95,8 @@ export function OpeningEventPopup({
                         <X className="size-6" />
                     </DialogClose>
                 </div>
+                {/* 쿠폰은 할증과 무관한 고정액이다. 신규 예약 할증이 없어(FAQ "별도 고지 전까지") "1시간 무료"가
+                    사실과 맞는다. 할증을 다시 적용할 때 이 헤드라인을 함께 재검토한다 (#298 리뷰). */}
                 <DialogTitle className="mt-6 text-3xl leading-tight font-extrabold break-keep sm:text-4xl">
                     첫 병원동행,
                     <br />

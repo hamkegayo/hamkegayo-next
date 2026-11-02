@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     const { data: payment } = await admin
         .from("payments")
         .select(
-            "id, reservation_id, type, status, gross_amount, discount_amount, token_expires_at, reservations!inner(id, code, status, confirmed_partner_id, payment_deadline, use_date)",
+            "id, reservation_id, type, status, gross_amount, discount_amount, campaign_discount_amount, token_expires_at, reservations!inner(id, code, status, confirmed_partner_id, payment_deadline, use_date)",
         )
         .eq("order_id", auth.orderId)
         .maybeSingle();
@@ -254,6 +254,28 @@ export async function POST(request: NextRequest) {
         return isExtension
             ? extensionResult(request, { status: "expired" })
             : fail(request, "PAYMENT_EXPIRED", rid);
+    }
+
+    //  오픈 이벤트 쿠폰 결제는 행사 종료 후 확정할 수 없다 (#297).
+    //  승인 전에 걸러 "승인 후 즉시 취소" 왕복을 줄인다. 종료 여부는 DB(ends_at·closed_at)가
+    //  판단하고, 이 검사와 확정 사이의 경합은 확정 트리거(⑥·⑦)가 최종으로 막는다.
+    if (!isExtension && payment.campaign_discount_amount > 0) {
+        const { data: campaign } = await admin.rpc("opening_event_status");
+        const ended =
+            (campaign as { ended?: boolean }[] | null)?.[0]?.ended === true;
+        if (ended) {
+            console.warn(
+                `[payments/confirm] 이벤트 종료 후 쿠폰 결제 — 승인 전 중단 order=${auth.orderId}`,
+            );
+            await netCancelQuietly(auth.orderId);
+            await failPayment(
+                admin,
+                payment.id,
+                "이벤트 종료 후 쿠폰 결제",
+                auth.orderId,
+            );
+            return fail(request, "COUPON_ENDED", rid);
+        }
     }
 
     // ---------- ⑤ PG 승인 — 여기서 돈이 빠진다 ----------

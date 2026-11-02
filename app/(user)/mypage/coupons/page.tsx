@@ -31,12 +31,16 @@ export default async function CouponWalletPage() {
         ["AVAILABLE", "HELD"].includes(rawCoupon.state)
             ? { ...rawCoupon, state: "PAUSED" as const }
             : rawCoupon;
-    // 종료 후에는 식별값을 새로 등록하지 않고, 파기로 미등록이 된 회원도 종료 안내를 바로 본다 (#297).
+    // 종료 후에는 식별값을 새로 등록하지 않고, 파기로 미등록이 된 회원도 '확인 중'에 머물지 않는다 (#297).
     // '확인 중' 안내는 등록하면 쿠폰이 보일 수 있는 상태(HIDDEN)에서만 쓴다.
-    const registering =
-        emailStatus === "missing" && rawCoupon?.state !== "CLOSED";
+    const ended = rawCoupon?.ended ?? rawCoupon?.state === "CLOSED";
+    const registering = emailStatus === "missing" && !ended;
     const checking = registering && rawCoupon?.state === "HIDDEN";
-    // 확보·사용한 쿠폰은 실제 확보액을, 그 밖에는 서비스별 금액을 보여 준다.
+    // 혜택 안내(금액·자동 적용·기한·변경 안내)는 쿠폰을 쓸 수 있는 상태에서만 보인다 (#298 리뷰).
+    // 확보·사용한 쿠폰은 실제 확보액을 보여 준다.
+    const usable =
+        coupon !== null &&
+        ["AVAILABLE", "HELD", "WAITING"].includes(coupon.state);
     const claimedDiscount =
         coupon && (coupon.state === "HELD" || coupon.state === "USED")
             ? coupon.discount
@@ -69,34 +73,39 @@ export default async function CouponWalletPage() {
                             {claimedDiscount.toLocaleString()}원
                         </p>
                     ) : (
-                        <>
-                            <p className="text-foreground mt-4 text-3xl font-extrabold">
-                                첫 1시간 무료
-                            </p>
-                            {coupon.discounts && (
-                                <p className="text-foreground mt-2 font-bold">
-                                    Basic{" "}
-                                    {coupon.discounts.basic.toLocaleString()}원
-                                    · Plus{" "}
-                                    {coupon.discounts.plus.toLocaleString()}원
+                        usable && (
+                            <>
+                                <p className="text-foreground mt-4 text-3xl font-extrabold">
+                                    첫 1시간 무료
                                 </p>
-                            )}
-                            <p className="text-muted-foreground mt-1 text-sm">
-                                예약한 서비스에 맞춰 자동 적용됩니다.
-                            </p>
-                        </>
+                                {coupon.discounts && (
+                                    <p className="text-foreground mt-2 font-bold">
+                                        Basic{" "}
+                                        {coupon.discounts.basic.toLocaleString()}
+                                        원 · Plus{" "}
+                                        {coupon.discounts.plus.toLocaleString()}
+                                        원
+                                    </p>
+                                )}
+                                <p className="text-muted-foreground mt-1 text-sm">
+                                    예약한 서비스에 맞춰 자동 적용됩니다.
+                                </p>
+                            </>
+                        )
                     )}
-                    <p className="text-muted-foreground mt-1 text-sm">
-                        {OPENING_EVENT_DEADLINE_LABEL}까지 결제가 확정된 예약에
-                        적용
-                    </p>
+                    {usable && (
+                        <p className="text-muted-foreground mt-1 text-sm">
+                            {OPENING_EVENT_DEADLINE_LABEL}까지 결제가 확정된
+                            예약에 적용
+                        </p>
+                    )}
                     <p
                         role="status"
                         className="text-muted-foreground mt-3 text-sm leading-relaxed"
                     >
                         {OPENING_COUPON_MESSAGES[coupon.state]}
                     </p>
-                    {coupon.state !== "USED" && coupon.state !== "CLOSED" && (
+                    {usable && (
                         <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm leading-relaxed text-amber-900">
                             {OPENING_EVENT_CHANGE_NOTICE}
                         </p>

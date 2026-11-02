@@ -13,10 +13,15 @@ export type OpeningCouponState =
 /** 쿠폰함 응답 (`opening_event_coupon()`). */
 export type OpeningCoupon = {
     state: OpeningCouponState;
-    /** 확보(HELD)·사용(USED)한 실제 할인액. 예약 전에는 서비스가 정해지지 않아 null 이다. */
-    discount: number | null;
+    /**
+     * 확보(HELD)·사용(USED)한 실제 할인액. 그 밖의 상태에서는 예약 서비스가 정해지지 않아
+     * 서비스별 최소 할인액이 온다(이전 앱 호환용). 화면은 `discounts` 를 쓴다.
+     */
+    discount: number;
     /** 서비스별 쿠폰액. 예약 서비스에 따라 자동 적용된다 (#297). */
     discounts?: { basic: number; plus: number };
+    /** 행사 종료(종료 시각 경과 또는 관리자 종료). 종료 후에는 식별값을 등록하지 않는다. */
+    ended?: boolean;
     remaining?: number;
     reservationId?: string | null;
 };
@@ -49,8 +54,9 @@ export const OPENING_COUPON_CONFIRM_MESSAGES: Record<
     OpeningCouponConfirmFailure,
     string
 > = {
+    // 승인 전(종료 시각·관리자 종료)과 확정 트리거(종료 시각) 두 경로가 같은 안내를 쓴다.
     COUPON_ENDED:
-        "이벤트 기간이 끝나 쿠폰이 적용되지 않았습니다. 결제는 취소되었으니 쿠폰 없이 다시 결제해 주세요.",
+        "이벤트가 종료되어 쿠폰이 적용되지 않았습니다. 결제는 취소되었으니 쿠폰 없이 다시 결제해 주세요.",
     COUPON_EXHAUSTED:
         "선착순 혜택이 소진되어 쿠폰이 적용되지 않았습니다. 결제는 취소되었으니 쿠폰 없이 다시 결제해 주세요.",
 };

@@ -95,7 +95,9 @@ update public.payments set discount_amount=0,commission_amount=commission_amount
 select set_config('request.jwt.claims','{"sub":"00000159-0000-4000-8000-000000000001","role":"authenticated"}',true);
 select pg_temp.assert(public.opening_event_coupon()->>'state'='AVAILABLE','new customer coupon auto visible');
 -- #297 예약 전 쿠폰함은 서비스별 금액을, 결제 화면은 예약 서비스의 최초 1시간 금액을 보여 준다.
-select pg_temp.assert(public.opening_event_coupon()->'discount'='null'::jsonb and public.opening_event_coupon()->'discounts'='{"basic":20000,"plus":25000}'::jsonb,'wallet lists per-plan amounts before booking');
+-- discount 는 이전 앱 쿠폰함이 숫자를 기대해 서비스별 최소액(20,000)을 둔다 (#298 리뷰).
+select pg_temp.assert((public.opening_event_coupon()->>'discount')::integer=20000 and public.opening_event_coupon()->'discounts'='{"basic":20000,"plus":25000}'::jsonb
+  and not (public.opening_event_coupon()->>'ended')::boolean,'wallet lists per-plan amounts before booking');
 select pg_temp.assert((public.opening_event_offer('00000159-0001-4000-8000-000000000001')->>'discount')::integer=25000,'Plus offer uses Plus first-hour amount');
 select set_config('request.jwt.claims','{"sub":"00000159-0000-4000-8000-000000000002","role":"authenticated"}',true);
 select pg_temp.assert((public.opening_event_offer('00000159-0001-4000-8000-000000000002')->>'discount')::integer=20000,'Basic offer uses Basic first-hour amount');
@@ -122,7 +124,10 @@ delete from public.opening_event_identities where customer_id='00000159-0000-400
 select set_config('request.jwt.claims','{"sub":"00000159-0000-4000-8000-000000000023","role":"authenticated"}',true);
 select pg_temp.assert(public.opening_event_coupon()->>'state'='PAUSED','missing identity still sees campaign pause');
 update public.opening_campaign set closed_at=now() where id;
-select pg_temp.assert(public.opening_event_coupon()->>'state'='CLOSED','missing identity still sees campaign closure');
+-- #298 리뷰: 종료는 영구 상태라 참여 이력(식별 행·확보 기록)이 없는 회원에게는 종료 안내를 보이지 않는다.
+select pg_temp.assert(public.opening_event_coupon()->>'state'='HIDDEN' and (public.opening_event_coupon()->>'ended')::boolean,'closure is hidden from members who never participated');
+select set_config('request.jwt.claims','{"sub":"00000159-0000-4000-8000-000000000002","role":"authenticated"}',true);
+select pg_temp.assert(public.opening_event_coupon()->>'state'='CLOSED','registered member sees campaign closure');
 rollback to review_states;
 savepoint review_cancel;
 update public.reservations set status='CANCELLED' where id='00000159-0001-4000-8000-000000000001';
@@ -134,9 +139,12 @@ rollback to review_cancel;
 savepoint review_period;
 update public.opening_campaign set ends_at=now() where id;
 select pg_temp.assert((select not enabled and ended from public.opening_event_status()),'ended campaign hides popup and reports ended');
-select pg_temp.assert(public.opening_event_coupon()->>'state'='CLOSED','ended campaign closes wallet coupon');
+select pg_temp.assert(public.opening_event_coupon()->>'state'='CLOSED' and (public.opening_event_coupon()->>'ended')::boolean,'ended campaign closes wallet coupon');
 select pg_temp.assert(public.opening_event_offer('00000159-0001-4000-8000-000000000001')->>'state'='CLOSED'
   and not (public.opening_event_offer('00000159-0001-4000-8000-000000000001')->>'eligible')::boolean,'ended campaign closes payment offer');
+select set_config('request.jwt.claims','{"sub":"00000159-0000-4000-8000-000000000023","role":"authenticated"}',true);
+select pg_temp.assert(public.opening_event_coupon()->>'state'='HIDDEN' and (public.opening_event_coupon()->>'ended')::boolean,'time end is hidden from members who never participated');
+select set_config('request.jwt.claims','{"sub":"00000159-0000-4000-8000-000000000001","role":"authenticated"}',true);
 do $$ begin
   begin perform public.reserve_opening_event('00000159-0002-4000-8000-000000000001');
   exception when check_violation then

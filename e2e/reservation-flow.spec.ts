@@ -201,7 +201,7 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
         });
         await pay.click();
         await expect(
-            user.getByText("이벤트 기간이 끝나 쿠폰이 적용되지 않았습니다.", {
+            user.getByText("이벤트가 종료되어 쿠폰이 적용되지 않았습니다.", {
                 exact: false,
             }),
         ).toBeVisible({ timeout: 30_000 });

@@ -14,6 +14,15 @@ export async function POST() {
         data: { user },
     } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ registered: false }, { status: 401 });
+    // 행사 종료 후에는 식별값을 수집하지 않는다 (#297). 결제 화면·쿠폰함이 열릴 때마다
+    // 등록 RPC 가 거부되지 않도록 종료 여부(DB 의 ends_at·closed_at)를 먼저 읽고 돌아간다.
+    // 조회가 실패하면 등록 RPC 가 종료를 다시 검사한다.
+    const { data: status } = await supabase.rpc("opening_event_status");
+    if ((status as { ended?: boolean }[] | null)?.[0]?.ended === true)
+        return NextResponse.json(
+            { registered: false },
+            { headers: { "Cache-Control": "no-store" } },
+        );
     const registered = await ensureOpeningEventEmail(user);
     return NextResponse.json(
         { registered },
