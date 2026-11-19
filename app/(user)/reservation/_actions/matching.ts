@@ -165,7 +165,8 @@ export async function getReservationApplicantsDetailed(
 }
 
 /** 예약 취소 사유 — DB 의 reservations.cancel_reason 과 같은 값이다. */
-export type CancelReason = "EXPIRED" | "USER" | "REFUND" | "ADMIN" | null;
+export type CancelReason =
+    "EXPIRED" | "USER_CONSENT_EXPIRED" | "USER" | "REFUND" | "ADMIN" | null;
 
 export type MatchingState = {
     /** 예약이 사라졌거나 남의 예약이면 null */

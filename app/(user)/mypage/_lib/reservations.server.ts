@@ -44,6 +44,11 @@ export type MatchingReservationView = {
      * 신규 방식에는 지원자·고객 선택이 없으므로 applicantCount 는 쓰지 않는다.
      */
     directPhase: DirectPhase | null;
+    /**
+     * 이용자 본인 동의 대기(PENDING_USER, #306) — 동의 전에는 파트너 매칭·결제가 열리지 않는다.
+     * 서비스 시작 예정시각까지 동의가 없으면 자동 취소된다 (#310).
+     */
+    consentPending: boolean;
 };
 
 /** 최근 예약 내역(완료/취소) */
@@ -66,6 +71,8 @@ type Row = {
     created_at: string;
     matching_mode?: string | null;
     paid_at?: string | null;
+    user_consent_status?: string | null;
+    cancel_reason?: string | null;
 };
 
 /** "YYYY-MM-DD" + "HH:mm" → "YYYY.MM.DD (요일) 오전/오후 h:mm" */
@@ -117,7 +124,7 @@ export async function getMyReservations(): Promise<{
         const { data, error } = await supabase
             .from("reservations")
             .select(
-                "id, status, plan, hospital_address, use_date, reserve_time, created_at, matching_mode, paid_at",
+                "id, status, plan, hospital_address, use_date, reserve_time, created_at, matching_mode, paid_at, user_consent_status, cancel_reason",
             )
             .eq("customer_id", user.id)
             .order("created_at", { ascending: false })
@@ -153,6 +160,7 @@ export async function getMyReservations(): Promise<{
                           refundStatus: null,
                       })
                     : null,
+                consentPending: r.user_consent_status === "PENDING_USER",
             }),
         );
 
@@ -234,7 +242,9 @@ export async function getMyReservations(): Promise<{
                               refundStatus,
                           })
                       ]
-                    : (RESERVATION_STATUS_LABEL[r.status] ?? r.status),
+                    : r.cancel_reason === "USER_CONSENT_EXPIRED"
+                      ? "예약 취소 · 본인 동의 없음"
+                      : (RESERVATION_STATUS_LABEL[r.status] ?? r.status),
             };
         });
 

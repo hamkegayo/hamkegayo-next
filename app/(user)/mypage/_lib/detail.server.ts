@@ -61,6 +61,8 @@ export type ReservationDetailView = {
     createdAtLabel: string;
     status: ReservationStatus;
     statusLabel: string;
+    /** 취소 사유 (reservations.cancel_reason). 취소되지 않았거나 기록 이전 건은 null */
+    cancelReason: string | null;
     planLabel: string;
     hospitalVisitLabel: string;
     partnerArriveLabel: string;
@@ -133,6 +135,7 @@ type ReservationRow = {
     code: string;
     created_at: string;
     status: ReservationStatus;
+    cancel_reason: string | null;
     plan: string;
     patient_name: string;
     patient_gender: string;
@@ -270,7 +273,7 @@ export async function getReservationDetail(
         const { data: r, error } = await supabase
             .from("reservations")
             .select(
-                "id, code, created_at, status, plan, patient_name, patient_gender, patient_birth, patient_phone, cautions, other_requests, use_date, arrive_time, reserve_time, depart_address, hospital_address, confirmed_partner_id, duration, duration_minutes, surcharge_rate, prepaid_amount, billed_minutes, final_amount",
+                "id, code, created_at, status, cancel_reason, plan, patient_name, patient_gender, patient_birth, patient_phone, cautions, other_requests, use_date, arrive_time, reserve_time, depart_address, hospital_address, confirmed_partner_id, duration, duration_minutes, surcharge_rate, prepaid_amount, billed_minutes, final_amount",
             )
             .eq("id", reservationId)
             .maybeSingle<ReservationRow>();
@@ -329,6 +332,7 @@ export async function getReservationDetail(
             createdAtLabel: formatDate(r.created_at.slice(0, 10)),
             status: r.status,
             statusLabel: RESERVATION_STATUS_LABEL[r.status] ?? r.status,
+            cancelReason: r.status === "CANCELLED" ? r.cancel_reason : null,
             planLabel: PLAN_INFO[planCode].label,
             hospitalVisitLabel: formatDateTime(r.use_date, r.reserve_time),
             partnerArriveLabel: formatDateTime(r.use_date, r.arrive_time),
