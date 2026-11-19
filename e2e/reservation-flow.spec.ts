@@ -104,6 +104,13 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
             ),
         ).toBeVisible();
         await expect(user.locator("#agreePreMatchingHealth")).toBeFocused();
+        await expect(user.locator("#agreePreMatchingHealth")).toHaveAttribute(
+            "aria-describedby",
+            "agreePreMatchingHealth-error",
+        );
+        await expect(user.locator("#agreePreMatchingHealth-error")).toHaveText(
+            "거동·인지 상태의 매칭 전 파트너 제공에 동의하지 않으면 예약할 수 없습니다.",
+        );
         await expect(user.locator("#userName")).toBeVisible();
         await user
             .getByRole("checkbox", {

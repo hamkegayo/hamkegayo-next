@@ -13,25 +13,20 @@ alter table public.reservations
   add column if not exists pre_matching_health_consented_at timestamptz,
   add column if not exists pre_matching_health_consent_version text;
 
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint
-     where conrelid = 'public.reservations'::regclass
-       and conname = 'reservations_pre_matching_health_consent_check'
-  ) then
-    alter table public.reservations
-      add constraint reservations_pre_matching_health_consent_check
-      check (
-        (pre_matching_health_consented_at is null and pre_matching_health_consent_version is null)
-        or (
-          pre_matching_health_consented_at is not null
-          and pre_matching_health_consent_version is not null
-          and btrim(pre_matching_health_consent_version) <> ''
-        )
-      );
-  end if;
-end $$;
+alter table public.reservations
+  drop constraint if exists reservations_pre_matching_health_consent_check;
+
+alter table public.reservations
+  add constraint reservations_pre_matching_health_consent_check
+  check (
+    (pre_matching_health_consented_at is null and pre_matching_health_consent_version is null)
+    or (
+      pre_matching_health_consented_at is not null
+      and pre_matching_health_consent_version is not null
+      and btrim(pre_matching_health_consent_version) <> ''
+      and pre_matching_health_consent_version ~ '^\d{4}-\d{2}-\d{2}$'
+    )
+  );
 
 comment on column public.reservations.pre_matching_health_consented_at is
   '거동·인지 상태의 매칭 전(단계 1) 파트너 제공 별도 동의 시각. 처리방침 제3조 ②·제5조 ② [단계 1]·④·⑥ (#285).';

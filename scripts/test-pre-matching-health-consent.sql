@@ -216,6 +216,31 @@ select pg_temp.expect_sqlstate(
   '공백 버전 동의 INSERT는 체크 제약으로 거부됨 (23514)'
 );
 
+select pg_temp.expect_sqlstate(
+  $q$insert into public.reservations (
+       id, code, customer_id, plan,
+       patient_name, patient_birth, patient_gender, patient_phone,
+       guardian_name, guardian_phone, relation,
+       treatment, purpose,
+       use_date, arrive_time, reserve_time, duration, duration_minutes,
+       depart_address, hospital_name, hospital_address,
+       mobility_status, cognitive_status,
+       pre_matching_health_consented_at, pre_matching_health_consent_version
+     ) values (
+       '00000285-0000-4000-8000-000000000016', 'TEST-285-BADFORMAT',
+       '00000285-0000-4000-8000-000000000001', 'basic',
+       '잘못된버전', '1950-01-01', 'female', '01011112222',
+       '보호자', '01033334444', '자녀',
+       '내과', '검진',
+       '2026-12-22', '09:00', '10:00', '2시간', 120,
+       '서울특별시 강남구 역삼동', '병원', '서울특별시 서초구',
+       '자력 보행', '의사소통 원활',
+       now(), 'invalid-version'
+     )$q$,
+  '23514',
+  '날짜 형식(YYYY-MM-DD)이 아닌 버전 동의 INSERT는 체크 제약으로 거부됨 (23514)'
+);
+
 -- 고객 INSERT 시 클라이언트 시각('2000-01-01T00:00:00Z')을 넘겨도 서버 now()로 강제됨
 insert into public.reservations (
   id, code, customer_id, plan,

@@ -232,13 +232,18 @@ export function StepUserInfo() {
                                     id="userName"
                                     placeholder="홍길동"
                                     aria-invalid={!!errors.userName}
+                                    aria-describedby={
+                                        errors.userName
+                                            ? "userName-error"
+                                            : undefined
+                                    }
                                     {...register("userName", {
                                         onChange: () =>
                                             errors.userName &&
                                             clearErrors("userName"),
                                     })}
                                 />
-                                <FieldError>
+                                <FieldError id="userName-error">
                                     {errors.userName?.message}
                                 </FieldError>
                             </div>
@@ -265,10 +270,15 @@ export function StepUserInfo() {
                                             }}
                                             max={kstToday()}
                                             invalid={!!errors.userBirth}
+                                            aria-describedby={
+                                                errors.userBirth
+                                                    ? "userBirth-error"
+                                                    : undefined
+                                            }
                                         />
                                     )}
                                 />
-                                <FieldError>
+                                <FieldError id="userBirth-error">
                                     {errors.userBirth?.message}
                                 </FieldError>
                                 <p className="text-description-foreground mt-1.5 text-sm leading-relaxed">
@@ -297,6 +307,11 @@ export function StepUserInfo() {
                                                 clearErrors("userGender");
                                             }}
                                             aria-pressed={gender === g.value}
+                                            aria-describedby={
+                                                errors.userGender
+                                                    ? "userGender-error"
+                                                    : undefined
+                                            }
                                             className={cn(
                                                 "h-11 rounded-lg border text-sm font-semibold transition-colors",
                                                 gender === g.value
@@ -308,7 +323,7 @@ export function StepUserInfo() {
                                         </button>
                                     ))}
                                 </div>
-                                <FieldError>
+                                <FieldError id="userGender-error">
                                     {errors.userGender?.message}
                                 </FieldError>
                             </div>
@@ -322,6 +337,11 @@ export function StepUserInfo() {
                                     inputMode="numeric"
                                     placeholder="010-1234-5678"
                                     aria-invalid={!!errors.userPhone}
+                                    aria-describedby={
+                                        errors.userPhone
+                                            ? "userPhone-error"
+                                            : undefined
+                                    }
                                     {...register("userPhone", {
                                         onChange: (e) => {
                                             setValue(
@@ -335,7 +355,7 @@ export function StepUserInfo() {
                                         },
                                     })}
                                 />
-                                <FieldError>
+                                <FieldError id="userPhone-error">
                                     {errors.userPhone?.message}
                                 </FieldError>
                             </div>
@@ -348,13 +368,18 @@ export function StepUserInfo() {
                                     id="guardianName"
                                     placeholder="홍길동"
                                     aria-invalid={!!errors.guardianName}
+                                    aria-describedby={
+                                        errors.guardianName
+                                            ? "guardianName-error"
+                                            : undefined
+                                    }
                                     {...register("guardianName", {
                                         onChange: () =>
                                             errors.guardianName &&
                                             clearErrors("guardianName"),
                                     })}
                                 />
-                                <FieldError>
+                                <FieldError id="guardianName-error">
                                     {errors.guardianName?.message}
                                 </FieldError>
                             </div>
@@ -368,6 +393,11 @@ export function StepUserInfo() {
                                     inputMode="numeric"
                                     placeholder="010-1234-5678"
                                     aria-invalid={!!errors.guardianPhone}
+                                    aria-describedby={
+                                        errors.guardianPhone
+                                            ? "guardianPhone-error"
+                                            : undefined
+                                    }
                                     {...register("guardianPhone", {
                                         onChange: (e) => {
                                             setValue(
@@ -381,7 +411,7 @@ export function StepUserInfo() {
                                         },
                                     })}
                                 />
-                                <FieldError>
+                                <FieldError id="guardianPhone-error">
                                     {errors.guardianPhone?.message}
                                 </FieldError>
                             </div>
@@ -393,6 +423,11 @@ export function StepUserInfo() {
                                 <NativeSelect
                                     id="relation"
                                     aria-invalid={!!errors.relation}
+                                    aria-describedby={
+                                        errors.relation
+                                            ? "relation-error"
+                                            : undefined
+                                    }
                                     {...register("relation", {
                                         onChange: () =>
                                             errors.relation &&
@@ -406,7 +441,7 @@ export function StepUserInfo() {
                                         </option>
                                     ))}
                                 </NativeSelect>
-                                <FieldError>
+                                <FieldError id="relation-error">
                                     {errors.relation?.message}
                                 </FieldError>
                             </div>
@@ -422,6 +457,11 @@ export function StepUserInfo() {
                                 <NativeSelect
                                     id="notifyTarget"
                                     aria-invalid={!!errors.notifyTarget}
+                                    aria-describedby={
+                                        errors.notifyTarget
+                                            ? "notifyTarget-error"
+                                            : undefined
+                                    }
                                     {...register("notifyTarget", {
                                         onChange: () =>
                                             errors.notifyTarget &&
@@ -434,7 +474,7 @@ export function StepUserInfo() {
                                         </option>
                                     ))}
                                 </NativeSelect>
-                                <FieldError>
+                                <FieldError id="notifyTarget-error">
                                     {errors.notifyTarget?.message}
                                 </FieldError>
                                 {/* 자동 발송이 아니다 — 앱 알림은 예약자 계정으로만 간다 (#254) */}
@@ -497,13 +537,18 @@ export function StepUserInfo() {
                                     id="treatment"
                                     placeholder="수면 내시경"
                                     aria-invalid={!!errors.treatment}
+                                    aria-describedby={
+                                        errors.treatment
+                                            ? "treatment-error"
+                                            : undefined
+                                    }
                                     {...register("treatment", {
                                         onChange: () =>
                                             errors.treatment &&
                                             clearErrors("treatment"),
                                     })}
                                 />
-                                <FieldError>
+                                <FieldError id="treatment-error">
                                     {errors.treatment?.message}
                                 </FieldError>
                             </div>
@@ -516,13 +561,18 @@ export function StepUserInfo() {
                                     id="purpose"
                                     placeholder="정기 검진"
                                     aria-invalid={!!errors.purpose}
+                                    aria-describedby={
+                                        errors.purpose
+                                            ? "purpose-error"
+                                            : undefined
+                                    }
                                     {...register("purpose", {
                                         onChange: () =>
                                             errors.purpose &&
                                             clearErrors("purpose"),
                                     })}
                                 />
-                                <FieldError>
+                                <FieldError id="purpose-error">
                                     {errors.purpose?.message}
                                 </FieldError>
                             </div>
@@ -542,6 +592,11 @@ export function StepUserInfo() {
                                 <NativeSelect
                                     id="mobilityStatus"
                                     aria-invalid={!!errors.mobilityStatus}
+                                    aria-describedby={
+                                        errors.mobilityStatus
+                                            ? "mobilityStatus-error"
+                                            : undefined
+                                    }
                                     {...register("mobilityStatus", {
                                         onChange: () =>
                                             errors.mobilityStatus &&
@@ -555,7 +610,7 @@ export function StepUserInfo() {
                                         </option>
                                     ))}
                                 </NativeSelect>
-                                <FieldError>
+                                <FieldError id="mobilityStatus-error">
                                     {errors.mobilityStatus?.message}
                                 </FieldError>
                             </div>
@@ -566,6 +621,11 @@ export function StepUserInfo() {
                                 <NativeSelect
                                     id="cognitiveStatus"
                                     aria-invalid={!!errors.cognitiveStatus}
+                                    aria-describedby={
+                                        errors.cognitiveStatus
+                                            ? "cognitiveStatus-error"
+                                            : undefined
+                                    }
                                     {...register("cognitiveStatus", {
                                         onChange: () =>
                                             errors.cognitiveStatus &&
@@ -579,7 +639,7 @@ export function StepUserInfo() {
                                         </option>
                                     ))}
                                 </NativeSelect>
-                                <FieldError>
+                                <FieldError id="cognitiveStatus-error">
                                     {errors.cognitiveStatus?.message}
                                 </FieldError>
                             </div>

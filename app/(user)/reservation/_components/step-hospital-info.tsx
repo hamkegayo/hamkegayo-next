@@ -199,73 +199,86 @@ export function StepHospitalInfo() {
         );
     };
 
-    const searchButton = (target: AddressTarget) => (
-        <button
-            id={`${target}AddressSearch`}
-            type="button"
-            disabled={!searchEnabled}
-            onClick={() => setSearchTarget(target)}
-            className="border-brand bg-background text-brand hover:bg-brand/5 inline-flex h-11 shrink-0 cursor-pointer items-center gap-1 rounded-lg border px-3.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-        >
-            <Search className="size-4" />
-            주소 검색
-        </button>
-    );
-    const addressInput = (target: AddressTarget) => (
-        <>
-            <div className="flex gap-2">
-                <Input
-                    id={addressField[target]}
-                    value={addresses[target].base}
-                    readOnly
-                    placeholder="주소 검색으로 선택해 주세요"
-                    aria-invalid={!!errors[addressField[target]]}
-                    className="bg-muted"
-                />
-                {searchButton(target)}
-            </div>
-            <input type="hidden" {...register(addressField[target])} />
-            <FieldError>{errors[addressField[target]]?.message}</FieldError>
-            {/* 다른 항목과 같은 라벨·간격 규칙을 쓴다 (라벨 아래 8px, 항목 사이 안내 6px). */}
-            <div className="mt-4">
-                <FieldLabel htmlFor={`${target}AddressDetail`}>
-                    상세주소 (선택)
-                </FieldLabel>
-                <Input
-                    id={`${target}AddressDetail`}
-                    value={addresses[target].detail}
-                    disabled={!addresses[target].base}
-                    maxLength={200}
-                    placeholder="동·호수, 층, 만남 장소 등"
-                    onChange={(event) => {
-                        const detail = event.target.value;
-                        setAddresses((previous) => ({
-                            ...previous,
-                            [target]: { ...previous[target], detail },
-                        }));
-                        setValue(
-                            addressField[target],
-                            joinSelectedAddress(addresses[target].base, detail),
-                        );
-                        clearErrors(addressField[target]);
-                    }}
-                />
-            </div>
-            <p className="text-description-foreground mt-1.5 text-xs leading-relaxed">
-                기본 주소는 검색으로만 변경할 수 있습니다. 동·호수는 상세주소에
-                입력해 주세요.
-            </p>
-            {searchEnabled === false && (
-                <p
-                    role="alert"
-                    className="text-destructive mt-1.5 text-sm leading-relaxed"
-                >
-                    주소 검색을 이용할 수 없습니다. 잠시 후 다시 시도하거나
-                    고객센터로 문의해 주세요.
+    const searchButton = (target: AddressTarget) => {
+        const field = addressField[target];
+        return (
+            <button
+                id={`${target}AddressSearch`}
+                type="button"
+                disabled={!searchEnabled}
+                onClick={() => setSearchTarget(target)}
+                aria-describedby={errors[field] ? `${field}-error` : undefined}
+                className="border-brand bg-background text-brand hover:bg-brand/5 inline-flex h-11 shrink-0 cursor-pointer items-center gap-1 rounded-lg border px-3.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            >
+                <Search className="size-4" />
+                주소 검색
+            </button>
+        );
+    };
+    const addressInput = (target: AddressTarget) => {
+        const field = addressField[target];
+        const errorId = `${field}-error`;
+        const hasError = !!errors[field];
+        return (
+            <>
+                <div className="flex gap-2">
+                    <Input
+                        id={field}
+                        value={addresses[target].base}
+                        readOnly
+                        placeholder="주소 검색으로 선택해 주세요"
+                        aria-invalid={hasError}
+                        aria-describedby={hasError ? errorId : undefined}
+                        className="bg-muted"
+                    />
+                    {searchButton(target)}
+                </div>
+                <input type="hidden" {...register(field)} />
+                <FieldError id={errorId}>{errors[field]?.message}</FieldError>
+                {/* 다른 항목과 같은 라벨·간격 규칙을 쓴다 (라벨 아래 8px, 항목 사이 안내 6px). */}
+                <div className="mt-4">
+                    <FieldLabel htmlFor={`${target}AddressDetail`}>
+                        상세주소 (선택)
+                    </FieldLabel>
+                    <Input
+                        id={`${target}AddressDetail`}
+                        value={addresses[target].detail}
+                        disabled={!addresses[target].base}
+                        maxLength={200}
+                        placeholder="동·호수, 층, 만남 장소 등"
+                        onChange={(event) => {
+                            const detail = event.target.value;
+                            setAddresses((previous) => ({
+                                ...previous,
+                                [target]: { ...previous[target], detail },
+                            }));
+                            setValue(
+                                field,
+                                joinSelectedAddress(
+                                    addresses[target].base,
+                                    detail,
+                                ),
+                            );
+                            clearErrors(field);
+                        }}
+                    />
+                </div>
+                <p className="text-description-foreground mt-1.5 text-xs leading-relaxed">
+                    기본 주소는 검색으로만 변경할 수 있습니다. 동·호수는
+                    상세주소에 입력해 주세요.
                 </p>
-            )}
-        </>
-    );
+                {searchEnabled === false && (
+                    <p
+                        role="alert"
+                        className="text-destructive mt-1.5 text-sm leading-relaxed"
+                    >
+                        주소 검색을 이용할 수 없습니다. 잠시 후 다시 시도하거나
+                        고객센터로 문의해 주세요.
+                    </p>
+                )}
+            </>
+        );
+    };
 
     const onSubmit = (v: Step2Values) => {
         for (const target of ["depart", "hospital"] as const) {
@@ -350,13 +363,18 @@ export function StepHospitalInfo() {
                                         e.currentTarget.showPicker?.()
                                     }
                                     aria-invalid={!!errors.useDate}
+                                    aria-describedby={
+                                        errors.useDate
+                                            ? "useDate-error"
+                                            : undefined
+                                    }
                                     {...register("useDate", {
                                         onChange: () =>
                                             errors.useDate &&
                                             clearErrors("useDate"),
                                     })}
                                 />
-                                <FieldError>
+                                <FieldError id="useDate-error">
                                     {errors.useDate?.message}
                                 </FieldError>
                                 <p className="text-description-foreground mt-1.5 text-xs leading-relaxed">
@@ -378,6 +396,11 @@ export function StepHospitalInfo() {
                                 <NativeSelect
                                     id="arriveTime"
                                     aria-invalid={!!errors.arriveTime}
+                                    aria-describedby={
+                                        errors.arriveTime
+                                            ? "arriveTime-error"
+                                            : undefined
+                                    }
                                     {...register("arriveTime", {
                                         onChange: () =>
                                             errors.arriveTime &&
@@ -402,7 +425,7 @@ export function StepHospitalInfo() {
                                         </option>
                                     ))}
                                 </NativeSelect>
-                                <FieldError>
+                                <FieldError id="arriveTime-error">
                                     {errors.arriveTime?.message}
                                 </FieldError>
                             </div>
@@ -414,6 +437,11 @@ export function StepHospitalInfo() {
                                 <NativeSelect
                                     id="reserveTime"
                                     aria-invalid={!!errors.reserveTime}
+                                    aria-describedby={
+                                        errors.reserveTime
+                                            ? "reserveTime-error"
+                                            : undefined
+                                    }
                                     {...register("reserveTime", {
                                         onChange: () =>
                                             errors.reserveTime &&
@@ -427,7 +455,7 @@ export function StepHospitalInfo() {
                                         </option>
                                     ))}
                                 </NativeSelect>
-                                <FieldError>
+                                <FieldError id="reserveTime-error">
                                     {errors.reserveTime?.message}
                                 </FieldError>
                             </div>
@@ -439,6 +467,11 @@ export function StepHospitalInfo() {
                                 <NativeSelect
                                     id="duration"
                                     aria-invalid={!!errors.duration}
+                                    aria-describedby={
+                                        errors.duration
+                                            ? "duration-error"
+                                            : undefined
+                                    }
                                     {...register("duration", {
                                         onChange: () =>
                                             errors.duration &&
@@ -463,7 +496,7 @@ export function StepHospitalInfo() {
                                         </option>
                                     ))}
                                 </NativeSelect>
-                                <FieldError>
+                                <FieldError id="duration-error">
                                     {errors.duration?.message}
                                 </FieldError>
                             </div>
@@ -484,13 +517,18 @@ export function StepHospitalInfo() {
                                     id="hospitalName"
                                     placeholder="세브란스병원"
                                     aria-invalid={!!errors.hospitalName}
+                                    aria-describedby={
+                                        errors.hospitalName
+                                            ? "hospitalName-error"
+                                            : undefined
+                                    }
                                     {...register("hospitalName", {
                                         onChange: () =>
                                             errors.hospitalName &&
                                             clearErrors("hospitalName"),
                                     })}
                                 />
-                                <FieldError>
+                                <FieldError id="hospitalName-error">
                                     {errors.hospitalName?.message}
                                 </FieldError>
                             </div>
@@ -526,6 +564,11 @@ export function StepHospitalInfo() {
                                 <NativeSelect
                                     id="transportTo"
                                     aria-invalid={!!errors.transportTo}
+                                    aria-describedby={
+                                        errors.transportTo
+                                            ? "transportTo-error"
+                                            : undefined
+                                    }
                                     {...register("transportTo", {
                                         onChange: () =>
                                             errors.transportTo &&
@@ -539,7 +582,7 @@ export function StepHospitalInfo() {
                                         </option>
                                     ))}
                                 </NativeSelect>
-                                <FieldError>
+                                <FieldError id="transportTo-error">
                                     {errors.transportTo?.message}
                                 </FieldError>
                             </div>
@@ -551,6 +594,11 @@ export function StepHospitalInfo() {
                                 <NativeSelect
                                     id="transportHome"
                                     aria-invalid={!!errors.transportHome}
+                                    aria-describedby={
+                                        errors.transportHome
+                                            ? "transportHome-error"
+                                            : undefined
+                                    }
                                     {...register("transportHome", {
                                         onChange: () =>
                                             errors.transportHome &&
@@ -564,7 +612,7 @@ export function StepHospitalInfo() {
                                         </option>
                                     ))}
                                 </NativeSelect>
-                                <FieldError>
+                                <FieldError id="transportHome-error">
                                     {errors.transportHome?.message}
                                 </FieldError>
                             </div>
@@ -576,6 +624,11 @@ export function StepHospitalInfo() {
                                 <NativeSelect
                                     id="endMethod"
                                     aria-invalid={!!errors.endMethod}
+                                    aria-describedby={
+                                        errors.endMethod
+                                            ? "endMethod-error"
+                                            : undefined
+                                    }
                                     {...register("endMethod", {
                                         onChange: (e) => {
                                             if (errors.endMethod) {
@@ -603,7 +656,7 @@ export function StepHospitalInfo() {
                                         </option>
                                     ))}
                                 </NativeSelect>
-                                <FieldError>
+                                <FieldError id="endMethod-error">
                                     {errors.endMethod?.message}
                                 </FieldError>
                             </div>
@@ -629,13 +682,18 @@ export function StepHospitalInfo() {
                                         id="handoverName"
                                         placeholder="홍길동"
                                         aria-invalid={!!errors.handoverName}
+                                        aria-describedby={
+                                            errors.handoverName
+                                                ? "handoverName-error"
+                                                : undefined
+                                        }
                                         {...register("handoverName", {
                                             onChange: () =>
                                                 errors.handoverName &&
                                                 clearErrors("handoverName"),
                                         })}
                                     />
-                                    <FieldError>
+                                    <FieldError id="handoverName-error">
                                         {errors.handoverName?.message}
                                     </FieldError>
                                 </div>
@@ -650,6 +708,11 @@ export function StepHospitalInfo() {
                                     <NativeSelect
                                         id="handoverRelation"
                                         aria-invalid={!!errors.handoverRelation}
+                                        aria-describedby={
+                                            errors.handoverRelation
+                                                ? "handoverRelation-error"
+                                                : undefined
+                                        }
                                         {...register("handoverRelation", {
                                             onChange: () =>
                                                 errors.handoverRelation &&
@@ -663,7 +726,7 @@ export function StepHospitalInfo() {
                                             </option>
                                         ))}
                                     </NativeSelect>
-                                    <FieldError>
+                                    <FieldError id="handoverRelation-error">
                                         {errors.handoverRelation?.message}
                                     </FieldError>
                                 </div>
@@ -680,6 +743,11 @@ export function StepHospitalInfo() {
                                         inputMode="numeric"
                                         placeholder="010-1234-5678"
                                         aria-invalid={!!errors.handoverPhone}
+                                        aria-describedby={
+                                            errors.handoverPhone
+                                                ? "handoverPhone-error"
+                                                : undefined
+                                        }
                                         {...register("handoverPhone", {
                                             onChange: (e) => {
                                                 setValue(
@@ -695,7 +763,7 @@ export function StepHospitalInfo() {
                                             },
                                         })}
                                     />
-                                    <FieldError>
+                                    <FieldError id="handoverPhone-error">
                                         {errors.handoverPhone?.message}
                                     </FieldError>
                                 </div>
