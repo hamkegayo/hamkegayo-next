@@ -30,7 +30,29 @@ import { StepBand, StepNav } from "./step-band";
 import { UrgentCallNotice } from "./urgent-call-notice";
 import { newReservationMatchingMode } from "@/lib/direct-assignment";
 import { totalStepsFor } from "../_lib/flow-branch";
-import { FieldError, FieldLabel, NativeSelect } from "./fields";
+import {
+    FieldError,
+    FieldLabel,
+    NativeSelect,
+    focusFieldById,
+    focusFirstErrorField,
+} from "./fields";
+
+const STEP2_FIELD_ORDER = [
+    "useDate",
+    "arriveTime",
+    "reserveTime",
+    "duration",
+    "departAddress",
+    "hospitalName",
+    "hospitalAddress",
+    "transportTo",
+    "transportHome",
+    "endMethod",
+    "handoverName",
+    "handoverRelation",
+    "handoverPhone",
+] as const;
 import { AddressSearchModal } from "./address-search-modal";
 import { addressSearchEnabled } from "../_actions/address";
 import type { SignedAddressResult } from "../_actions/address";
@@ -58,6 +80,7 @@ export function StepHospitalInfo() {
         resolver: zodResolver(step2Form),
         mode: "onSubmit",
         reValidateMode: "onSubmit",
+        shouldFocusError: false,
         defaultValues: {
             useDate: data.useDate,
             arriveTime: data.arriveTime,
@@ -178,6 +201,7 @@ export function StepHospitalInfo() {
 
     const searchButton = (target: AddressTarget) => (
         <button
+            id={`${target}AddressSearch`}
             type="button"
             disabled={!searchEnabled}
             onClick={() => setSearchTarget(target)}
@@ -250,6 +274,11 @@ export function StepHospitalInfo() {
                     type: "validate",
                     message: "주소 검색으로 기본 주소를 선택해 주세요.",
                 });
+                focusFieldById(
+                    searchEnabled
+                        ? `${target}AddressSearch`
+                        : addressField[target],
+                );
                 return;
             }
         }
@@ -258,6 +287,7 @@ export function StepHospitalInfo() {
                 type: "validate",
                 message: MIN_SERVICE_AGE_MESSAGE,
             });
+            focusFieldById("useDate");
             return;
         }
 
@@ -279,7 +309,18 @@ export function StepHospitalInfo() {
 
             <Section>
                 <form
-                    onSubmit={handleSubmit(onSubmit)}
+                    onSubmit={handleSubmit(onSubmit, (errs) =>
+                        focusFirstErrorField(
+                            STEP2_FIELD_ORDER,
+                            errs,
+                            searchEnabled
+                                ? {
+                                      departAddress: "departAddressSearch",
+                                      hospitalAddress: "hospitalAddressSearch",
+                                  }
+                                : undefined,
+                        ),
+                    )}
                     noValidate
                     className="mx-auto max-w-3xl space-y-6"
                 >
@@ -536,9 +577,23 @@ export function StepHospitalInfo() {
                                     id="endMethod"
                                     aria-invalid={!!errors.endMethod}
                                     {...register("endMethod", {
-                                        onChange: () =>
-                                            errors.endMethod &&
-                                            clearErrors("endMethod"),
+                                        onChange: (e) => {
+                                            if (errors.endMethod) {
+                                                clearErrors("endMethod");
+                                            }
+                                            if (
+                                                e.target.value ===
+                                                "ADULT_HANDOVER"
+                                            ) {
+                                                setTimeout(
+                                                    () =>
+                                                        focusFieldById(
+                                                            "handoverName",
+                                                        ),
+                                                    0,
+                                                );
+                                            }
+                                        },
                                     })}
                                 >
                                     <option value="">선택하세요</option>

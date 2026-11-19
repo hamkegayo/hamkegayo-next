@@ -36,11 +36,16 @@ export const step1Schema = z.object({
     relation: z.string().min(1, "관계를 선택해 주세요."),
     treatment: z.string().min(1, required),
     purpose: z.string().min(1, required),
-    // 거동·인지 상태의 매칭 전 제공에는 별도 동의가 필요하다 (처리방침 제5조 ② [단계 1]·④⑥).
-    // 이 필수 입력 검증은 제3자 제공 동의 수집·접근 게이트를 구현하지 않는다.
+    // 처리방침 제3조 ② · 제5조 ② [단계 1]·④⑥ — 거동·인지 상태는 아래 agreePreMatchingHealth
+    // 별도 동의를 받은 경우에만 매칭 전(단계 1) 파트너에게 제공된다 (#285).
     // 파트너가 수행 가능 여부를 판단하는 근거라 필수로 받는다.
     mobilityStatus: z.string().min(1, "거동 상태를 선택해 주세요."),
     cognitiveStatus: z.string().min(1, "인지 상태를 선택해 주세요."),
+    // 처리방침 제3조 ② · 제5조 ② [단계 1]·④⑥ — 거동·인지 상태의 매칭 전 파트너 제공 별도 동의.
+    agreePreMatchingHealth: z.boolean().refine((v) => v === true, {
+        message:
+            "거동·인지 상태의 매칭 전 파트너 제공에 동의하지 않으면 예약할 수 없습니다.",
+    }),
     cautions: z.string().optional(),
     docPrescription: z.boolean().optional(),
     docReceipt: z.boolean().optional(),

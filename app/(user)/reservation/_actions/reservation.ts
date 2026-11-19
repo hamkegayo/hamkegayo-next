@@ -8,6 +8,7 @@ import { verifiedRegionCode } from "@/lib/address-token.server";
 import { generateReservationCode } from "@/lib/reservation";
 import { reservationServerSchema } from "../_lib/schema";
 import { quoteReservation } from "../_lib/quote.server";
+import { PRIVACY } from "@/lib/legal/privacy";
 import { notifyPartnersOfNewRequest } from "@/lib/partner-new-request.server";
 import {
     newReservationMatchingMode,
@@ -35,9 +36,13 @@ export async function createReservation(
         // 일정 문제는 이유를 그대로 보여준다. "입력값을 확인하세요" 만
         // 띄우면 어느 칸이 문제인지 알 수 없어 같은 신청을 반복하게 된다.
         const actionableIssue = parsed.error.issues.find((i) =>
-            ["userBirth", "useDate", "arriveTime", "reserveTime"].includes(
-                String(i.path[0] ?? ""),
-            ),
+            [
+                "userBirth",
+                "useDate",
+                "arriveTime",
+                "reserveTime",
+                "agreePreMatchingHealth",
+            ].includes(String(i.path[0] ?? "")),
         );
         return {
             ok: false,
@@ -46,6 +51,14 @@ export async function createReservation(
         };
     }
     const v = parsed.data;
+    if (v.agreePreMatchingHealth !== true) {
+        return {
+            ok: false,
+            reason: "validation",
+            message:
+                "거동·인지 상태의 매칭 전 파트너 제공에 동의하지 않으면 예약할 수 없습니다.",
+        };
+    }
     const regionCodes = {
         depart: verifiedRegionCode({
             address: v.departAddress,
@@ -121,6 +134,9 @@ export async function createReservation(
         cautions: v.cautions ?? null,
         mobility_status: v.mobilityStatus,
         cognitive_status: v.cognitiveStatus,
+        // 처리방침 제5조 ② [단계 1]·④⑥ — 매칭 전 최소 건강정보 제공 동의 기록 (#285)
+        pre_matching_health_consented_at: new Date().toISOString(),
+        pre_matching_health_consent_version: PRIVACY.version,
         doc_prescription: v.docPrescription ?? false,
         doc_receipt: v.docReceipt ?? false,
         doc_certificate: v.docCertificate ?? false,

@@ -28,7 +28,30 @@ import { StepBand, StepNav } from "./step-band";
 import { CareRecipientPicker } from "./care-recipient-picker";
 import { listMyCareRecipients } from "../_actions/care";
 import type { CareRecipient } from "@/app/(user)/mypage/_lib/care.server";
-import { FieldError, FieldLabel, NativeSelect, Textarea } from "./fields";
+import {
+    FieldError,
+    FieldLabel,
+    NativeSelect,
+    Textarea,
+    focusFieldById,
+    focusFirstErrorField,
+} from "./fields";
+
+const STEP1_FIELD_ORDER = [
+    "userName",
+    "userBirth",
+    "userGender",
+    "userPhone",
+    "guardianName",
+    "guardianPhone",
+    "relation",
+    "notifyTarget",
+    "treatment",
+    "purpose",
+    "mobilityStatus",
+    "cognitiveStatus",
+    "agreePreMatchingHealth",
+] as const;
 
 const DOCS = [
     { name: "docPrescription", label: "처방전" },
@@ -48,6 +71,7 @@ export function StepUserInfo() {
         register,
         handleSubmit,
         setValue,
+        getValues,
         watch,
         control,
         clearErrors,
@@ -56,6 +80,7 @@ export function StepUserInfo() {
         resolver: zodResolver(step1Schema),
         mode: "onSubmit",
         reValidateMode: "onSubmit",
+        shouldFocusError: false,
         defaultValues: {
             userName: data.userName,
             userBirth: data.userBirth,
@@ -68,6 +93,7 @@ export function StepUserInfo() {
             purpose: data.purpose,
             mobilityStatus: data.mobilityStatus,
             cognitiveStatus: data.cognitiveStatus,
+            agreePreMatchingHealth: data.agreePreMatchingHealth,
             cautions: data.cautions,
             docPrescription: data.docPrescription,
             docReceipt: data.docReceipt,
@@ -138,6 +164,17 @@ export function StepUserInfo() {
                 ? `${r.name} 님의 정보로 채워졌습니다.`
                 : `${r.name} 님의 정보로 채워졌습니다. 관계는 직접 선택해 주세요.`,
         );
+        setTimeout(() => {
+            if (!getValues("guardianName")?.trim()) {
+                focusFieldById("guardianName");
+            } else if (!getValues("guardianPhone")?.trim()) {
+                focusFieldById("guardianPhone");
+            } else if (!relationFilled && !getValues("relation")?.trim()) {
+                focusFieldById("relation");
+            } else if (!getValues("treatment")?.trim()) {
+                focusFieldById("treatment");
+            }
+        }, 0);
     };
 
     return (
@@ -175,7 +212,9 @@ export function StepUserInfo() {
                 </div>
 
                 <form
-                    onSubmit={handleSubmit(onSubmit)}
+                    onSubmit={handleSubmit(onSubmit, (errs) =>
+                        focusFirstErrorField(STEP1_FIELD_ORDER, errs),
+                    )}
                     noValidate
                     className="mx-auto mt-8 max-w-3xl space-y-6"
                 >
@@ -244,9 +283,14 @@ export function StepUserInfo() {
                                     {[
                                         { value: "female", label: "여성" },
                                         { value: "male", label: "남성" },
-                                    ].map((g) => (
+                                    ].map((g, i) => (
                                         <button
                                             key={g.value}
+                                            id={
+                                                i === 0
+                                                    ? "userGender"
+                                                    : undefined
+                                            }
                                             type="button"
                                             onClick={() => {
                                                 setValue("userGender", g.value);
@@ -486,8 +530,8 @@ export function StepUserInfo() {
 
                         {/*
                          * 거동·인지 상태는 파트너가 수락 여부를 판단하는 근거라
-                         * 매칭 전 제공에는 별도 동의가 필요하다 (처리방침 제5조 ② [단계 1]·④⑥).
-                         * 현재 입력 UI는 그 동의 수집을 구현하지 않는다. 보호자 전달 동의와도 다르다.
+                         * 매칭 전 제공에는 별도 동의가 필요하다 (처리방침 제3조 ② · 제5조 ② [단계 1]·④·⑥, #285).
+                         * 보호자 전달 동의(shareMedicalInfo)와 분리해 아래에서 별도 동의를 받으며,
                          * 아래 '주의해야 할 점' 은 예약 확정 후에만 전달된다.
                          */}
                         <div className="mt-5 grid gap-5 md:grid-cols-2">
@@ -537,6 +581,110 @@ export function StepUserInfo() {
                                 </NativeSelect>
                                 <FieldError>
                                     {errors.cognitiveStatus?.message}
+                                </FieldError>
+                            </div>
+                        </div>
+
+                        {/*
+                         * 처리방침 제3조 ② · 제5조 ② [단계 1]·④·⑥ (#285)
+                         * 거동·인지 상태(민감정보)의 매칭 전 파트너 제공에 대한 별도 동의.
+                         */}
+                        <div
+                            className={cn(
+                                "bg-background mt-5 rounded-xl border p-4 md:p-5",
+                                errors.agreePreMatchingHealth
+                                    ? "border-destructive"
+                                    : "border-border",
+                            )}
+                        >
+                            <p className="text-foreground text-sm font-bold">
+                                [필수] 매칭 전 파트너에게 거동·인지 상태 제공
+                                동의 (민감정보)
+                            </p>
+                            <dl className="text-description-foreground mt-3 space-y-1.5 text-sm leading-relaxed">
+                                <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
+                                    <dt className="text-foreground shrink-0 font-semibold sm:w-28">
+                                        제공받는 자
+                                    </dt>
+                                    <dd>
+                                        해당 예약 요청을 검토하는 함께가요
+                                        병원동행 파트너
+                                    </dd>
+                                </div>
+                                <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
+                                    <dt className="text-foreground shrink-0 font-semibold sm:w-28">
+                                        제공 목적
+                                    </dt>
+                                    <dd>
+                                        서비스 수행 가능 여부 및 예약 수락 여부
+                                        판단 (민감정보)
+                                    </dd>
+                                </div>
+                                <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
+                                    <dt className="text-foreground shrink-0 font-semibold sm:w-28">
+                                        제공 항목
+                                    </dt>
+                                    <dd>거동상태, 인지상태</dd>
+                                </div>
+                                <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
+                                    <dt className="text-foreground shrink-0 font-semibold sm:w-28">
+                                        보유·이용기간
+                                    </dt>
+                                    <dd>
+                                        수락 여부 결정 시까지. 수락하지 않은
+                                        파트너는 즉시 접근 차단
+                                    </dd>
+                                </div>
+                            </dl>
+                            <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
+                                동의를 거부할 권리가 있으나, 동의하지 않으면
+                                예약할 수 없습니다.
+                            </p>
+                            <div className="border-border mt-3 border-t pt-3">
+                                <Controller
+                                    control={control}
+                                    name="agreePreMatchingHealth"
+                                    render={({ field }) => (
+                                        <label className="flex cursor-pointer items-start gap-2.5">
+                                            <Checkbox
+                                                id="agreePreMatchingHealth"
+                                                nativeButton
+                                                render={
+                                                    <button type="button" />
+                                                }
+                                                className="mt-0.5"
+                                                checked={field.value === true}
+                                                aria-invalid={
+                                                    !!errors.agreePreMatchingHealth
+                                                }
+                                                aria-describedby={
+                                                    errors.agreePreMatchingHealth
+                                                        ? "agreePreMatchingHealth-error"
+                                                        : undefined
+                                                }
+                                                onCheckedChange={(checked) => {
+                                                    field.onChange(
+                                                        checked === true,
+                                                    );
+                                                    if (
+                                                        errors.agreePreMatchingHealth
+                                                    ) {
+                                                        clearErrors(
+                                                            "agreePreMatchingHealth",
+                                                        );
+                                                    }
+                                                }}
+                                            />
+                                            <span className="text-foreground text-sm leading-relaxed font-medium">
+                                                거동·인지 상태(민감정보)를 매칭
+                                                전 파트너에게 제공하는 데
+                                                동의합니다.
+                                            </span>
+                                        </label>
+                                    )}
+                                />
+                                <FieldError id="agreePreMatchingHealth-error">
+                                    {errors.agreePreMatchingHealth?.message}
                                 </FieldError>
                             </div>
                         </div>

@@ -66,7 +66,54 @@ export const Textarea = React.forwardRef<
 });
 
 /** 필드 하단 에러 메시지 */
-export function FieldError({ children }: { children?: React.ReactNode }) {
+export function FieldError({
+    id,
+    children,
+}: {
+    id?: string;
+    children?: React.ReactNode;
+}) {
     if (!children) return null;
-    return <p className="text-destructive mt-1.5 text-sm">{children}</p>;
+    return (
+        <p id={id} className="text-destructive mt-1.5 text-sm">
+            {children}
+        </p>
+    );
+}
+
+/** 사용자의 모션 축소 선호(`prefers-reduced-motion`)에 맞춘 스크롤 동작을 반환한다. */
+export function preferredScrollBehavior(): ScrollBehavior {
+    return typeof window !== "undefined" &&
+        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth";
+}
+
+/**
+ * id로 DOM 요소를 찾아 화면 중앙으로 부드럽게 스크롤한 뒤 포커스를 이동한다.
+ * 스크롤과 포커스를 분리(`preventScroll: true`)해 브라우저 기본 점프를 막는다.
+ */
+export function focusFieldById(id: string): boolean {
+    if (typeof document === "undefined") return false;
+    const el = document.getElementById(id);
+    if (!el) return false;
+    el.scrollIntoView({ behavior: preferredScrollBehavior(), block: "center" });
+    el.focus({ preventScroll: true });
+    return true;
+}
+
+/**
+ * 선언된 필드 순서(`orderedFields`)대로 첫 오류 필드를 찾아 포커스·스크롤한다.
+ */
+export function focusFirstErrorField(
+    orderedFields: readonly string[],
+    errors: Record<string, unknown>,
+    idMap?: Partial<Record<string, string>>,
+): void {
+    for (const field of orderedFields) {
+        if (errors[field]) {
+            focusFieldById(idMap?.[field] ?? field);
+            return;
+        }
+    }
 }

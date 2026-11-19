@@ -171,6 +171,10 @@ export const SUITES = [
     ["비밀번호 재설정·세션 실효 (#127)", [npm("test:reset")]],
     // 개정 고지: 약관 제4조 ③ · 처리방침 게시본(2026-09-06) 제16조 ② / Notion 원문(2026-09-10) 제16조 ③.
     ["약관 재동의 안내·중복 방지 (#91)", [npm("test:reconsent")]],
+    [
+        "매칭 전 건강정보 제공 별도 동의 · 미동의 노출 차단 · 불변성 (#285)",
+        [sql("test-pre-matching-health-consent.sql")],
+    ],
     // ⚠️ test:nicepay · test:payapi 는 넣지 않는다. NICEPAY 샌드박스 실호출이라
     //    외부 장애가 CI 실패로 둔갑한다 (테스트 가이드 3. 외부 연동 — https://app.notion.com/p/3f1169f76f9f819ca52ef036622c3fc1).
 ];

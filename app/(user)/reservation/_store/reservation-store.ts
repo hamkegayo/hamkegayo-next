@@ -29,6 +29,8 @@ export type ReservationData = {
     purpose: string;
     mobilityStatus: string;
     cognitiveStatus: string;
+    /** 매칭 전 파트너에게 거동·인지 상태(민감정보) 제공 별도 동의 (#285) */
+    agreePreMatchingHealth: boolean;
     cautions: string;
     docPrescription: boolean;
     docReceipt: boolean;
@@ -103,6 +105,8 @@ const initialData: ReservationData = {
     purpose: "",
     mobilityStatus: "",
     cognitiveStatus: "",
+    // Opt-in 원칙: 민감정보(거동·인지 상태) 매칭 전 파트너 제공은 별도 동의가 필요하다 (#285).
+    agreePreMatchingHealth: false,
     cautions: "",
     docPrescription: false,
     docReceipt: false,
