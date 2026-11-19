@@ -22,6 +22,8 @@ import {
     RELATION_OPTIONS,
 } from "../_lib/options";
 import { NOTIFY_TARGET_OPTIONS } from "@/lib/handover";
+import { newReservationMatchingMode } from "@/lib/direct-assignment";
+import { totalStepsFor } from "../_lib/flow-branch";
 import { StepBand, StepNav } from "./step-band";
 import { CareRecipientPicker } from "./care-recipient-picker";
 import { listMyCareRecipients } from "../_actions/care";
@@ -36,6 +38,11 @@ const DOCS = [
 
 export function StepUserInfo() {
     const { data, patch, next } = useReservationStore();
+    const totalSteps = totalStepsFor(
+        data.matchingMode === "admin_direct"
+            ? "admin_direct"
+            : newReservationMatchingMode(),
+    );
 
     const {
         register,
@@ -137,6 +144,7 @@ export function StepUserInfo() {
         <>
             <StepBand
                 index={1}
+                totalSteps={totalSteps}
                 title="이용자 정보를 입력해주세요."
                 subtitles={[
                     "병원을 방문하시는 이용자의 정보를 입력해주세요.",

@@ -27,6 +27,9 @@ import {
 } from "@/lib/handover";
 import { RELATION_OPTIONS } from "../_lib/options";
 import { StepBand, StepNav } from "./step-band";
+import { UrgentCallNotice } from "./urgent-call-notice";
+import { newReservationMatchingMode } from "@/lib/direct-assignment";
+import { totalStepsFor } from "../_lib/flow-branch";
 import { FieldError, FieldLabel, NativeSelect } from "./fields";
 import { AddressSearchModal } from "./address-search-modal";
 import { addressSearchEnabled } from "../_actions/address";
@@ -36,6 +39,11 @@ type AddressTarget = "depart" | "hospital";
 
 export function StepHospitalInfo() {
     const { data, patch, next, prev } = useReservationStore();
+    const totalSteps = totalStepsFor(
+        data.matchingMode === "admin_direct"
+            ? "admin_direct"
+            : newReservationMatchingMode(),
+    );
 
     const {
         register,
@@ -89,6 +97,7 @@ export function StepHospitalInfo() {
      */
     const useDate = useWatch({ control, name: "useDate" });
     const arriveTime = useWatch({ control, name: "arriveTime" });
+    const reserveTime = useWatch({ control, name: "reserveTime" });
     const duration = useWatch({ control, name: "duration" });
     const timeOptions = timeOptionsFor(useDate ?? "");
     const noSlotToday =
@@ -260,6 +269,7 @@ export function StepHospitalInfo() {
         <>
             <StepBand
                 index={2}
+                totalSteps={totalSteps}
                 title="병원 정보를 입력해주세요."
                 subtitles={[
                     "방문하실 병원 정보를 입력해주세요.",
@@ -721,6 +731,16 @@ export function StepHospitalInfo() {
                                 나오지 않는 경우에는 예약시각부터{" "}
                                 {NO_SHOW_WAIT_MIN}분간 기다립니다.
                             </p>
+                        </div>
+                    )}
+
+                    {/* 급한 예약 전화 상담 안내 (#300) — 24시간 미만이면 강조하되 입력·결제는 막지 않는다 */}
+                    {newReservationMatchingMode() === "admin_direct" && (
+                        <div className="mt-6">
+                            <UrgentCallNotice
+                                useDate={useDate ?? ""}
+                                time={arriveTime || reserveTime || ""}
+                            />
                         </div>
                     )}
 

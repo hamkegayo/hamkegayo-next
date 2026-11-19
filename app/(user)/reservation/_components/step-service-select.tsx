@@ -11,6 +11,8 @@ import type { OpeningCoupon } from "@/lib/opening-coupon";
 import { OPENING_EVENT_CAPACITY } from "@/lib/opening-event";
 import { couponDiscountFor, useCouponStatus } from "@/lib/opening-coupon-offer";
 import { useReservationStore, type Plan } from "../_store/reservation-store";
+import { newReservationMatchingMode } from "@/lib/direct-assignment";
+import { totalStepsFor } from "../_lib/flow-branch";
 import { StepBand, StepNav } from "./step-band";
 
 type PlanCard = {
@@ -116,6 +118,11 @@ export function CouponNoticeBand({
 
 export function StepServiceSelect() {
     const { data, patch, next, prev } = useReservationStore();
+    const totalSteps = totalStepsFor(
+        data.matchingMode === "admin_direct"
+            ? "admin_direct"
+            : newReservationMatchingMode(),
+    );
     const selected = data.plan;
     const couponStatus = useCouponStatus();
 
@@ -131,6 +138,7 @@ export function StepServiceSelect() {
         <>
             <StepBand
                 index={3}
+                totalSteps={totalSteps}
                 title="원하는 서비스를 선택해주세요."
                 subtitles={[
                     "어떤 도움이 필요하신가요?",

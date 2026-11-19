@@ -5,9 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 import { trackBeginCheckoutGA } from "@/lib/analytics";
-import { OPENING_COUPON_CONFIRM_MESSAGES } from "@/lib/opening-coupon";
 import { useReservationStore } from "../_store/reservation-store";
 import { resumeReservation } from "../_actions/payment";
+import { paymentErrorMessage, resumeStepFor } from "../_lib/flow-branch";
 import { IntroModal } from "./intro-modal";
 import { StepUserInfo } from "./step-user-info";
 import { StepHospitalInfo } from "./step-hospital-info";
@@ -17,23 +17,6 @@ import { StepMatching } from "./step-matching";
 import { StepPartnerSelect } from "./step-partner-select";
 import { StepPayment } from "./step-payment";
 import { StepComplete } from "./step-complete";
-
-/** 결제 결과 코드 → 사용자 안내 문구 */
-const PAY_ERROR_MESSAGE: Record<string, string> = {
-    INVALID_SIGNATURE: "결제 정보를 확인할 수 없습니다. 다시 시도해 주세요.",
-    AMOUNT_MISMATCH:
-        "결제 금액이 일치하지 않아 취소되었습니다. 다시 시도해 주세요.",
-    PAYMENT_EXPIRED:
-        "결제 시간이 지나 파트너 선택이 해제되었습니다. 다시 선택해 주세요.",
-    UNKNOWN_ORDER: "결제 정보를 찾을 수 없습니다. 고객센터로 문의해 주세요.",
-    CONFIRM_FAILED:
-        "결제는 취소되었습니다. 예약이 확정되지 않았으니 다시 시도해 주세요.",
-    // 오픈 이벤트 쿠폰이 결제 확정 시점에 거부된 경우 (#297). 결제 화면은 쿠폰 선택이 풀린 채 다시 열린다.
-    ...OPENING_COUPON_CONFIRM_MESSAGES,
-    PAYMENT_NOT_PENDING: "이미 처리된 결제입니다.",
-    RESERVATION_DATE_OUT_OF_RANGE:
-        "PG사 기준에 따라 결제일을 1일째로 계산해 60일 이내 날짜만 결제할 수 있습니다. 기존 예약을 취소하고 날짜를 다시 선택해 주세요.",
-};
 
 /** 예약 STEP 오케스트레이터 — 현재 단계 렌더 + STEP0 모달 */
 export function ReservationFlow() {
@@ -80,6 +63,7 @@ export function ReservationFlow() {
                 plan: state.plan as "basic" | "plus",
                 useDate: state.useDate,
                 reserveTime: state.reserveTime,
+                arriveTime: state.arriveTime,
                 duration: state.duration,
                 hospitalName: state.hospitalName,
                 hospitalAddress: state.hospitalAddress,
@@ -87,7 +71,34 @@ export function ReservationFlow() {
                 userPhone: state.userPhone,
                 prepaidAmount: state.prepaidAmount,
                 pointBalance: state.pointBalance,
+                matchingMode: state.matchingMode,
             };
+
+            // 신규 방식(#300) — 파트너 선택 단계가 없다. 서버 상태만 믿고 결제/완료로 보낸다.
+            if (state.matchingMode === "admin_direct") {
+                const target = resumeStepFor(state);
+                if (target === "mypage") {
+                    toast.error(
+                        "취소된 예약입니다. 예약 현황을 확인해 주세요.",
+                    );
+                    router.replace("/mypage");
+                    return;
+                }
+                if (target === 8) {
+                    // 결제가 끝났다 — 확정이 아니라 매칭 대기 안내(STEP8)를 보여준다.
+                    hydrate(8, common);
+                } else {
+                    if (pay === "fail" && payCode) {
+                        toast.error(
+                            paymentErrorMessage(payCode, state.matchingMode),
+                        );
+                    }
+                    hydrate(7, common);
+                }
+                router.replace("/reservation");
+                setResuming(false);
+                return;
+            }
 
             // 결제가 끝났으면 예약이 CONFIRMED 다. 서버 상태를 믿는다.
             if (state.status === "CONFIRMED") {
@@ -95,8 +106,7 @@ export function ReservationFlow() {
             } else if (state.partnerId) {
                 if (pay === "fail" && payCode) {
                     toast.error(
-                        PAY_ERROR_MESSAGE[payCode] ??
-                            "결제에 실패했습니다. 다시 시도해 주세요.",
+                        paymentErrorMessage(payCode, state.matchingMode),
                     );
                 }
                 hydrate(7, common);

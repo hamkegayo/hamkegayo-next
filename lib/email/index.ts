@@ -61,6 +61,14 @@ export function getEmailSender(): EmailSender {
     return sender;
 }
 
+/**
+ * 실제 발송이 가능한 설정인가. Mock 발송은 에러 없이 끝나므로 **성공으로 오인하면 안 되는** 호출부
+ * (운영자 신규 접수 알림 #300)가 발송 전에 확인한다.
+ */
+export function isEmailDeliveryConfigured(): boolean {
+    return Boolean(process.env.RESEND_API_KEY?.trim());
+}
+
 /** 인증번호 안내 메일 HTML 본문 */
 export function buildOtpEmailHtml(code: string): string {
     return `

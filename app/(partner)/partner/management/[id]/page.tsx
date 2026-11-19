@@ -5,6 +5,8 @@ import {
     getServiceNotices,
 } from "../../../_lib/services.server";
 import { getServiceAttachments } from "../../../_lib/reports.server";
+import { getCustomerNoticeView } from "../../../_lib/customer-notice.server";
+import { CustomerNoticePanel } from "./customer-notice-panel";
 import { ServiceDetailView } from "./service-detail-view";
 
 export default async function PartnerManagementDetail({
@@ -31,16 +33,20 @@ export default async function PartnerManagementDetail({
         );
     }
 
-    const [notices, attachments] = await Promise.all([
+    const [notices, attachments, customerNotice] = await Promise.all([
         getServiceNotices(id),
         getServiceAttachments(id),
+        getCustomerNoticeView(id),
     ]);
 
     return (
-        <ServiceDetailView
-            service={service}
-            notices={notices}
-            attachments={attachments}
-        />
+        <>
+            {customerNotice && <CustomerNoticePanel notice={customerNotice} />}
+            <ServiceDetailView
+                service={service}
+                notices={notices}
+                attachments={attachments}
+            />
+        </>
     );
 }

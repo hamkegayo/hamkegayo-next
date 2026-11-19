@@ -83,6 +83,12 @@ export type ReservationData = {
     prepaidAmount: number;
     /** STEP7 · 사용 가능한 포인트 잔액 */
     pointBalance: number;
+    /**
+     * 처리 방식 (#300). 서버가 예약 등록 때 정해 돌려준 값이다.
+     *  admin_direct — 파트너 지원·선택 없이 바로 결제 → 매칭 대기(운영자 배정)
+     *  legacy_auto  — 기존 흐름(지원 대기 → 고객 선택 → 결제 → 확정)
+     */
+    matchingMode: "legacy_auto" | "admin_direct";
 };
 
 const initialData: ReservationData = {
@@ -136,6 +142,7 @@ const initialData: ReservationData = {
     paymentDeadline: "",
     prepaidAmount: 0,
     pointBalance: 0,
+    matchingMode: "legacy_auto",
 };
 
 type ReservationState = {

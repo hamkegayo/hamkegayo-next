@@ -16,6 +16,7 @@ import type { LucideIcon } from "lucide-react";
 import { Section } from "@/app/(user)/_components/home/section";
 import { useReservationStore, PLAN_INFO } from "../_store/reservation-store";
 import { StepBand } from "./step-band";
+import { DirectCompleteView } from "./direct-complete-view";
 import { kstCompactDate, kstDate, weekdayOf } from "@/lib/format";
 
 function formatVisit(dateStr: string, time: string) {
@@ -83,6 +84,22 @@ export function StepComplete() {
     const statusHref = data.reservationId
         ? `/mypage/reservations/${data.reservationId}`
         : "/mypage";
+
+    // 신규 방식(#300)은 결제 직후 확정이 아니다. 접수·파트너 확인 중 안내를 보여준다.
+    if (data.matchingMode === "admin_direct") {
+        return (
+            <DirectCompleteView
+                reservationNo={reservationNo}
+                statusHref={statusHref}
+                planLabel={plan.label}
+                visitLabel={formatVisit(data.useDate, data.reserveTime)}
+                useDate={data.useDate}
+                startTime={data.arriveTime || data.reserveTime}
+                hospital={data.hospitalName || data.hospitalAddress}
+                userName={data.userName}
+            />
+        );
+    }
 
     return (
         <>

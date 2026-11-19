@@ -13,6 +13,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { createClient } from "@/utils/supabase/server";
 import { ensureOpeningEventEmail } from "@/lib/opening-event-email.server";
 import { openingCouponError } from "@/lib/opening-coupon";
+import { isAdminDirect } from "@/lib/direct-assignment";
 
 /**
  * 선결제 준비 — 결제창을 열기 직전에 호출한다 (#53).
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
     const { data: reservation, error: readError } = await admin
         .from("reservations")
         .select(
-            "id, code, customer_id, status, plan, duration_minutes, surcharge_rate, fee_rate, prepaid_amount, confirmed_partner_id, payment_deadline, use_date",
+            "id, code, customer_id, status, plan, duration_minutes, surcharge_rate, fee_rate, prepaid_amount, confirmed_partner_id, payment_deadline, use_date, matching_mode, paid_at",
         )
         .eq("id", reservationId)
         .maybeSingle();
@@ -128,6 +129,20 @@ export async function POST(request: NextRequest) {
         );
     }
 
+    // 신규 방식(#300)은 파트너 선택 없이 결제한다. 기존 예약(legacy_auto)은 아래 선택·기한 검사가 그대로다.
+    const direct = isAdminDirect(reservation.matching_mode);
+
+    if (direct && reservation.paid_at) {
+        // 이미 결제를 마치고 매칭 대기 중이다. 두 번째 선결제를 받지 않는다.
+        return NextResponse.json(
+            {
+                error: "이미 결제가 완료된 예약입니다.",
+                code: "ALREADY_PAID",
+            },
+            { status: 409 },
+        );
+    }
+
     if (useOpeningEvent && !(await ensureOpeningEventEmail(user))) {
         return NextResponse.json(
             {
@@ -138,7 +153,7 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    if (!reservation.confirmed_partner_id) {
+    if (!direct && !reservation.confirmed_partner_id) {
         return NextResponse.json(
             {
                 error: "파트너를 먼저 선택해 주세요.",
@@ -149,6 +164,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (
+        !direct &&
         reservation.payment_deadline &&
         new Date(reservation.payment_deadline).getTime() <= Date.now()
     ) {
@@ -226,6 +242,17 @@ export async function POST(request: NextRequest) {
             .from("payments")
             .update({ status: "CANCELLED" })
             .eq("id", row.id);
+    }
+
+    // ---------- 3-1. 신규 방식: 결제창 유효 기한을 먼저 건다 ----------
+    // 신규 방식에는 "파트너 선택 +30분" 기한이 없다. 이벤트 쿠폰 확보(reserve_opening_event)가
+    // 살아 있는 결제 기한을 요구하므로 결제 준비 시점에 +10분을 건다. 결제 완료(paid_at)가 되면 DB 가 비운다.
+    const directDeadline = new Date(Date.now() + 10 * 60 * 1000);
+    if (direct) {
+        await admin
+            .from("reservations")
+            .update({ payment_deadline: directDeadline.toISOString() })
+            .eq("id", reservation.id);
     }
 
     // ---------- 4. PENDING 결제 생성 ----------
@@ -307,12 +334,15 @@ export async function POST(request: NextRequest) {
 
     // ---------- 6. 결제 기한 +10분 ----------
     // 결제창을 띄우는 동안 만료되면 승인 직전에 튕긴다. 화면 카운트다운도 이 값을 다시 읽는다.
-    const extended = new Date(Date.now() + 10 * 60 * 1000);
-    const current = reservation.payment_deadline
-        ? new Date(reservation.payment_deadline)
-        : null;
+    const extended = direct
+        ? directDeadline
+        : new Date(Date.now() + 10 * 60 * 1000);
+    const current =
+        !direct && reservation.payment_deadline
+            ? new Date(reservation.payment_deadline)
+            : null;
 
-    if (!current || extended > current) {
+    if (!direct && (!current || extended > current)) {
         await admin
             .from("reservations")
             .update({ payment_deadline: extended.toISOString() })

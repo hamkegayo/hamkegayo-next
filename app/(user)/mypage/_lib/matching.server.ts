@@ -1,4 +1,10 @@
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
+import { matchingModeOf, type MatchingMode } from "@/lib/direct-assignment";
+import type {
+    RefundReason,
+    RefundStatus,
+} from "@/lib/direct-reservation-status";
 import { getConsentedPartnerAvatars } from "@/lib/partner-avatars.server";
 import { kstStamp, toHhmm, weekdayOf } from "@/lib/format";
 import {
@@ -20,6 +26,13 @@ export type CustomerReservation = {
     dateLabel: string;
     timeLabel: string;
     confirmedPartnerId: string | null;
+    /** 처리 방식 (#300) — admin_direct 는 선결제 후 운영자 배정 */
+    matchingMode: MatchingMode;
+    /** 신규 방식 결제 승인·저장 시각. 없으면 결제 전 */
+    paidAt: string | null;
+    /** 예약 희망 시각(급한 예약 판정용) — "YYYY-MM-DD" · "HH:mm" */
+    useDate: string;
+    startTime: string;
 };
 
 /** ACCEPTED 지원 파트너 (지원자 선택 카드) */
@@ -40,6 +53,9 @@ type ReservationRow = {
     use_date: string;
     reserve_time: string;
     confirmed_partner_id: string | null;
+    matching_mode?: string | null;
+    paid_at?: string | null;
+    arrive_time?: string | null;
 };
 
 /** "YYYY-MM-DD" → "YYYY.MM.DD (요일)" */
@@ -74,7 +90,7 @@ export async function getCustomerReservation(
         const { data, error } = await supabase
             .from("reservations")
             .select(
-                "id, code, status, plan, hospital_address, use_date, reserve_time, confirmed_partner_id",
+                "id, code, status, plan, hospital_address, use_date, reserve_time, arrive_time, confirmed_partner_id, matching_mode, paid_at",
             )
             .eq("id", reservationId)
             .maybeSingle<ReservationRow>();
@@ -93,6 +109,10 @@ export async function getCustomerReservation(
             dateLabel: formatDate(data.use_date),
             timeLabel: toHhmm(data.reserve_time),
             confirmedPartnerId: data.confirmed_partner_id,
+            matchingMode: matchingModeOf(data.matching_mode),
+            paidAt: data.paid_at ?? null,
+            useDate: data.use_date,
+            startTime: toHhmm(data.arrive_time || data.reserve_time),
         };
     } catch {
         return null;
@@ -135,5 +155,34 @@ export async function getReservationApplicants(
         }));
     } catch {
         return [];
+    }
+}
+
+/** 배정 전 취소·매칭 실패 환불의 진행 상태 */
+export type DirectRefundState = {
+    status: RefundStatus;
+    reason: RefundReason;
+};
+
+/**
+ * 신규 방식(#300) 예약의 환불 진행 상태.
+ *
+ *  reservation_refunds 는 관리자만 읽을 수 있다. 호출부가 고객 세션으로 소유를 확인한
+ *  예약 id 만 넘겨야 한다(getCustomerReservation 통과 후). 없거나 실패하면 null.
+ *  PG 취소 실패(PG_FAILED)는 그대로 돌려준다 — 화면이 "환불 완료" 로 오표시하지 않게 하는 근거다.
+ */
+export async function getDirectRefundState(
+    reservationId: string,
+): Promise<DirectRefundState | null> {
+    try {
+        const admin = createAdminClient();
+        const { data } = await admin
+            .from("reservation_refunds")
+            .select("status, reason")
+            .eq("reservation_id", reservationId)
+            .maybeSingle<DirectRefundState>();
+        return data ?? null;
+    } catch {
+        return null;
     }
 }

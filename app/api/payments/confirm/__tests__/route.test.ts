@@ -11,6 +11,11 @@ const mock = vi.hoisted(() => ({
     cancel: vi.fn(),
     netCancel: vi.fn(),
     incident: vi.fn(),
+    dispatch: vi.fn(),
+    notify: vi.fn(),
+}));
+vi.mock("@/lib/intake-notification.server", () => ({
+    scheduleIntakeDispatch: mock.dispatch,
 }));
 vi.mock("@/lib/payments/nicepay", () => ({
     parseAuthResult: () => ({
@@ -52,7 +57,10 @@ vi.mock("@/utils/supabase/admin", () => ({
                     return { error: null };
                 },
             }),
-            insert: async () => ({ error: null }),
+            insert: async (row: unknown) => {
+                mock.notify(table, row);
+                return { error: null };
+            },
         }),
         rpc: mock.rpc,
     }),
@@ -65,7 +73,10 @@ const request = {
 } as unknown as NextRequest;
 
 /** Basic 2시간 40,000원. 쿠폰이 있으면 20,000원을 할인한다. */
-function pendingPayment(coupon: number) {
+function pendingPayment(
+    coupon: number,
+    reservation: Record<string, unknown> = {},
+) {
     return {
         id: "PAY-1",
         reservation_id: "RES-1",
@@ -82,6 +93,7 @@ function pendingPayment(coupon: number) {
             confirmed_partner_id: "PARTNER-1",
             payment_deadline: new Date(Date.now() + 10 * 60_000).toISOString(),
             use_date: "2026-12-31",
+            ...reservation,
         },
     };
 }
@@ -90,12 +102,14 @@ function setup({
     coupon,
     ended,
     finalizeError = null,
+    reservation = {},
 }: {
     coupon: number;
     ended: boolean;
     finalizeError?: string | null;
+    reservation?: Record<string, unknown>;
 }) {
-    mock.payment.mockReturnValue(pendingPayment(coupon));
+    mock.payment.mockReturnValue(pendingPayment(coupon, reservation));
     mock.approve.mockResolvedValue({
         transactionId: "TID-1",
         orderId: "ORDER-1",
@@ -202,5 +216,81 @@ describe("opening coupon payment confirmation", () => {
         expect(calledRpc("opening_event_status")).toBe(false);
         expect(mock.approve).toHaveBeenCalledOnce();
         expect(calledRpc("finalize_payment")).toBe(true);
+    });
+});
+
+// 선결제 후 운영자 직접 배정 (#300). 승인·저장 성공은 확정이 아니라 매칭 대기이며 운영자 접수 알림만 예약한다.
+// 접수 행·상태 전이는 DB(finalize_payment)가 하고 scripts/test-direct-assignment.sql 이 검증한다.
+describe("direct assignment payment confirmation (#300)", () => {
+    const direct = {
+        matching_mode: "admin_direct",
+        confirmed_partner_id: null,
+        paid_at: null,
+        // 결제 기한이 지나 있어도 신규 방식은 막지 않는다(선택 후 30분 기한이 없다)
+        payment_deadline: new Date(Date.now() - 60_000).toISOString(),
+    };
+
+    it("approves without a selected partner and schedules the operator intake alert", async () => {
+        setup({ coupon: 0, ended: false, reservation: direct });
+        const location = await confirm();
+        expect(location.searchParams.get("pay")).toBe("done");
+        expect(mock.approve).toHaveBeenCalledOnce();
+        expect(calledRpc("finalize_payment")).toBe(true);
+        expect(mock.dispatch).toHaveBeenCalledOnce();
+        // 파트너 확정 알림은 보내지 않는다 — 배정 시점에 DB 가 알린다
+        expect(mock.notify).not.toHaveBeenCalled();
+    });
+
+    it("does not schedule an alert when approval is rejected or finalize fails", async () => {
+        setup({ coupon: 0, ended: false, reservation: direct });
+        mock.approve.mockRejectedValue(new Error("declined"));
+        expect((await confirm()).searchParams.get("pay")).toBe("fail");
+        expect(mock.dispatch).not.toHaveBeenCalled();
+
+        vi.resetAllMocks();
+        setup({
+            coupon: 0,
+            ended: false,
+            finalizeError: "not_matching",
+            reservation: direct,
+        });
+        expect((await confirm()).searchParams.get("pay")).toBe("fail");
+        expect(mock.cancel).toHaveBeenCalled();
+        expect(mock.dispatch).not.toHaveBeenCalled();
+    });
+
+    it("rejects a second payment for a reservation that is already paid", async () => {
+        setup({
+            coupon: 0,
+            ended: false,
+            reservation: { ...direct, paid_at: new Date().toISOString() },
+        });
+        const location = await confirm();
+        expect(location.searchParams.get("code")).toBe("PAYMENT_EXPIRED");
+        expect(mock.approve).not.toHaveBeenCalled();
+        expect(mock.dispatch).not.toHaveBeenCalled();
+    });
+
+    it("keeps the legacy flow for reservations without matching_mode", async () => {
+        setup({
+            coupon: 0,
+            ended: false,
+            reservation: { confirmed_partner_id: null },
+        });
+        const location = await confirm();
+        // 파트너 선택이 없으면 기존 방식은 여전히 승인 전에 걸러낸다
+        expect(location.searchParams.get("code")).toBe("PAYMENT_EXPIRED");
+        expect(mock.approve).not.toHaveBeenCalled();
+        expect(mock.dispatch).not.toHaveBeenCalled();
+    });
+
+    it("notifies the selected partner and not the operator for legacy reservations", async () => {
+        setup({ coupon: 0, ended: false });
+        expect((await confirm()).searchParams.get("pay")).toBe("done");
+        expect(mock.notify).toHaveBeenCalledWith(
+            "notifications",
+            expect.objectContaining({ type: "RESERVATION_CONFIRMED" }),
+        );
+        expect(mock.dispatch).not.toHaveBeenCalled();
     });
 });

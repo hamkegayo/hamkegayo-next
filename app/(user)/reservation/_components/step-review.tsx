@@ -8,6 +8,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Section } from "@/app/(user)/_components/home/section";
 import { useReservationStore, PLAN_INFO } from "../_store/reservation-store";
 import { createReservation } from "../_actions/reservation";
+import { resumeReservation } from "../_actions/payment";
+import { stepAfterRegistration, totalStepsFor } from "../_lib/flow-branch";
+import { newReservationMatchingMode } from "@/lib/direct-assignment";
 import { getReservationQuote } from "../_actions/quote";
 import type { ReservationQuote } from "../_lib/quote.server";
 import { formatMinutes, PAYMENT_DEADLINE_MIN } from "@/lib/pricing";
@@ -95,7 +98,12 @@ export function CouponEstimateRow({
 }
 
 export function StepReview() {
-    const { data, patch, next, prev } = useReservationStore();
+    const { data, patch, next, prev, goStep } = useReservationStore();
+    // 신규 방식(#300)이면 파트너 지원 대기 없이 바로 결제로 간다. 실제 방식은 서버가 정해 응답에 담는다.
+    const direct = newReservationMatchingMode() === "admin_direct";
+    const totalSteps = totalStepsFor(
+        direct ? "admin_direct" : data.matchingMode,
+    );
     const router = useRouter();
     const plan = PLAN_INFO[data.plan || "basic"];
     const [agreed, setAgreed] = useState(false);
@@ -138,9 +146,32 @@ export function StepReview() {
                 }
                 return;
             }
-            patch({ reservationCode: res.code, reservationId: res.id });
+            patch({
+                reservationCode: res.code,
+                reservationId: res.id,
+                matchingMode: res.matchingMode,
+            });
             // 서버가 성공을 반환한 직후에만 예약 신청 완료 이벤트 전송
             if (data.plan) trackReservationComplete(data.plan, quote?.amount);
+
+            if (res.matchingMode === "admin_direct") {
+                // 결제 화면이 쓰는 선결제 금액·포인트 잔액을 서버 값으로 채우고 바로 결제(STEP7)로 간다.
+                const state = await resumeReservation(res.id);
+                if (!state) {
+                    toast.error(
+                        "예약은 등록되었으나 결제 화면을 불러오지 못했습니다. 예약 현황에서 결제를 이어 주세요.",
+                    );
+                    router.push("/mypage");
+                    return;
+                }
+                patch({
+                    prepaidAmount: state.prepaidAmount,
+                    pointBalance: state.pointBalance,
+                    paymentDeadline: state.paymentDeadline,
+                });
+                goStep(stepAfterRegistration(res.matchingMode));
+                return;
+            }
             next();
         } finally {
             setSubmitting(false);
@@ -151,11 +182,23 @@ export function StepReview() {
         <>
             <StepBand
                 index={4}
-                title="매칭 신청을 확인해주세요."
-                subtitles={[
-                    "신청 내역을 확인해주세요.",
-                    "입력하신 정보를 바탕으로 추천된 파트너에게 매칭 요청이 전달됩니다.",
-                ]}
+                totalSteps={totalSteps}
+                title={
+                    direct
+                        ? "예약 신청을 확인해주세요."
+                        : "매칭 신청을 확인해주세요."
+                }
+                subtitles={
+                    direct
+                        ? [
+                              "신청 내역을 확인해주세요.",
+                              "다음 단계에서 결제하시면 동행 파트너 확인이 시작됩니다.",
+                          ]
+                        : [
+                              "신청 내역을 확인해주세요.",
+                              "입력하신 정보를 바탕으로 추천된 파트너에게 매칭 요청이 전달됩니다.",
+                          ]
+                }
             />
 
             <Section>
@@ -317,11 +360,24 @@ export function StepReview() {
                                 예상 결제 금액
                             </h2>
                             <p className="bg-brand/5 text-description-foreground mt-3 rounded-lg px-3 py-2 text-xs leading-relaxed">
-                                지금은 결제하지 않습니다. 파트너를 선택한 뒤{" "}
-                                <span className="text-brand font-semibold">
-                                    {PAYMENT_DEADLINE_MIN}분 안에 결제
-                                </span>
-                                하시면 예약이 확정됩니다.
+                                {direct ? (
+                                    <>
+                                        다음 단계에서 예상 이용요금을{" "}
+                                        <span className="text-brand font-semibold">
+                                            선결제
+                                        </span>
+                                        하시면 동행 파트너 확인이 시작됩니다.
+                                    </>
+                                ) : (
+                                    <>
+                                        지금은 결제하지 않습니다. 파트너를
+                                        선택한 뒤{" "}
+                                        <span className="text-brand font-semibold">
+                                            {PAYMENT_DEADLINE_MIN}분 안에 결제
+                                        </span>
+                                        하시면 예약이 확정됩니다.
+                                    </>
+                                )}
                             </p>
                             <div className="border-border mt-4 space-y-2.5 border-b pb-4 text-sm">
                                 <div className="text-muted-foreground flex items-center justify-between">
@@ -401,12 +457,23 @@ export function StepReview() {
                                     택시비와 진료비 등의 부가 비용은 고객님께서
                                     부담해주셔야 합니다.
                                 </p>
-                                <p>
-                                    플랫폼 내 전문 인력 스스로 매칭 신청을
-                                    검토하므로, 매칭 신청을 하시더라도 최종
-                                    매칭에 실패할 가능성이 있음을 알려드립니다.
-                                    매칭 전에는 결제가 발생하지 않습니다.
-                                </p>
+                                {direct ? (
+                                    <p>
+                                        결제 후 동행 파트너를 확인해 24시간
+                                        이내에 예약 진행 결과를 안내드립니다.
+                                        파트너 배정이 완료되면 예약이 최종
+                                        확정되며, 배정이 어려운 경우 결제하신
+                                        금액은 전액 환불됩니다.
+                                    </p>
+                                ) : (
+                                    <p>
+                                        플랫폼 내 전문 인력 스스로 매칭 신청을
+                                        검토하므로, 매칭 신청을 하시더라도 최종
+                                        매칭에 실패할 가능성이 있음을
+                                        알려드립니다. 매칭 전에는 결제가
+                                        발생하지 않습니다.
+                                    </p>
+                                )}
                             </div>
                             <div className="bg-border my-5 h-px" />
                             <label className="flex items-center gap-2">
@@ -429,7 +496,15 @@ export function StepReview() {
                     onPrev={prev}
                     nextType="button"
                     onNext={onSubmit}
-                    nextLabel={submitting ? "매칭 신청 중…" : "매칭 신청하기"}
+                    nextLabel={
+                        direct
+                            ? submitting
+                                ? "예약 신청 중…"
+                                : "예약 신청하고 결제하기"
+                            : submitting
+                              ? "매칭 신청 중…"
+                              : "매칭 신청하기"
+                    }
                     nextDisabled={!agreed || submitting}
                 />
             </Section>

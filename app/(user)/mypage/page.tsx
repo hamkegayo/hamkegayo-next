@@ -7,6 +7,7 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { getSessionProfile } from "./_lib/profile";
 import { getMyReservations } from "./_lib/reservations.server";
 import { UnpaidCharges } from "./_components/unpaid-charges";
+import { DIRECT_PHASE_LABEL } from "@/lib/direct-reservation-status";
 
 const STEPS: { label: string; icon: LucideIcon }[] = [
     { label: "파트너 확정", icon: UserRound },
@@ -47,9 +48,9 @@ export default async function MypageHome() {
                         </span>
                     </h2>
                     <p className="text-description-foreground mt-1 text-sm break-keep">
-                        파트너가 수락하면 예약 상세에서 파트너를 선택하고 결제해
-                        예약을 확정할 수 있어요. 매칭이 성사되지 않을 수도
-                        있어요.
+                        {matching.every((m) => m.directPhase)
+                            ? "결제를 마친 예약은 파트너 배정이 끝나면 확정돼요. 배정 전에는 예약 상세에서 전액 환불로 취소할 수 있어요."
+                            : "파트너가 수락하면 예약 상세에서 파트너를 선택하고 결제해 예약을 확정할 수 있어요. 매칭이 성사되지 않을 수도 있어요."}
                     </p>
                     <ul className="mt-4 space-y-3">
                         {matching.map((m) => (
@@ -60,7 +61,11 @@ export default async function MypageHome() {
                                 >
                                     <div className="min-w-0 flex-1">
                                         <span className="inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700 dark:bg-amber-500/15">
-                                            매칭 대기중
+                                            {m.directPhase
+                                                ? DIRECT_PHASE_LABEL[
+                                                      m.directPhase
+                                                  ]
+                                                : "매칭 대기중"}
                                         </span>
                                         <p className="text-foreground mt-2 truncate font-bold">
                                             {m.hospital}
@@ -68,21 +73,29 @@ export default async function MypageHome() {
                                         <p className="text-muted-foreground mt-1 text-sm">
                                             {m.datetimeLabel} · {m.planLabel}
                                         </p>
-                                        <p
-                                            className={cn(
-                                                "mt-1 text-sm font-semibold",
-                                                m.applicantCount !== null &&
-                                                    m.applicantCount > 0
-                                                    ? "text-brand"
-                                                    : "text-muted-foreground",
-                                            )}
-                                        >
-                                            {m.applicantCount === null
-                                                ? "지원 현황을 불러오지 못했어요 · 상세에서 확인하기"
-                                                : m.applicantCount > 0
-                                                  ? `지원한 파트너 ${m.applicantCount}명 · 선택하러 가기`
-                                                  : "아직 지원한 파트너가 없어요"}
-                                        </p>
+                                        {m.directPhase ? (
+                                            <p className="text-muted-foreground mt-1 text-sm font-semibold">
+                                                {m.directPhase === "UNPAID"
+                                                    ? "결제를 마치면 파트너 확인이 시작돼요"
+                                                    : "24시간 이내에 진행 결과를 안내드려요"}
+                                            </p>
+                                        ) : (
+                                            <p
+                                                className={cn(
+                                                    "mt-1 text-sm font-semibold",
+                                                    m.applicantCount !== null &&
+                                                        m.applicantCount > 0
+                                                        ? "text-brand"
+                                                        : "text-muted-foreground",
+                                                )}
+                                            >
+                                                {m.applicantCount === null
+                                                    ? "지원 현황을 불러오지 못했어요 · 상세에서 확인하기"
+                                                    : m.applicantCount > 0
+                                                      ? `지원한 파트너 ${m.applicantCount}명 · 선택하러 가기`
+                                                      : "아직 지원한 파트너가 없어요"}
+                                            </p>
+                                        )}
                                     </div>
                                     <ChevronRight className="text-muted-foreground size-5 shrink-0" />
                                 </Link>
