@@ -7,6 +7,9 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Section } from "@/app/(user)/_components/home/section";
 import { trackAddToCart } from "@/lib/analytics";
+import type { OpeningCoupon } from "@/lib/opening-coupon";
+import { OPENING_EVENT_CAPACITY } from "@/lib/opening-event";
+import { couponDiscountFor, useCouponStatus } from "@/lib/opening-coupon-offer";
 import { useReservationStore, type Plan } from "../_store/reservation-store";
 import { StepBand, StepNav } from "./step-band";
 
@@ -78,9 +81,43 @@ const NOTICES: { icon: LucideIcon; lines: string[] }[] = [
     },
 ];
 
+/**
+ * 쿠폰 보유 안내 띠 (#282). AVAILABLE 일 때만 보인다.
+ * 보유 안내일 뿐 혜택 확보가 아니다 — 결제 완료·예약 확정 선착순으로 적용된다.
+ * 금액은 서버가 내려준 서비스별 할인액을 쓴다 (#297).
+ */
+export function CouponNoticeBand({
+    status,
+    plan,
+}: {
+    status: OpeningCoupon;
+    plan: "basic" | "plus" | "";
+}) {
+    if (status.state !== "AVAILABLE") return null;
+    const won = (n: number) => `${n.toLocaleString()}원`;
+    const amount =
+        plan || !status.discounts
+            ? won(couponDiscountFor(status, plan))
+            : `베이직 ${won(status.discounts.basic)} · 플러스 ${won(status.discounts.plus)}`;
+    return (
+        <p
+            role="status"
+            className="border-brand bg-brand/5 text-foreground rounded-xl border px-4 py-3 text-sm"
+        >
+            <span className="text-brand font-bold">
+                사용 가능한 오픈 이벤트 쿠폰이 있습니다 ({amount})
+            </span>{" "}
+            (결제 단계에서 적용 · 선착순) 쿠폰 보유만으로 혜택이 확보되지는
+            않으며, 결제 완료·예약 확정 선착순 {OPENING_EVENT_CAPACITY}명에게
+            적용됩니다.
+        </p>
+    );
+}
+
 export function StepServiceSelect() {
     const { data, patch, next, prev } = useReservationStore();
     const selected = data.plan;
+    const couponStatus = useCouponStatus();
 
     const onNext = () => {
         if (!selected) {
@@ -103,6 +140,7 @@ export function StepServiceSelect() {
 
             <Section>
                 <div className="mx-auto max-w-3xl space-y-6">
+                    <CouponNoticeBand status={couponStatus} plan={selected} />
                     <div className="grid gap-4 md:grid-cols-2">
                         {PLANS.map((plan) => {
                             const Icon = plan.icon;

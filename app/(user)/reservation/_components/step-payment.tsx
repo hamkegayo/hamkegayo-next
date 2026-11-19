@@ -79,6 +79,134 @@ function OrderRow({ label, value }: { label: string; value: string }) {
     );
 }
 
+/**
+ * 오픈 이벤트 쿠폰 영역 (#282). 조회가 끝난 뒤에만 그린다(로딩 중 깜빡임 방지).
+ *  - 적용 가능: 체크박스(기본 ON) + 적용 전/후 금액 + 복원 불가 안내
+ *  - 그 밖: 상태별 안내. HIDDEN(미대상자)은 종료가 아닐 때 쿠폰함·이벤트 안내 링크를 함께 보여준다.
+ */
+export function PaymentCouponSection({
+    loaded,
+    offer,
+    checked,
+    onCheckedChange,
+    gross,
+}: {
+    loaded: boolean;
+    offer: OpeningCouponOffer;
+    checked: boolean;
+    onCheckedChange: (checked: boolean) => void;
+    gross: number;
+}) {
+    if (!loaded) return null;
+    if (!offer.eligible) {
+        if (offer.state === "HIDDEN" && offer.ended) return null;
+        return (
+            <p
+                role="status"
+                className="text-muted-foreground mt-4 rounded-2xl border p-5 text-sm"
+            >
+                {OPENING_COUPON_MESSAGES[offer.state]}{" "}
+                <Link
+                    href="/mypage/coupons"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand underline"
+                >
+                    쿠폰함 보기
+                </Link>
+                {offer.state === "HIDDEN" && (
+                    <>
+                        {" "}
+                        <Link
+                            href="/event/opening"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-brand underline"
+                        >
+                            이벤트 안내 보기
+                        </Link>
+                    </>
+                )}
+            </p>
+        );
+    }
+    const after = Math.max(gross - offer.discount, 0);
+    return (
+        <div className="border-brand bg-brand/5 mt-4 rounded-2xl border p-5 text-sm">
+            <label className="flex cursor-pointer items-start gap-2 font-bold">
+                <Checkbox
+                    checked={checked}
+                    onCheckedChange={(v) => onCheckedChange(v === true)}
+                    className="mt-0.5"
+                />
+                <span className="leading-snug">
+                    쿠폰함의 오픈 이벤트 쿠폰 적용 (
+                    {offer.discount.toLocaleString()}원){" "}
+                    <span className="text-brand font-semibold">
+                        · 이번 예약에 사용
+                    </span>
+                </span>
+            </label>
+            <p className="mt-1.5 font-semibold text-red-600 dark:text-red-400">
+                고객 취소·노쇼 시 혜택이 복원되지 않습니다.
+            </p>
+            <dl className="border-brand/15 mt-3 space-y-1.5 border-y py-3">
+                <div className="text-muted-foreground flex justify-between">
+                    <dt>적용 전 금액</dt>
+                    <dd>{gross.toLocaleString()}원</dd>
+                </div>
+                <div className="text-brand flex justify-between font-bold">
+                    <dt>적용 후 결제 금액</dt>
+                    <dd>{after.toLocaleString()}원</dd>
+                </div>
+            </dl>
+            <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
+                결제 완료·예약 확정 선착순 {OPENING_EVENT_CAPACITY}명 한정 ·
+                보유만으로 혜택이 확보되지 않으며 포인트와 중복 적용되지
+                않습니다.
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <Link
+                    href="/event/opening"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand cursor-pointer underline"
+                >
+                    이벤트 조건·이메일 식별정보 처리 안내 보기 (새 창)
+                </Link>
+                <Link
+                    href="/mypage/coupons"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand underline"
+                >
+                    쿠폰함 보기
+                </Link>
+            </div>
+            <details className="text-muted-foreground mt-3 text-xs">
+                <summary className="hover:text-foreground cursor-pointer font-medium">
+                    적용 조건 및 상세 안내
+                </summary>
+                <div className="mt-2 space-y-2 leading-relaxed">
+                    <p>
+                        쿠폰 보유만으로 혜택이 확보되지는 않습니다.{" "}
+                        {OPENING_EVENT_DEADLINE_LABEL}까지 결제 완료·예약 확정
+                        선착순 {OPENING_EVENT_CAPACITY}명에게 적용합니다. 이
+                        시각까지 결제가 확정되지 않으면 쿠폰이 적용되지
+                        않습니다. 포인트와 중복 적용하지 않습니다.
+                    </p>
+                    <p>{OPENING_EVENT_CHANGE_NOTICE}</p>
+                    <ul className="list-disc space-y-1.5 pl-4">
+                        {OPENING_EVENT_TERMS.map((term) => (
+                            <li key={term}>{term}</li>
+                        ))}
+                    </ul>
+                </div>
+            </details>
+        </div>
+    );
+}
+
 export function StepPayment() {
     const { data, patch, goStep } = useReservationStore();
     const plan = PLAN_INFO[data.plan || "basic"];
@@ -86,14 +214,24 @@ export function StepPayment() {
     const [eventOffer, setEventOffer] =
         useState<OpeningCouponOffer>(EMPTY_COUPON_OFFER);
     const [useOpeningEvent, setUseOpeningEvent] = useState(false);
+    // 조회가 끝나기 전에는 안내를 그리지 않는다(깜빡임 방지).
+    const [couponLoaded, setCouponLoaded] = useState(false);
+    // 사용자가 직접 바꾼 뒤에는 기본값 ON 이 덮어쓰지 않는다.
+    const couponTouchedRef = useRef(false);
     useEffect(() => {
         let cancelled = false;
         if (!data.reservationId) return;
         void loadCouponOffer(data.reservationId)
             .then((offer) => {
-                if (!cancelled) setEventOffer(offer);
+                if (cancelled) return;
+                setEventOffer(offer);
+                if (offer.eligible && !couponTouchedRef.current)
+                    setUseOpeningEvent(true);
             })
-            .catch(() => {});
+            .catch(() => {})
+            .finally(() => {
+                if (!cancelled) setCouponLoaded(true);
+            });
         return () => {
             cancelled = true;
         };
@@ -171,7 +309,10 @@ export function StepPayment() {
             if (!res.ok) {
                 toast.error(body.error ?? "결제를 시작할 수 없습니다.");
                 if (body.code === "CAMPAIGN_UNAVAILABLE") {
+                    // 해제 상태를 유지한다 — 재조회 결과가 다시 켜지 않도록 touched 로 표시.
+                    couponTouchedRef.current = true;
                     setUseOpeningEvent(false);
+                    setCouponLoaded(false);
                     setEventOffer(EMPTY_COUPON_OFFER);
                     try {
                         setEventOffer(
@@ -180,6 +321,7 @@ export function StepPayment() {
                     } catch {
                         /* 체크는 해제한 상태로 재시도 가능 */
                     }
+                    setCouponLoaded(true);
                 }
                 // 결제창이 열리지 않았으니 다시 시도·이전 단계 이동이 가능해야 한다 (#259)
                 setSubmitting(false);
@@ -254,76 +396,6 @@ export function StepPayment() {
             />
 
             <Section>
-                {!eventOffer.eligible && eventOffer.state !== "HIDDEN" && (
-                    <p
-                        role="status"
-                        className="text-muted-foreground mx-auto mb-6 max-w-3xl rounded-xl border p-4 text-sm"
-                    >
-                        {OPENING_COUPON_MESSAGES[eventOffer.state]}{" "}
-                        <Link
-                            href="/mypage/coupons"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-brand underline"
-                        >
-                            쿠폰함 보기
-                        </Link>
-                    </p>
-                )}
-                {eventOffer.eligible && (
-                    <div className="border-brand bg-brand/5 mx-auto mb-6 max-w-3xl rounded-xl border p-4 text-sm">
-                        <label className="flex items-center gap-2 font-bold">
-                            <Checkbox
-                                checked={useOpeningEvent}
-                                onCheckedChange={(checked) =>
-                                    setUseOpeningEvent(checked === true)
-                                }
-                            />
-                            쿠폰함의 오픈 이벤트 쿠폰 적용 (
-                            {eventOffer.discount.toLocaleString()}원)
-                        </label>
-                        <p className="mt-2">
-                            <Link
-                                href="/event/opening"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-brand cursor-pointer underline"
-                            >
-                                이벤트 조건·이메일 식별정보 처리 안내 보기 (새
-                                창)
-                            </Link>
-                        </p>
-                        <p className="text-muted-foreground mt-2">
-                            쿠폰 보유만으로 혜택이 확보되지는 않습니다.{" "}
-                            {OPENING_EVENT_DEADLINE_LABEL}까지 결제 완료·예약
-                            확정 선착순 {OPENING_EVENT_CAPACITY}명에게
-                            적용합니다. 이 시각까지 결제가 확정되지 않으면
-                            쿠폰이 적용되지 않습니다. 포인트와 중복 적용하지
-                            않습니다.{" "}
-                            <Link
-                                href="/mypage/coupons"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-brand underline"
-                            >
-                                쿠폰함 보기
-                            </Link>
-                        </p>
-                        <p className="text-muted-foreground mt-2">
-                            {OPENING_EVENT_CHANGE_NOTICE}
-                        </p>
-                        <details className="mt-2">
-                            <summary className="cursor-pointer">
-                                적용 조건
-                            </summary>
-                            <ul className="mt-2 space-y-2">
-                                {OPENING_EVENT_TERMS.map((term) => (
-                                    <li key={term}>{term}</li>
-                                ))}
-                            </ul>
-                        </details>
-                    </div>
-                )}
                 <div className="mx-auto max-w-xl">
                     {/* 남은 시간 */}
                     <div
@@ -373,6 +445,18 @@ export function StepPayment() {
                             </p>
                         </div>
                     )}
+
+                    {/* 오픈 이벤트 쿠폰 — 결제 금액 요약 바로 위 (#282) */}
+                    <PaymentCouponSection
+                        loaded={couponLoaded}
+                        offer={eventOffer}
+                        checked={useOpeningEvent}
+                        onCheckedChange={(checked) => {
+                            couponTouchedRef.current = true;
+                            setUseOpeningEvent(checked);
+                        }}
+                        gross={gross}
+                    />
 
                     {/* 결제 금액 */}
                     <div className="bg-panel-muted mt-4 rounded-2xl p-6">

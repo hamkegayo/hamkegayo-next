@@ -103,6 +103,10 @@ select set_config('request.jwt.claims','{"sub":"00000159-0000-4000-8000-00000000
 select pg_temp.assert((public.opening_event_offer('00000159-0001-4000-8000-000000000002')->>'discount')::integer=20000,'Basic offer uses Basic first-hour amount');
 select set_config('request.jwt.claims','{"sub":"00000159-0000-4000-8000-000000000001","role":"authenticated"}',true);
 select pg_temp.assert((select used_count=0 from public.opening_campaign),'wallet does not consume capacity');
+-- #282 예약 ID 없는 상태 조회(opening_event_coupon 반복 호출)는 정원을 확보(HOLD)하지 않는다.
+select public.opening_event_coupon();
+select public.opening_event_coupon();
+select pg_temp.assert(not exists(select 1 from public.opening_event_claims where state='HELD') and (select used_count=0 from public.opening_campaign),'status lookup without reservation does not hold capacity');
 -- 확보 만료는 종료 시각을 넘지 않는다.
 savepoint review_hold_cap;
 update public.opening_campaign set ends_at=now()+interval '5 minutes' where id;

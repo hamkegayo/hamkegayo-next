@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
     EMPTY_COUPON_OFFER,
+    HIDDEN_COUPON_STATUS,
+    couponDiscountFor,
+    loadCouponStatus,
+    parseCouponStatus,
     loadCouponOffer,
     parseCouponOffer,
 } from "../opening-coupon-offer";
@@ -89,5 +93,51 @@ describe("coupon review regressions", () => {
         expect(await loadCouponOffer("reservation")).toEqual(
             EMPTY_COUPON_OFFER,
         );
+    });
+});
+
+describe("#282 쿠폰함 상태 조회", () => {
+    it("parseCouponStatus 는 서비스별 할인액과 종료 여부를 읽고 잘못된 값은 HIDDEN 으로 본다", () => {
+        expect(
+            parseCouponStatus({
+                state: "AVAILABLE",
+                discount: 20000,
+                discounts: { basic: 20000, plus: 25000 },
+                ended: false,
+            }),
+        ).toEqual({
+            state: "AVAILABLE",
+            discount: 20000,
+            discounts: { basic: 20000, plus: 25000 },
+        });
+        expect(parseCouponStatus({ state: "nope" }).state).toBe("HIDDEN");
+        expect(parseCouponStatus(null)).toEqual(HIDDEN_COUPON_STATUS);
+        expect(parseCouponStatus({ state: "CLOSED", ended: true }).ended).toBe(
+            true,
+        );
+    });
+    it("loadCouponStatus 는 실패·예외를 HIDDEN 으로 폴백한다", async () => {
+        vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+        expect(await loadCouponStatus()).toEqual(HIDDEN_COUPON_STATUS);
+        vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("x")));
+        expect(await loadCouponStatus()).toEqual(HIDDEN_COUPON_STATUS);
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ state: "AVAILABLE", discount: 20000 }),
+        });
+        vi.stubGlobal("fetch", fetchMock);
+        expect((await loadCouponStatus()).state).toBe("AVAILABLE");
+        expect(fetchMock.mock.calls[0][0]).toBe(
+            "/api/campaigns/opening/coupon",
+        );
+    });
+    it("couponDiscountFor 는 서비스별 값을 쓰고 없으면 안내용 값을 쓴다", () => {
+        const status = {
+            state: "AVAILABLE" as const,
+            discount: 20000,
+            discounts: { basic: 20000, plus: 25000 },
+        };
+        expect(couponDiscountFor(status, "plus")).toBe(25000);
+        expect(couponDiscountFor(status, "")).toBe(20000);
     });
 });
