@@ -2,6 +2,9 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { WITHDRAW_BLOCKER_MESSAGE } from "@/lib/auth/admin-withdrawal";
+// "use server" 파일에서 export 하면 공개 서버 액션이 되므로 서버 전용 모듈에 둔다(#293).
+import { lockAuthAccount } from "@/lib/auth/withdraw-account.server";
 
 /**
  * 회원 탈퇴 (#72) — 개인정보처리방침 제4조 · 제11조 ③.
@@ -30,40 +33,8 @@ import { createAdminClient } from "@/utils/supabase/admin";
 
 export type WithdrawResult = { ok: true } | { ok: false; message: string };
 
-/** RPC 가 던지는 거절 사유 → 사용자 안내 */
-const BLOCKER_MESSAGE: Record<string, string> = {
-    UNPAID_CHARGE:
-        "결제되지 않은 추가 요금이 있어 탈퇴할 수 없습니다. 마이페이지에서 결제를 완료한 뒤 다시 시도해 주세요.",
-    ACTIVE_RESERVATION:
-        "진행 예정인 예약이 있어 탈퇴할 수 없습니다. 예약을 취소하거나 이용을 마친 뒤 다시 시도해 주세요.",
-    ACTIVE_SERVICE:
-        "맡고 계신 서비스가 남아 있어 탈퇴할 수 없습니다. 수행을 마친 뒤 다시 시도해 주세요.",
-    PENDING_SETTLEMENT:
-        "지급되지 않은 정산금이 남아 있어 탈퇴할 수 없습니다. 고객센터로 문의해 주세요.",
-    PROFILE_NOT_FOUND: "회원 정보를 찾을 수 없습니다.",
-};
-
-/**
- * 로그인 수단을 잠근다.
- *
- *  이메일을 예약된 `.invalid` 도메인으로 바꿔 실제 주소를 놓아 준다 —
- *  같은 주소로 다시 가입할 수 있어야 한다. 그대로 두면 탈퇴가 주소를
- *  영구히 묶는다.
- */
-async function lockAuthAccount(userId: string): Promise<void> {
-    const admin = createAdminClient();
-    const { error } = await admin.auth.admin.updateUserById(userId, {
-        email: `withdrawn+${userId}@users.hamkegayo.invalid`,
-        // 100년. GoTrue 에 "영구" 옵션이 없어 사실상의 상한을 쓴다.
-        ban_duration: "876600h",
-    });
-
-    if (error) {
-        // 탈퇴 자체는 이미 성립했다. 여기서 실패를 사용자에게 돌려주면
-        // "탈퇴가 안 됐다" 고 오해하게 된다.
-        console.error("[withdraw] auth 정리 실패:", userId, error.message);
-    }
-}
+/** RPC 가 던지는 거절 사유 → 사용자 안내 (lib/auth/admin-withdrawal.ts 와 공유) */
+const BLOCKER_MESSAGE = WITHDRAW_BLOCKER_MESSAGE;
 
 /**
  * 본인 계정을 탈퇴 처리한다.
@@ -96,6 +67,8 @@ export async function withdrawMember(reason?: string): Promise<WithdrawResult> {
         };
     }
 
+    // 실패해도 탈퇴는 이미 성립했다. 실패를 돌려주면 "탈퇴가 안 됐다" 고 오해하게 되므로
+    // 결과는 쓰지 않는다(로그는 lockAuthAccount 가 남긴다).
     await lockAuthAccount(user.id);
     await supabase.auth.signOut();
 
