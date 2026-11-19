@@ -130,9 +130,21 @@ export function ReservationDetailView({ r }: { r: ReservationDetailView }) {
                     {/* 서비스 진행 상태 */}
                     <Card title="서비스 진행 상태">
                         {isCancelled ? (
-                            <div className="bg-destructive/5 text-destructive flex items-center gap-2 rounded-xl p-4 text-sm font-bold">
-                                <XCircle className="size-5" />이 예약은
-                                취소되었습니다.
+                            <div className="bg-destructive/5 rounded-xl p-4">
+                                <p className="text-destructive flex items-center gap-2 text-sm font-bold">
+                                    <XCircle className="size-5" />이 예약은
+                                    취소되었습니다.
+                                </p>
+                                {r.cancelReason === "USER_CONSENT_EXPIRED" && (
+                                    <p className="text-description-foreground mt-2 text-sm leading-relaxed break-keep">
+                                        서비스 시작 예정시각까지 이용자 본인의
+                                        동의가 완료되지 않아 자동으로
+                                        취소되었습니다. 결제 전 예약이라 청구된
+                                        금액은 없습니다. 다시 예약하실 때는
+                                        이용자 본인이 미리 동의할 수 있게 링크를
+                                        전달해 주세요.
+                                    </p>
+                                )}
                             </div>
                         ) : (
                             <div className="flex items-start justify-between">

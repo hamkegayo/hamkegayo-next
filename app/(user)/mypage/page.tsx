@@ -61,11 +61,13 @@ export default async function MypageHome() {
                                 >
                                     <div className="min-w-0 flex-1">
                                         <span className="inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700 dark:bg-amber-500/15">
-                                            {m.directPhase
-                                                ? DIRECT_PHASE_LABEL[
-                                                      m.directPhase
-                                                  ]
-                                                : "매칭 대기중"}
+                                            {m.consentPending
+                                                ? "본인 동의 대기"
+                                                : m.directPhase
+                                                  ? DIRECT_PHASE_LABEL[
+                                                        m.directPhase
+                                                    ]
+                                                  : "매칭 대기중"}
                                         </span>
                                         <p className="text-foreground mt-2 truncate font-bold">
                                             {m.hospital}
@@ -73,7 +75,14 @@ export default async function MypageHome() {
                                         <p className="text-muted-foreground mt-1 text-sm">
                                             {m.datetimeLabel} · {m.planLabel}
                                         </p>
-                                        {m.directPhase ? (
+                                        {m.consentPending ? (
+                                            <p className="text-muted-foreground mt-1 text-sm font-semibold break-keep">
+                                                이용자 본인이 동의하면 파트너
+                                                매칭이 시작돼요 · 서비스 시작
+                                                시각까지 동의가 없으면 자동
+                                                취소돼요
+                                            </p>
+                                        ) : m.directPhase ? (
                                             <p className="text-muted-foreground mt-1 text-sm font-semibold">
                                                 {m.directPhase === "UNPAID"
                                                     ? "결제를 마치면 파트너 확인이 시작돼요"
