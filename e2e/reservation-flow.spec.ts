@@ -96,11 +96,33 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
         await user.locator("#purpose").fill("정기 검진");
         await user.locator("#mobilityStatus").selectOption({ index: 1 });
         await user.locator("#cognitiveStatus").selectOption({ index: 1 });
+        // 거동·인지 상태 매칭 전 파트너 제공 별도 동의 미체크 시 다음 단계로 넘어가지 않는다 (#285).
+        await user.getByRole("button", { name: "다음" }).click();
+        await expect(
+            user.getByText(
+                "거동·인지 상태의 매칭 전 파트너 제공에 동의하지 않으면 예약할 수 없습니다.",
+            ),
+        ).toBeVisible();
+        await expect(user.locator("#agreePreMatchingHealth")).toBeFocused();
+        await expect(user.locator("#agreePreMatchingHealth")).toHaveAttribute(
+            "aria-describedby",
+            "agreePreMatchingHealth-error",
+        );
+        await expect(user.locator("#agreePreMatchingHealth-error")).toHaveText(
+            "거동·인지 상태의 매칭 전 파트너 제공에 동의하지 않으면 예약할 수 없습니다.",
+        );
+        await expect(user.locator("#userName")).toBeVisible();
+        await user
+            .getByRole("checkbox", {
+                name: /거동·인지 상태.*매칭 전 파트너에게 제공하는 데 동의합니다/,
+            })
+            .check();
         await user.getByRole("button", { name: "다음" }).click();
 
         // 2. 병원 정보 — 사전 예약 기간(59일)·서비스 시간(07~19시) 안.
         // 같은 파트너의 예약과 시간이 겹치면 선택이 거절된다(partner_unavailable).
         // 이전 실행 예약은 global-setup 이 정리하고, 재시도끼리 겹치지 않게 이용일도 바꾼다.
+        await expect(user.locator("#reservation-step-title")).toBeFocused();
         await user.locator("#useDate").fill(kstDatePlus(5 + (runId % 50)));
         await user.locator("#arriveTime").selectOption({ label: "10시 00분" });
         await user.locator("#reserveTime").selectOption({ label: "10시 30분" });

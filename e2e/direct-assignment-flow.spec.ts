@@ -86,6 +86,11 @@ async function fillReservationAndSubmit(
     await page.locator("#purpose").fill("정기 검진");
     await page.locator("#mobilityStatus").selectOption({ index: 1 });
     await page.locator("#cognitiveStatus").selectOption({ index: 1 });
+    await page
+        .getByRole("checkbox", {
+            name: /거동·인지 상태.*매칭 전 파트너에게 제공하는 데 동의합니다/,
+        })
+        .check();
     await page.getByRole("button", { name: "다음" }).click();
 
     await page.locator("#useDate").fill(opts.date);

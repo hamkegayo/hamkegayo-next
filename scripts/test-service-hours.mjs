@@ -69,6 +69,7 @@ const input = {
     purpose: "Test",
     mobilityStatus: "스스로 보행 가능",
     cognitiveStatus: "의사소통 원활",
+    agreePreMatchingHealth: true,
     notifyTarget: "BOTH",
     shareMedicalInfo: false,
     useDate: "2026-10-05",

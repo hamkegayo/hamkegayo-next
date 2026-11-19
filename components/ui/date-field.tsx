@@ -40,6 +40,7 @@ export function DateField({
     disabled,
     placeholder = "YYYY-MM-DD",
     className,
+    "aria-describedby": ariaDescribedBy,
 }: {
     id?: string;
     value: string;
@@ -50,6 +51,7 @@ export function DateField({
     disabled?: boolean;
     placeholder?: string;
     className?: string;
+    "aria-describedby"?: string;
 }) {
     const pickerRef = useRef<HTMLInputElement>(null);
 
@@ -78,6 +80,7 @@ export function DateField({
                 value={value}
                 disabled={disabled}
                 aria-invalid={invalid}
+                aria-describedby={ariaDescribedBy}
                 onChange={(e) => onChange(formatDateInput(e.target.value))}
                 className="pr-11"
             />

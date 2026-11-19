@@ -9,6 +9,7 @@ import { useReservationStore } from "../_store/reservation-store";
 import { resumeReservation } from "../_actions/payment";
 import { paymentErrorMessage, resumeStepFor } from "../_lib/flow-branch";
 import { IntroModal } from "./intro-modal";
+import { preferredScrollBehavior } from "./fields";
 import { StepUserInfo } from "./step-user-info";
 import { StepHospitalInfo } from "./step-hospital-info";
 import { StepServiceSelect } from "./step-service-select";
@@ -160,6 +161,17 @@ export function ReservationFlow() {
     useEffect(() => {
         trackBeginCheckoutGA();
     }, []);
+
+    // 단계 이동 또는 인트로 모달 닫힘 직후 상단 스크롤 + 단계 제목 포커스
+    useEffect(() => {
+        if (!introConfirmed || resuming || (enteredFinished && finished)) {
+            return;
+        }
+        window.scrollTo({ top: 0, behavior: preferredScrollBehavior() });
+        document
+            .getElementById("reservation-step-title")
+            ?.focus({ preventScroll: true });
+    }, [step, introConfirmed, resuming, enteredFinished, finished]);
 
     // 복원 중에는 옛 단계를 잠깐 보여주지 않는다.
     if (resuming) return null;

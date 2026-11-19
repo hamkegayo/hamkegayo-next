@@ -38,7 +38,11 @@ export function StepBand({
     return (
         <div className="border-border bg-muted/70 border-b">
             <div className="mx-auto max-w-3xl px-4 py-12 text-center">
-                <h1 className="text-foreground text-2xl font-extrabold md:text-3xl">
+                <h1
+                    id="reservation-step-title"
+                    tabIndex={-1}
+                    className="text-foreground text-2xl font-extrabold outline-none md:text-3xl"
+                >
                     <span className="text-brand">{index}.</span> {title}
                 </h1>
                 {subtitles.map((s, i) => (

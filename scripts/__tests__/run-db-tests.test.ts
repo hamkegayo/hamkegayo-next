@@ -29,7 +29,7 @@ describe("test:db 인자 해석", () => {
         expect(parseArgs(argv)).toEqual({ error });
     });
 
-    it("CI 목록 35개 묶음을 유지한다 (#300 직접 배정 추가)", () => {
-        expect(SUITES).toHaveLength(35);
+    it("CI 목록 36개 묶음을 유지한다 (#285 매칭 전 건강정보 동의 추가)", () => {
+        expect(SUITES).toHaveLength(36);
     });
 });

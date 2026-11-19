@@ -63,6 +63,7 @@ const validReservation = {
     purpose: "외래 진료",
     mobilityStatus: "INDEPENDENT",
     cognitiveStatus: "NORMAL",
+    agreePreMatchingHealth: true,
     notifyTarget: "BOTH",
     shareMedicalInfo: false,
     useDate: "2026-10-01",

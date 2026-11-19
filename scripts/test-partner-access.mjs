@@ -142,6 +142,8 @@ async function seedReservation(customerId, code, extra = {}) {
             hospital_name: "테스트정형외과",
             mobility_status: "부축 필요",
             cognitive_status: "의사소통 원활",
+            pre_matching_health_consented_at: new Date().toISOString(),
+            pre_matching_health_consent_version: "2026-09-06",
             // 수행 조건 (#77). 이동 3종은 단계 1 에 나가고,
             // 인계자는 제3자 개인정보라 확정 후에만 나가야 한다.
             transport_to: "TAXI",
@@ -334,6 +336,40 @@ async function main() {
         "거동·인지 상태는 제공됨 (처리방침 제5조 ② [단계 1]·④)",
         row?.mobility_status === "부축 필요" &&
             row?.cognitive_status === "의사소통 원활",
+    );
+
+    // #285: 별도 동의가 없는 예약은 단계 1 목록·상세에서 거동·인지 상태가 null 이어야 한다.
+    const unconsentedId = await seedReservation(
+        customer.id,
+        `${CODE_PREFIX}-NOCONSENT`,
+        {
+            pre_matching_health_consented_at: null,
+            pre_matching_health_consent_version: null,
+        },
+    );
+    const unconsentedList = await partnerClient.rpc(
+        "partner_list_open_reservations",
+        { p_limit: 100 },
+    );
+    const unconsentedListRow = (unconsentedList.data ?? []).find(
+        (r) => r.id === unconsentedId,
+    );
+    const unconsentedDetail = await partnerClient.rpc(
+        "partner_get_open_reservation",
+        { p_id: unconsentedId },
+    );
+    const unconsentedDetailRow = unconsentedDetail.data?.[0];
+    check(
+        "별도 동의 없는 예약은 목록·상세 모두 거동·인지 상태가 null임 (#285)",
+        !unconsentedList.error &&
+            !!unconsentedListRow &&
+            unconsentedListRow.mobility_status === null &&
+            unconsentedListRow.cognitive_status === null &&
+            !unconsentedDetail.error &&
+            !!unconsentedDetailRow &&
+            unconsentedDetailRow.mobility_status === null &&
+            unconsentedDetailRow.cognitive_status === null,
+        unconsentedList.error?.message ?? unconsentedDetail.error?.message,
     );
 
     // =============================================================
