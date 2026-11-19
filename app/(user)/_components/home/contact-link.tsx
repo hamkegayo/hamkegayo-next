@@ -1,6 +1,7 @@
 "use client";
 
 import { trackContact } from "@/lib/analytics";
+import { PhoneContactLink } from "@/components/contact/phone-contact-link";
 
 /**
  * 문의 창구로 연결하는 링크.
@@ -15,6 +16,9 @@ import { trackContact } from "@/lib/analytics";
  *
  *  ⚠️ 이벤트 전송은 그대로 둔다. 지금까지의 집계와 끊기면 전후 비교가
  *     불가능해지고, 이제는 실제로 닿는 클릭이라 집계가 맞다.
+ *
+ *  `tel:` 는 PhoneContactLink 로 넘긴다(#304) — PC 에서는 전화 앱 대신 번호·QR·
+ *  카카오톡 안내 모달을 연다. 이벤트는 PC·모바일 모두 클릭당 한 번 보낸다.
  */
 export function ContactLink({
     href,
@@ -31,6 +35,17 @@ export function ContactLink({
     className?: string;
     children: React.ReactNode;
 }) {
+    if (href.startsWith("tel:")) {
+        return (
+            <PhoneContactLink
+                href={href}
+                className={className}
+                onClick={() => trackContact(method)}
+            >
+                {children}
+            </PhoneContactLink>
+        );
+    }
     return (
         <a
             href={href}

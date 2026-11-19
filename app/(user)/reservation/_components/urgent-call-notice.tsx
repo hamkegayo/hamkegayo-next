@@ -11,6 +11,7 @@ import {
     URGENT_NOTICE_COMPLETE_EMPHASIS,
     URGENT_NOTICE_EMPHASIS,
 } from "@/lib/direct-flow-copy";
+import { PhoneContactLink } from "@/components/contact/phone-contact-link";
 
 export type UrgentCallContext = "pre-payment" | "complete";
 
@@ -58,7 +59,7 @@ export function UrgentCallNoticeView({
                     {urgent ? emphasisMessage : URGENT_NOTICE_BASE}
                 </p>
                 {showButton && (
-                    <a
+                    <PhoneContactLink
                         href={CUSTOMER_CENTER_TEL_HREF}
                         className={
                             urgent
@@ -68,7 +69,7 @@ export function UrgentCallNoticeView({
                     >
                         <Phone className="size-3.5" />
                         {CUSTOMER_CENTER_CALL_LABEL}
-                    </a>
+                    </PhoneContactLink>
                 )}
             </div>
         </div>
