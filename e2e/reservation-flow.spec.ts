@@ -55,6 +55,16 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
                   : { eligible: false, state: "PAUSED", discount: 20000 },
         });
     });
+    // 3·4단계 쿠폰 보유 안내(#282)는 사용 가능 상태로 고정한다.
+    await user.route("**/api/campaigns/opening/coupon", async (route) => {
+        await route.fulfill({
+            json: {
+                state: "AVAILABLE",
+                discount: 20000,
+                discounts: { basic: 20000, plus: 25000 },
+            },
+        });
+    });
     await user.route("**/api/payments/prepare", async (route) => {
         if (route.request().postDataJSON()?.useOpeningEvent) {
             unavailableAttempt = true;
@@ -134,11 +144,16 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
         await user.getByRole("button", { name: "다음" }).click();
 
         // 3. 서비스 — 베이직(시간당 20,000원)
+        await expect(
+            user.getByText("(결제 단계에서 적용 · 선착순)"),
+        ).toBeVisible();
         await user.getByRole("button", { name: "선택" }).first().click();
         await user.getByRole("button", { name: "다음" }).click();
 
         // 4. 확인 후 신청
         await expect(user.getByText(hospital)).toBeVisible();
+        // 기존 예상 결제 금액은 그대로, 쿠폰 적용 예상은 별도 줄로만 보인다 (#282)
+        await expect(user.getByText("쿠폰 적용 시 예상")).toBeVisible();
         await user.getByRole("checkbox").check();
         await user.getByRole("button", { name: "매칭 신청하기" }).click();
         await expect(user.getByText("파트너를 찾고 있습니다.")).toBeVisible();
@@ -166,11 +181,22 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
         await user.getByRole("button", { name: "선택하고 결제하기" }).click();
 
         // 2시간 × 20,000원, 주말·공휴일 할증 0%(#206)
+        // 쿠폰 대상이면 체크박스가 기본 ON 이다 (#282).
         const pay = user.getByRole("button", { name: "40,000원 결제하기" });
+        const couponPay = user.getByRole("button", {
+            name: "20,000원 결제하기",
+        });
+        const couponBox = user.getByRole("checkbox", {
+            name: /쿠폰.*20,000원/,
+        });
+        await expect(couponBox).toBeChecked();
+        await expect(couponPay).toBeVisible();
+        // 체크 해제(미적용)하면 쿠폰 없는 금액으로 돌아온다.
+        await couponBox.uncheck();
         await expect(pay).toBeVisible();
+        await couponBox.check();
         await user.getByRole("checkbox", { name: /취소·환불 정책/ }).check();
-        await user.getByRole("checkbox", { name: /쿠폰.*20,000원/ }).check();
-        await user.getByRole("button", { name: "20,000원 결제하기" }).click();
+        await couponPay.click();
         await expect(
             user
                 .getByRole("status")

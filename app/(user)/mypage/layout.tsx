@@ -18,7 +18,7 @@ export default async function MypageLayout({
 
     return (
         <div className="mx-auto w-full max-w-6xl px-4 py-10">
-            <div className="grid gap-8 md:grid-cols-[220px_1fr]">
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-[220px_1fr]">
                 <MypageSidebar />
                 <div className="min-w-0">{children}</div>
             </div>
