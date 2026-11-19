@@ -15,7 +15,13 @@ import {
     useReservationStore,
     type ReservationData,
 } from "../_store/reservation-store";
-import { step1Schema, type Step1Values } from "../_lib/schema";
+import { step1Form, type Step1Values } from "../_lib/schema";
+import {
+    isSelfRelation,
+    PROXY_REASON_DETAIL_MAX,
+    PROXY_REASON_DETAIL_MIN,
+    PROXY_REASON_OPTIONS,
+} from "@/lib/proxy-consent";
 import {
     COGNITIVE_OPTIONS,
     MOBILITY_OPTIONS,
@@ -45,12 +51,32 @@ const STEP1_FIELD_ORDER = [
     "guardianName",
     "guardianPhone",
     "relation",
+    "consentMode",
+    "proxyReasonCode",
+    "proxyReasonDetail",
+    "proxyAuthorityPledge",
     "notifyTarget",
     "treatment",
     "purpose",
     "mobilityStatus",
     "cognitiveStatus",
     "agreePreMatchingHealth",
+] as const;
+
+/** 처리방침 제10조 ①-③ — 대리 예약의 동의 방식 선택지 */
+const CONSENT_MODE_OPTIONS = [
+    {
+        value: "USER_DIRECT",
+        id: "consentMode-direct",
+        title: "이용자 본인이 직접 동의 (원칙)",
+        desc: "예약 후 이용자 본인에게 보낼 동의 링크가 만들어집니다. 이용자가 본인 확인 후 직접 동의하면 파트너 매칭이 시작됩니다.",
+    },
+    {
+        value: "GUARDIAN_PROXY",
+        id: "consentMode-proxy",
+        title: "보호자가 대리 동의 (예외)",
+        desc: "의사능력 제한 등으로 이용자가 직접 동의할 수 없는 경우에만 선택할 수 있습니다. 사유와 대리 권한을 확인합니다.",
+    },
 ] as const;
 
 const DOCS = [
@@ -77,7 +103,7 @@ export function StepUserInfo() {
         clearErrors,
         formState: { errors },
     } = useForm<Step1Values>({
-        resolver: zodResolver(step1Schema),
+        resolver: zodResolver(step1Form),
         mode: "onSubmit",
         reValidateMode: "onSubmit",
         shouldFocusError: false,
@@ -101,14 +127,50 @@ export function StepUserInfo() {
             otherRequests: data.otherRequests,
             notifyTarget: data.notifyTarget as "USER" | "GUARDIAN" | "BOTH",
             shareMedicalInfo: data.shareMedicalInfo,
+            consentMode: data.consentMode,
+            proxyReasonCode:
+                data.proxyReasonCode as Step1Values["proxyReasonCode"],
+            proxyReasonDetail: data.proxyReasonDetail,
+            proxyAuthorityPledge: data.proxyAuthorityPledge,
         },
     });
 
     const gender = watch("userGender");
+    const relation = watch("relation");
+    const consentMode = watch("consentMode");
+    // 처리방침 제10조 — 관계가 "본인"이 아니면 대리 예약이다.
+    const isProxy = !!relation && !isSelfRelation(relation);
+    // 본인 직접 동의(USER_DIRECT)는 거동·인지 상태 제공 동의와 진료 내용 전달 동의를 이용자가 링크에서 직접 한다.
+    const userDirect = isProxy && consentMode === "USER_DIRECT";
+    const guardianProxy = isProxy && consentMode === "GUARDIAN_PROXY";
 
     const onSubmit = (v: Step1Values) => {
+        // 본인 예약이면 대리 동의 입력을 비운다. 대리 예약에서는 보호자가 대신 동의할 수 없는
+        // 진료 내용 전달 동의(제10조 ④)를 끈다. 서버도 같은 규칙을 다시 적용한다.
+        const normalized: Step1Values = isProxy
+            ? {
+                  ...v,
+                  shareMedicalInfo: false,
+                  agreePreMatchingHealth: userDirect
+                      ? false
+                      : v.agreePreMatchingHealth,
+                  ...(userDirect
+                      ? {
+                            proxyReasonCode: "",
+                            proxyReasonDetail: "",
+                            proxyAuthorityPledge: false,
+                        }
+                      : {}),
+              }
+            : {
+                  ...v,
+                  consentMode: "",
+                  proxyReasonCode: "",
+                  proxyReasonDetail: "",
+                  proxyAuthorityPledge: false,
+              };
         // userGender 등은 UI에서 유효값만 설정되므로 스토어 타입으로 캐스팅
-        patch(v as Partial<ReservationData>);
+        patch(normalized as Partial<ReservationData>);
         next();
     };
 
@@ -447,6 +509,226 @@ export function StepUserInfo() {
                             </div>
 
                             {/*
+                              처리방침 제10조 ①-③ — 대리 예약은 이용자 본인 동의가 원칙이다.
+                              보호자 대리 동의는 이용자가 직접 동의할 수 없는 예외 사유가 있을 때만 받는다.
+                            */}
+                            {isProxy && (
+                                <fieldset
+                                    id="consentMode"
+                                    tabIndex={-1}
+                                    className="border-border bg-background rounded-xl border p-4 md:col-span-2 md:p-5"
+                                    aria-describedby={
+                                        errors.consentMode
+                                            ? "consentMode-error"
+                                            : undefined
+                                    }
+                                >
+                                    <legend className="text-foreground px-1 text-sm font-bold">
+                                        <span className="text-brand mr-0.5">
+                                            *
+                                        </span>
+                                        이용자 본인의 동의 방식
+                                    </legend>
+                                    <p className="text-description-foreground text-sm leading-relaxed">
+                                        다른 분을 대신해 예약하시는 경우,
+                                        거동·인지 상태와 진료 내용 전달에 대한
+                                        동의는 이용자 본인이 하시는 것이
+                                        원칙입니다.
+                                    </p>
+                                    <div className="mt-3 space-y-2.5">
+                                        {CONSENT_MODE_OPTIONS.map((o) => (
+                                            <label
+                                                key={o.value}
+                                                className="flex cursor-pointer items-start gap-2.5"
+                                            >
+                                                <input
+                                                    type="radio"
+                                                    id={o.id}
+                                                    name="consentModeRadio"
+                                                    className="mt-1"
+                                                    checked={
+                                                        consentMode === o.value
+                                                    }
+                                                    onChange={() => {
+                                                        setValue(
+                                                            "consentMode",
+                                                            o.value,
+                                                        );
+                                                        clearErrors(
+                                                            "consentMode",
+                                                        );
+                                                    }}
+                                                />
+                                                <span className="text-sm leading-relaxed">
+                                                    <span className="text-foreground block font-semibold">
+                                                        {o.title}
+                                                    </span>
+                                                    <span className="text-muted-foreground block">
+                                                        {o.desc}
+                                                    </span>
+                                                </span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                    <FieldError id="consentMode-error">
+                                        {errors.consentMode?.message}
+                                    </FieldError>
+
+                                    {guardianProxy && (
+                                        <div className="border-border mt-4 space-y-4 border-t pt-4">
+                                            <div>
+                                                <FieldLabel
+                                                    htmlFor="proxyReasonCode"
+                                                    required
+                                                >
+                                                    대리 동의가 필요한 사유
+                                                </FieldLabel>
+                                                <NativeSelect
+                                                    id="proxyReasonCode"
+                                                    aria-invalid={
+                                                        !!errors.proxyReasonCode
+                                                    }
+                                                    aria-describedby={
+                                                        errors.proxyReasonCode
+                                                            ? "proxyReasonCode-error"
+                                                            : undefined
+                                                    }
+                                                    {...register(
+                                                        "proxyReasonCode",
+                                                        {
+                                                            onChange: () =>
+                                                                errors.proxyReasonCode &&
+                                                                clearErrors(
+                                                                    "proxyReasonCode",
+                                                                ),
+                                                        },
+                                                    )}
+                                                >
+                                                    <option value="">
+                                                        선택하세요
+                                                    </option>
+                                                    {PROXY_REASON_OPTIONS.map(
+                                                        (r) => (
+                                                            <option
+                                                                key={r.value}
+                                                                value={r.value}
+                                                            >
+                                                                {r.label}
+                                                            </option>
+                                                        ),
+                                                    )}
+                                                </NativeSelect>
+                                                <FieldError id="proxyReasonCode-error">
+                                                    {
+                                                        errors.proxyReasonCode
+                                                            ?.message
+                                                    }
+                                                </FieldError>
+                                            </div>
+                                            <div>
+                                                <FieldLabel
+                                                    htmlFor="proxyReasonDetail"
+                                                    required
+                                                >
+                                                    사유 상세
+                                                </FieldLabel>
+                                                <Textarea
+                                                    id="proxyReasonDetail"
+                                                    maxLength={
+                                                        PROXY_REASON_DETAIL_MAX
+                                                    }
+                                                    placeholder={`이용자가 직접 동의할 수 없는 상황을 ${PROXY_REASON_DETAIL_MIN}자 이상 구체적으로 적어 주세요.`}
+                                                    aria-invalid={
+                                                        !!errors.proxyReasonDetail
+                                                    }
+                                                    aria-describedby={
+                                                        errors.proxyReasonDetail
+                                                            ? "proxyReasonDetail-error"
+                                                            : undefined
+                                                    }
+                                                    {...register(
+                                                        "proxyReasonDetail",
+                                                        {
+                                                            onChange: () =>
+                                                                errors.proxyReasonDetail &&
+                                                                clearErrors(
+                                                                    "proxyReasonDetail",
+                                                                ),
+                                                        },
+                                                    )}
+                                                />
+                                                <FieldError id="proxyReasonDetail-error">
+                                                    {
+                                                        errors.proxyReasonDetail
+                                                            ?.message
+                                                    }
+                                                </FieldError>
+                                            </div>
+                                            <div>
+                                                <Controller
+                                                    control={control}
+                                                    name="proxyAuthorityPledge"
+                                                    render={({ field }) => (
+                                                        <label className="flex cursor-pointer items-start gap-2.5">
+                                                            <Checkbox
+                                                                id="proxyAuthorityPledge"
+                                                                nativeButton
+                                                                render={
+                                                                    <button type="button" />
+                                                                }
+                                                                className="mt-0.5"
+                                                                checked={
+                                                                    field.value ===
+                                                                    true
+                                                                }
+                                                                aria-invalid={
+                                                                    !!errors.proxyAuthorityPledge
+                                                                }
+                                                                aria-describedby={
+                                                                    errors.proxyAuthorityPledge
+                                                                        ? "proxyAuthorityPledge-error"
+                                                                        : undefined
+                                                                }
+                                                                onCheckedChange={(
+                                                                    checked,
+                                                                ) => {
+                                                                    field.onChange(
+                                                                        checked ===
+                                                                            true,
+                                                                    );
+                                                                    clearErrors(
+                                                                        "proxyAuthorityPledge",
+                                                                    );
+                                                                }}
+                                                            />
+                                                            <span className="text-foreground text-sm leading-relaxed font-medium">
+                                                                저는 이용자를
+                                                                대신해 동의할 수
+                                                                있는 정당한
+                                                                권한(법정대리인
+                                                                또는 이에 준하는
+                                                                보호 관계)이
+                                                                있으며, 위
+                                                                사유가 사실임을
+                                                                확인합니다.
+                                                            </span>
+                                                        </label>
+                                                    )}
+                                                />
+                                                <FieldError id="proxyAuthorityPledge-error">
+                                                    {
+                                                        errors
+                                                            .proxyAuthorityPledge
+                                                            ?.message
+                                                    }
+                                                </FieldError>
+                                            </div>
+                                        </div>
+                                    )}
+                                </fieldset>
+                            )}
+
+                            {/*
                               통보대상 — 매뉴얼 4단계에서 파트너가 "도착했습니다"
                               를 보낼 대상이다. 용어정의상 이용자 또는 보호자다.
                             */}
@@ -490,36 +772,52 @@ export function StepUserInfo() {
                               이용자 의사에 따른다. 동의하지 않으면 파트너는
                               전달하지 않는다(대응카드 16).
                             */}
-                            <div className="md:col-span-2">
-                                <Controller
-                                    control={control}
-                                    name="shareMedicalInfo"
-                                    render={({ field }) => (
-                                        <label className="flex cursor-pointer items-start gap-2.5">
-                                            <Checkbox
-                                                className="mt-0.5"
-                                                checked={field.value === true}
-                                                onCheckedChange={(checked) =>
-                                                    field.onChange(
-                                                        checked === true,
-                                                    )
-                                                }
-                                            />
-                                            <span className="text-sm leading-relaxed">
-                                                <span className="text-foreground">
-                                                    진료 내용을 보호자에게
-                                                    전달하는 데 동의합니다.
+                            {isProxy && (
+                                <p className="text-description-foreground text-sm leading-relaxed md:col-span-2">
+                                    진료 내용을 보호자에게 전달하는 데 대한
+                                    동의는 이용자 본인만 할 수 있습니다.
+                                    {userDirect
+                                        ? " 이용자 본인이 동의 링크에서 직접 선택합니다."
+                                        : " 대리 동의로는 선택할 수 없어 전달하지 않는 것으로 처리됩니다."}
+                                </p>
+                            )}
+                            {!isProxy && (
+                                <div className="md:col-span-2">
+                                    <Controller
+                                        control={control}
+                                        name="shareMedicalInfo"
+                                        render={({ field }) => (
+                                            <label className="flex cursor-pointer items-start gap-2.5">
+                                                <Checkbox
+                                                    className="mt-0.5"
+                                                    checked={
+                                                        field.value === true
+                                                    }
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        field.onChange(
+                                                            checked === true,
+                                                        )
+                                                    }
+                                                />
+                                                <span className="text-sm leading-relaxed">
+                                                    <span className="text-foreground">
+                                                        진료 내용을 보호자에게
+                                                        전달하는 데 동의합니다.
+                                                    </span>
+                                                    <span className="text-muted-foreground block">
+                                                        동의하지 않으시면
+                                                        파트너가 보호자에게 진료
+                                                        내용을 전달하지
+                                                        않습니다.
+                                                    </span>
                                                 </span>
-                                                <span className="text-muted-foreground block">
-                                                    동의하지 않으시면 파트너가
-                                                    보호자에게 진료 내용을
-                                                    전달하지 않습니다.
-                                                </span>
-                                            </span>
-                                        </label>
-                                    )}
-                                />
-                            </div>
+                                            </label>
+                                        )}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -649,105 +947,121 @@ export function StepUserInfo() {
                          * 처리방침 제3조 ② · 제5조 ② [단계 1]·④·⑥ (#285)
                          * 거동·인지 상태(민감정보)의 매칭 전 파트너 제공에 대한 별도 동의.
                          */}
-                        <div
-                            className={cn(
-                                "bg-background mt-5 rounded-xl border p-4 md:p-5",
-                                errors.agreePreMatchingHealth
-                                    ? "border-destructive"
-                                    : "border-border",
-                            )}
-                        >
-                            <p className="text-foreground text-sm font-bold">
-                                [필수] 매칭 전 파트너에게 거동·인지 상태 제공
-                                동의 (민감정보)
+                        {userDirect ? (
+                            <p
+                                id="agreePreMatchingHealth-direct-notice"
+                                className="bg-background text-description-foreground mt-5 rounded-xl border p-4 text-sm leading-relaxed md:p-5"
+                            >
+                                거동·인지 상태를 매칭 전 파트너에게 제공하는 데
+                                대한 동의는 이용자 본인이 동의 링크에서 직접
+                                합니다. 동의가 완료되기 전에는 파트너에게 예약이
+                                공개되지 않습니다.
                             </p>
-                            <dl className="text-description-foreground mt-3 space-y-1.5 text-sm leading-relaxed">
-                                <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
-                                    <dt className="text-foreground shrink-0 font-semibold sm:w-28">
-                                        제공받는 자
-                                    </dt>
-                                    <dd>
-                                        해당 예약 요청을 검토하는 함께가요
-                                        병원동행 파트너
-                                    </dd>
-                                </div>
-                                <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
-                                    <dt className="text-foreground shrink-0 font-semibold sm:w-28">
-                                        제공 목적
-                                    </dt>
-                                    <dd>
-                                        서비스 수행 가능 여부 및 예약 수락 여부
-                                        판단 (민감정보)
-                                    </dd>
-                                </div>
-                                <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
-                                    <dt className="text-foreground shrink-0 font-semibold sm:w-28">
-                                        제공 항목
-                                    </dt>
-                                    <dd>거동상태, 인지상태</dd>
-                                </div>
-                                <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
-                                    <dt className="text-foreground shrink-0 font-semibold sm:w-28">
-                                        보유·이용기간
-                                    </dt>
-                                    <dd>
-                                        수락 여부 결정 시까지. 수락하지 않은
-                                        파트너는 즉시 접근 차단
-                                    </dd>
-                                </div>
-                            </dl>
-                            <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
-                                동의를 거부할 권리가 있으나, 동의하지 않으면
-                                예약할 수 없습니다.
-                            </p>
-                            <div className="border-border mt-3 border-t pt-3">
-                                <Controller
-                                    control={control}
-                                    name="agreePreMatchingHealth"
-                                    render={({ field }) => (
-                                        <label className="flex cursor-pointer items-start gap-2.5">
-                                            <Checkbox
-                                                id="agreePreMatchingHealth"
-                                                nativeButton
-                                                render={
-                                                    <button type="button" />
-                                                }
-                                                className="mt-0.5"
-                                                checked={field.value === true}
-                                                aria-invalid={
-                                                    !!errors.agreePreMatchingHealth
-                                                }
-                                                aria-describedby={
-                                                    errors.agreePreMatchingHealth
-                                                        ? "agreePreMatchingHealth-error"
-                                                        : undefined
-                                                }
-                                                onCheckedChange={(checked) => {
-                                                    field.onChange(
-                                                        checked === true,
-                                                    );
-                                                    if (
-                                                        errors.agreePreMatchingHealth
-                                                    ) {
-                                                        clearErrors(
-                                                            "agreePreMatchingHealth",
-                                                        );
+                        ) : (
+                            <div
+                                className={cn(
+                                    "bg-background mt-5 rounded-xl border p-4 md:p-5",
+                                    errors.agreePreMatchingHealth
+                                        ? "border-destructive"
+                                        : "border-border",
+                                )}
+                            >
+                                <p className="text-foreground text-sm font-bold">
+                                    [필수] 매칭 전 파트너에게 거동·인지 상태
+                                    제공 동의 (민감정보)
+                                </p>
+                                <dl className="text-description-foreground mt-3 space-y-1.5 text-sm leading-relaxed">
+                                    <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
+                                        <dt className="text-foreground shrink-0 font-semibold sm:w-28">
+                                            제공받는 자
+                                        </dt>
+                                        <dd>
+                                            해당 예약 요청을 검토하는 함께가요
+                                            병원동행 파트너
+                                        </dd>
+                                    </div>
+                                    <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
+                                        <dt className="text-foreground shrink-0 font-semibold sm:w-28">
+                                            제공 목적
+                                        </dt>
+                                        <dd>
+                                            서비스 수행 가능 여부 및 예약 수락
+                                            여부 판단 (민감정보)
+                                        </dd>
+                                    </div>
+                                    <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
+                                        <dt className="text-foreground shrink-0 font-semibold sm:w-28">
+                                            제공 항목
+                                        </dt>
+                                        <dd>거동상태, 인지상태</dd>
+                                    </div>
+                                    <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
+                                        <dt className="text-foreground shrink-0 font-semibold sm:w-28">
+                                            보유·이용기간
+                                        </dt>
+                                        <dd>
+                                            수락 여부 결정 시까지. 수락하지 않은
+                                            파트너는 즉시 접근 차단
+                                        </dd>
+                                    </div>
+                                </dl>
+                                <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
+                                    동의를 거부할 권리가 있으나, 동의하지 않으면
+                                    예약할 수 없습니다.
+                                </p>
+                                <div className="border-border mt-3 border-t pt-3">
+                                    <Controller
+                                        control={control}
+                                        name="agreePreMatchingHealth"
+                                        render={({ field }) => (
+                                            <label className="flex cursor-pointer items-start gap-2.5">
+                                                <Checkbox
+                                                    id="agreePreMatchingHealth"
+                                                    nativeButton
+                                                    render={
+                                                        <button type="button" />
                                                     }
-                                                }}
-                                            />
-                                            <span className="text-foreground text-sm leading-relaxed font-medium">
-                                                거동·인지 상태(민감정보)를 매칭
-                                                전 파트너에게 제공하는 데
-                                                동의합니다.
-                                            </span>
-                                        </label>
-                                    )}
-                                />
-                                <FieldError id="agreePreMatchingHealth-error">
-                                    {errors.agreePreMatchingHealth?.message}
-                                </FieldError>
+                                                    className="mt-0.5"
+                                                    checked={
+                                                        field.value === true
+                                                    }
+                                                    aria-invalid={
+                                                        !!errors.agreePreMatchingHealth
+                                                    }
+                                                    aria-describedby={
+                                                        errors.agreePreMatchingHealth
+                                                            ? "agreePreMatchingHealth-error"
+                                                            : undefined
+                                                    }
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) => {
+                                                        field.onChange(
+                                                            checked === true,
+                                                        );
+                                                        if (
+                                                            errors.agreePreMatchingHealth
+                                                        ) {
+                                                            clearErrors(
+                                                                "agreePreMatchingHealth",
+                                                            );
+                                                        }
+                                                    }}
+                                                />
+                                                <span className="text-foreground text-sm leading-relaxed font-medium">
+                                                    거동·인지 상태(민감정보)를
+                                                    매칭 전 파트너에게 제공하는
+                                                    데 동의합니다.
+                                                </span>
+                                            </label>
+                                        )}
+                                    />
+                                    <FieldError id="agreePreMatchingHealth-error">
+                                        {errors.agreePreMatchingHealth?.message}
+                                    </FieldError>
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         <div className="mt-5">
                             <FieldLabel htmlFor="cautions">

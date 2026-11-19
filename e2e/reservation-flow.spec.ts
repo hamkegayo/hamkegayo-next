@@ -91,7 +91,7 @@ test("예약부터 파트너 수락, 모의 결제, 관리자 확인까지", asy
         await user.locator("#userPhone").fill("010-2222-3333");
         await user.locator("#guardianName").fill("김보호");
         await user.locator("#guardianPhone").fill("010-4444-5555");
-        await user.locator("#relation").selectOption("자녀");
+        await user.locator("#relation").selectOption("본인");
         await user.locator("#treatment").fill("정기 진료");
         await user.locator("#purpose").fill("정기 검진");
         await user.locator("#mobilityStatus").selectOption({ index: 1 });

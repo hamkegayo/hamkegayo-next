@@ -22,13 +22,13 @@ insert into public.profiles(id,name,role) values ('00000176-0000-4000-8000-00000
 select set_config('request.jwt.claims','{"sub":"00000176-0000-4000-8000-000000000001","role":"authenticated"}',true);
 set local role authenticated;
 insert into public.reservations(code, customer_id, plan, patient_name, patient_birth, patient_gender, patient_phone, guardian_name, guardian_phone, relation, treatment, purpose, use_date, arrive_time, reserve_time, duration, duration_minutes, depart_address, hospital_address)
-values ('TEST-HOURS-176','00000176-0000-4000-8000-000000000001','basic','Test','1960-01-01','female','01000000000','Test','01000000000','self','Test','Test','2099-01-01','07:00','07:30','2시간',120,'Test','Test');
+values ('TEST-HOURS-176','00000176-0000-4000-8000-000000000001','basic','Test','1960-01-01','female','01000000000','Test','01000000000','본인','Test','Test','2099-01-01','07:00','07:30','2시간',120,'Test','Test');
 select pg_temp.assert(exists(select 1 from public.reservations where code='TEST-HOURS-176'), 'authenticated insert at opening accepted');
 do $$
 begin
   begin
     insert into public.reservations(code, customer_id, plan, patient_name, patient_birth, patient_gender, patient_phone, guardian_name, guardian_phone, relation, treatment, purpose, use_date, arrive_time, reserve_time, duration, duration_minutes, depart_address, hospital_address)
-    values ('TEST-HOURS-176-BYPASS','00000176-0000-4000-8000-000000000001','basic','Test','1960-01-01','female','01000000000','Test','01000000000','self','Test','Test','2099-01-01','06:30','07:30','2시간',120,'Test','Test');
+    values ('TEST-HOURS-176-BYPASS','00000176-0000-4000-8000-000000000001','basic','Test','1960-01-01','female','01000000000','Test','01000000000','본인','Test','Test','2099-01-01','06:30','07:30','2시간',120,'Test','Test');
   exception when check_violation then
     raise notice 'PASS: direct authenticated insert outside hours rejected';
     return;
@@ -46,7 +46,7 @@ begin
     v_rejected := false;
     begin
       insert into public.reservations(code, customer_id, plan, patient_name, patient_birth, patient_gender, patient_phone, guardian_name, guardian_phone, relation, treatment, purpose, use_date, arrive_time, reserve_time, duration, duration_minutes, depart_address, hospital_address)
-      values ('TEST-HOURS-END-'||replace(v_start,':','')||coalesce(v_minutes::text,'NULL'),'00000176-0000-4000-8000-000000000001','basic','Test','1960-01-01','female','01000000000','Test','01000000000','self','Test','Test','2099-01-01',v_start,v_start,case when v_minutes=150 then '2시간 30분' else '2시간' end,v_minutes,'Test','Test');
+      values ('TEST-HOURS-END-'||replace(v_start,':','')||coalesce(v_minutes::text,'NULL'),'00000176-0000-4000-8000-000000000001','basic','Test','1960-01-01','female','01000000000','Test','01000000000','본인','Test','Test','2099-01-01',v_start,v_start,case when v_minutes=150 then '2시간 30분' else '2시간' end,v_minutes,'Test','Test');
     exception when check_violation then v_rejected := true;
     end;
     perform pg_temp.assert(v_rejected = (v_minutes is null or (v_start='17:30' and v_minutes=120)), 'planned end boundary '||v_start||'/'||coalesce(v_minutes::text,'NULL'));

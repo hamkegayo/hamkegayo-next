@@ -38,6 +38,12 @@ export type ReservationData = {
     otherRequests: string;
     notifyTarget: string;
     shareMedicalInfo: boolean;
+    // STEP1 · 대리 예약 동의 방식 (처리방침 제10조, #306). 관계가 "본인"이면 쓰지 않는다.
+    /** USER_DIRECT 이용자 본인 직접 동의(원칙) / GUARDIAN_PROXY 보호자 대리 동의(예외) */
+    consentMode: "" | "USER_DIRECT" | "GUARDIAN_PROXY";
+    proxyReasonCode: string;
+    proxyReasonDetail: string;
+    proxyAuthorityPledge: boolean;
     // STEP2 · 병원 및 일정 정보
     useDate: string;
     arriveTime: string;
@@ -91,6 +97,11 @@ export type ReservationData = {
      *  legacy_auto  — 기존 흐름(지원 대기 → 고객 선택 → 결제 → 확정)
      */
     matchingMode: "legacy_auto" | "admin_direct";
+    /** 예약 등록 후 이용자 본인 동의 상태. PENDING_USER 면 동의 대기 화면을 보여준다 (#306) */
+    consentStatus: "" | "PENDING_USER" | "CONFIRMED";
+    /** 이번 세션에서 발급한 본인 동의 링크. 서버에는 해시만 있어 새로고침하면 재발급이 필요하다 */
+    consentLink: string;
+    consentExpiresAt: string;
 };
 
 const initialData: ReservationData = {
@@ -116,6 +127,10 @@ const initialData: ReservationData = {
     // Opt-in 이 원칙이다. 진료정보는 민감정보라 기본 동의로 두면 이용자가
     // 인지하지 못한 채 보호자에게 전달될 수 있다 (2026-09-05 기획 확정).
     shareMedicalInfo: false,
+    consentMode: "",
+    proxyReasonCode: "",
+    proxyReasonDetail: "",
+    proxyAuthorityPledge: false,
     useDate: "",
     arriveTime: "",
     reserveTime: "",
@@ -147,6 +162,9 @@ const initialData: ReservationData = {
     prepaidAmount: 0,
     pointBalance: 0,
     matchingMode: "legacy_auto",
+    consentStatus: "",
+    consentLink: "",
+    consentExpiresAt: "",
 };
 
 type ReservationState = {

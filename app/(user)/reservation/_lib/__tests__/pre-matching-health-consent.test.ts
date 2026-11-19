@@ -65,7 +65,7 @@ import { kstToday } from "@/lib/format";
 import { addCalendarDays } from "@/lib/reservation-window";
 import { PRIVACY } from "@/lib/legal/privacy";
 import { createReservation } from "../../_actions/reservation";
-import { reservationServerSchema, step1Schema } from "../schema";
+import { reservationServerSchema, step1Form } from "../schema";
 
 const CONSENT_ERROR_MESSAGE =
     "거동·인지 상태의 매칭 전 파트너 제공에 동의하지 않으면 예약할 수 없습니다.";
@@ -78,7 +78,8 @@ function validStep1() {
         userPhone: "010-1234-5678",
         guardianName: "홍보호",
         guardianPhone: "010-9876-5432",
-        relation: "자녀",
+        // 본인 예약 흐름 — 대리 예약은 proxy-consent.test.ts 에서 다룬다 (#306)
+        relation: "본인",
         treatment: "정형외과",
         purpose: "외래 진료",
         mobilityStatus: "부축 필요",
@@ -126,13 +127,13 @@ describe("매칭 전 거동·인지 상태 제공 별도 동의 (#285)", () => {
         });
     });
 
-    describe("step1Schema", () => {
+    describe("step1Form", () => {
         it("agreePreMatchingHealth가 true이면 통과한다", () => {
-            expect(step1Schema.safeParse(validStep1()).success).toBe(true);
+            expect(step1Form.safeParse(validStep1()).success).toBe(true);
         });
 
         it("agreePreMatchingHealth가 false이면 거절한다", () => {
-            const parsed = step1Schema.safeParse({
+            const parsed = step1Form.safeParse({
                 ...validStep1(),
                 agreePreMatchingHealth: false,
             });
@@ -150,7 +151,7 @@ describe("매칭 전 거동·인지 상태 제공 별도 동의 (#285)", () => {
 
         it("agreePreMatchingHealth가 누락되면 거절한다", () => {
             expect(
-                step1Schema.safeParse(withoutConsent(validStep1())).success,
+                step1Form.safeParse(withoutConsent(validStep1())).success,
             ).toBe(false);
         });
     });

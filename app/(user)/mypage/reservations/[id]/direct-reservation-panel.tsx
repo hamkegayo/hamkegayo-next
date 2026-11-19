@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { Building2, ChevronLeft, Phone, XCircle } from "lucide-react";
 
@@ -51,6 +52,7 @@ export function DirectReservationPanel({
     resumeHref,
     onCancelClick,
     onBack,
+    notice,
 }: {
     code: string;
     hospital: string;
@@ -65,6 +67,8 @@ export function DirectReservationPanel({
     resumeHref?: string;
     onCancelClick?: () => void;
     onBack?: () => void;
+    /** 예약 요약 카드 아래에 보여줄 안내(예: 이용자 본인 동의 대기) */
+    notice?: ReactNode;
 }) {
     const active = canCancelBeforeAssignment(phase);
 
@@ -139,6 +143,8 @@ export function DirectReservationPanel({
                     </div>
                 )}
             </div>
+
+            {notice}
 
             {(phase === "WAITING" || phase === "UNPAID") && (
                 <div className="mt-4">

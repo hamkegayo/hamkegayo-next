@@ -9,14 +9,32 @@ import { generateReservationCode } from "@/lib/reservation";
 import { reservationServerSchema } from "../_lib/schema";
 import { quoteReservation } from "../_lib/quote.server";
 import { PRIVACY } from "@/lib/legal/privacy";
+import { resolveConsentMode } from "@/lib/proxy-consent";
+import { issueConsentLink } from "@/lib/proxy-consent-issue.server";
 import { notifyPartnersOfNewRequest } from "@/lib/partner-new-request.server";
 import {
     newReservationMatchingMode,
     type MatchingMode,
 } from "@/lib/direct-assignment";
 
+/** 이용자 본인 동의 대기 중 예약의 동의 링크 안내 (처리방침 제10조 ②, #306) */
+export type PendingConsentInfo = {
+    status: "PENDING_USER";
+    link: string;
+    expiresAt: string;
+    /** 시스템이 이용자에게 직접 보냈는지. false 면 보호자가 링크를 전달해야 한다 */
+    delivered: boolean;
+};
+
 export type CreateReservationResult =
-    | { ok: true; code: string; id: string; matchingMode: MatchingMode }
+    | {
+          ok: true;
+          code: string;
+          id: string;
+          matchingMode: MatchingMode;
+          /** 본인 동의 대기 중일 때만 있다 */
+          consent?: PendingConsentInfo;
+      }
     | {
           ok: false;
           reason: "auth" | "validation" | "error" | "unpaid";
@@ -42,6 +60,10 @@ export async function createReservation(
                 "arriveTime",
                 "reserveTime",
                 "agreePreMatchingHealth",
+                "consentMode",
+                "proxyReasonCode",
+                "proxyReasonDetail",
+                "proxyAuthorityPledge",
             ].includes(String(i.path[0] ?? "")),
         );
         return {
@@ -51,7 +73,17 @@ export async function createReservation(
         };
     }
     const v = parsed.data;
-    if (v.agreePreMatchingHealth !== true) {
+    // 처리방침 제10조 — 본인 예약(SELF) / 이용자 본인 직접 동의(USER_DIRECT, 원칙) / 보호자 대리 동의(GUARDIAN_PROXY, 예외)
+    const consentMode = resolveConsentMode(v);
+    if (!consentMode) {
+        return {
+            ok: false,
+            reason: "validation",
+            message: "동의 방식을 선택해 주세요.",
+        };
+    }
+    // 본인 직접 동의가 아니면 이 화면에서 거동·인지 상태 제공 동의를 받아야 한다 (#285).
+    if (consentMode !== "USER_DIRECT" && v.agreePreMatchingHealth !== true) {
         return {
             ok: false,
             reason: "validation",
@@ -134,9 +166,29 @@ export async function createReservation(
         cautions: v.cautions ?? null,
         mobility_status: v.mobilityStatus,
         cognitive_status: v.cognitiveStatus,
-        // 처리방침 제5조 ② [단계 1]·④⑥ — 매칭 전 최소 건강정보 제공 동의 기록 (#285)
-        pre_matching_health_consented_at: new Date().toISOString(),
-        pre_matching_health_consent_version: PRIVACY.version,
+        // 처리방침 제5조 ② [단계 1]·④⑥ — 매칭 전 최소 건강정보 제공 동의 기록 (#285).
+        // 본인 직접 동의(제10조 ①②)는 이용자가 동의 링크에서 직접 하므로 그때까지 비워 둔다.
+        // 시각은 DB 트리거가 서버 시각으로 덮어쓴다.
+        pre_matching_health_consented_at:
+            consentMode === "USER_DIRECT" ? null : new Date().toISOString(),
+        pre_matching_health_consent_version:
+            consentMode === "USER_DIRECT" ? null : PRIVACY.version,
+        // 처리방침 제10조 — 동의 주체·상태. 확정·시각은 DB 가 서버 시각으로 기록하고 사후 변경을 막는다.
+        user_consent_mode: consentMode,
+        user_consent_status:
+            consentMode === "SELF"
+                ? ("NOT_REQUIRED" as const)
+                : consentMode === "USER_DIRECT"
+                  ? ("PENDING_USER" as const)
+                  : ("CONFIRMED" as const),
+        // 제10조 ③ — 보호자 대리 동의의 사유·권한 확인(서약)
+        ...(consentMode === "GUARDIAN_PROXY"
+            ? {
+                  proxy_reason_code: v.proxyReasonCode,
+                  proxy_reason_detail: v.proxyReasonDetail?.trim(),
+                  proxy_authority_version: PRIVACY.version,
+              }
+            : {}),
         doc_prescription: v.docPrescription ?? false,
         doc_receipt: v.docReceipt ?? false,
         doc_certificate: v.docCertificate ?? false,
@@ -151,7 +203,9 @@ export async function createReservation(
 
         // 매뉴얼 1장 업무 시작 조건 (#77)
         notify_target: v.notifyTarget,
-        share_medical_info: v.shareMedicalInfo,
+        // 제10조 ④ — 진료 내용 전달 동의는 실제 이용자만 한다. 본인 예약은 본인이 고른 값,
+        // 본인 직접 동의는 이용자가 링크에서 고를 때까지 false, 보호자 대리 동의는 false 로 고정한다.
+        share_medical_info: consentMode === "SELF" ? v.shareMedicalInfo : false,
         transport_to: v.transportTo,
         transport_home: v.transportHome,
         end_method: v.endMethod,
@@ -182,6 +236,35 @@ export async function createReservation(
 
         if (!error && data) {
             await recordRegionCodes(data.id, user.id, regionCodes);
+
+            // 제10조 ② — 이용자 본인 직접 동의 대기: 동의 링크를 발급한다. 발급에 실패하면 본인에게 안내할
+            // 방법이 없는 예약이 남으므로 예약을 지우고 실패로 돌려준다. 파트너 알림은 동의 확정 뒤에 나간다.
+            let consent: PendingConsentInfo | undefined;
+            if (consentMode === "USER_DIRECT") {
+                const issued = await issueConsentLink(supabase, {
+                    reservationId: data.id,
+                    patientPhone: v.userPhone,
+                });
+                if (!issued.ok) {
+                    await createAdminClient()
+                        .from("reservations")
+                        .delete()
+                        .eq("id", data.id)
+                        .eq("customer_id", user.id);
+                    return {
+                        ok: false,
+                        reason: "error",
+                        message:
+                            "이용자 본인 동의 링크를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.",
+                    };
+                }
+                consent = {
+                    status: "PENDING_USER",
+                    link: issued.link,
+                    expiresAt: issued.expiresAt,
+                    delivered: issued.delivered,
+                };
+            }
 
             // 처리 방식은 서버가 정한다 (#300). 고객 권한 INSERT 는 DB 가드가 항상 legacy_auto 로 되돌리므로
             // 신규 방식(admin_direct) 전환은 서비스 권한으로 기록한다. 플래그가 꺼져 있으면 기존 그대로다.
@@ -217,24 +300,29 @@ export async function createReservation(
                     code: data.code,
                     id: data.id,
                     matchingMode: "admin_direct",
+                    ...(consent ? { consent } : {}),
                 };
             }
 
             // 활동 지역·시간이 맞는 파트너에게 새 요청 알림 (#255). 응답을 막지 않게 응답 후 처리한다.
-            after(() =>
-                notifyPartnersOfNewRequest({
-                    reservationId: data.id,
-                    useDate: v.useDate,
-                    arriveTime: v.arriveTime,
-                    plan: v.plan,
-                    hospitalAddress: v.hospitalAddress,
-                }),
-            );
+            // 본인 동의 대기 건은 알리지 않는다 — 동의 확정 시점에 알린다 (DB 도 notify_partners_new_request 에서 막는다).
+            if (!consent) {
+                after(() =>
+                    notifyPartnersOfNewRequest({
+                        reservationId: data.id,
+                        useDate: v.useDate,
+                        arriveTime: v.arriveTime,
+                        plan: v.plan,
+                        hospitalAddress: v.hospitalAddress,
+                    }),
+                );
+            }
             return {
                 ok: true,
                 code: data.code,
                 id: data.id,
                 matchingMode: "legacy_auto",
+                ...(consent ? { consent } : {}),
             };
         }
         if (error?.code === "23505") continue; // 예약번호 중복 → 재생성

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { useRouter } from "next/navigation";
 import {
@@ -38,9 +38,12 @@ function statusBadge(status: CustomerReservation["status"]) {
 export function MatchingReservationView({
     reservation,
     applicants,
+    notice,
 }: {
     reservation: CustomerReservation;
     applicants: ReservationApplicant[];
+    /** 예약 요약 카드 아래에 보여줄 안내(예: 이용자 본인 동의 대기) */
+    notice?: ReactNode;
 }) {
     const router = useRouter();
     const [selected, setSelected] = useState<ReservationApplicant | null>(null);
@@ -136,6 +139,8 @@ export function MatchingReservationView({
                     </div>
                 )}
             </div>
+
+            {notice}
 
             {/* 파트너 선택 / 확정 결과 */}
             <div className="mt-5">
