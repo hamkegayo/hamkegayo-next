@@ -79,7 +79,7 @@ export default async function MypageHome() {
                                             <p className="text-muted-foreground mt-1 text-sm font-semibold break-keep">
                                                 이용자 본인이 동의하면 파트너
                                                 매칭이 시작돼요 · 서비스 시작
-                                                시각까지 동의가 없으면 자동
+                                                예정시각까지 동의가 없으면 자동
                                                 취소돼요
                                             </p>
                                         ) : m.directPhase ? (

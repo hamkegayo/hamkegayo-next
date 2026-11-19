@@ -139,7 +139,7 @@ export function ReservationDetailView({ r }: { r: ReservationDetailView }) {
                                     <p className="text-description-foreground mt-2 text-sm leading-relaxed break-keep">
                                         서비스 시작 예정시각까지 이용자 본인의
                                         동의가 완료되지 않아 자동으로
-                                        취소되었습니다. 결제 전 예약이라 청구된
+                                        취소되었습니다. 결제 전 예약이라 결제된
                                         금액은 없습니다. 다시 예약하실 때는
                                         이용자 본인이 미리 동의할 수 있게 링크를
                                         전달해 주세요.

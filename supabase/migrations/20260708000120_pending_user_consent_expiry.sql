@@ -82,7 +82,7 @@ begin
                 else '서비스 시작 시각이 지나 예약이 취소되었어요'
            end,
            case when e.cancel_reason = 'USER_CONSENT_EXPIRED'
-                then '서비스 시작 예정시각까지 이용자 본인의 동의가 완료되지 않아 예약이 자동으로 취소되었습니다. 결제 전 예약이라 청구된 금액은 없습니다.'
+                then '서비스 시작 예정시각까지 이용자 본인의 동의가 완료되지 않아 예약이 자동으로 취소되었습니다. 결제 전 예약이라 결제된 금액은 없습니다.'
                 else '파트너가 정해지지 않은 채 서비스 시작 예정시각이 지나 예약이 자동으로 취소되었습니다.'
            end,
            '/mypage/reservations/' || e.id::text
@@ -97,3 +97,35 @@ $$;
 
 comment on function public.expire_past_matchings() is
   '파트너 미정(결제 전) 상태로 서비스 시작 예정시각(arrive_time)이 지난 매칭을 취소하고 이용자에게 알린다. 본인 동의 대기(PENDING_USER) 건은 USER_CONSENT_EXPIRED 로 구분하고 미사용 동의 토큰을 폐기한다 (#310).';
+
+-- =============================================================
+-- 동의 링크 상태 — 예약이 끝났으면 CLOSED 를 먼저 돌려준다 (#310 리뷰)
+--
+--  119 의 판정 순서는 USED → REVOKED → LOCKED → EXPIRED → CLOSED 였다.
+--  위 정리가 토큰에 revoked_at 을 남기면 본인이 링크를 열었을 때 "새 링크로 교체되었습니다"
+--  가 보이고, 폐기하지 않아도 토큰은 서비스 시작 전에 만료되므로 "다시 보내 달라고 요청"
+--  하라는 EXPIRED 가 보였다. 둘 다 취소된 예약에는 맞지 않는 안내다.
+--  예약이 MATCHING 이 아니면(취소·확정·완료) USED 다음으로 CLOSED 를 돌려준다.
+--  MATCHING 예약의 판정 순서는 그대로다.
+-- =============================================================
+create or replace function public.get_user_consent_token_state(p_token_hash text)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_tok public.reservation_consent_tokens;
+  v_res public.reservations;
+begin
+  select * into v_tok from public.reservation_consent_tokens where token_hash = p_token_hash;
+  if not found then return 'NOT_FOUND'; end if;
+  select * into v_res from public.reservations where id = v_tok.reservation_id;
+  if v_tok.used_at is not null or v_res.user_consent_status = 'CONFIRMED' then return 'USED'; end if;
+  if v_res.status <> 'MATCHING'::public.reservation_status then return 'CLOSED'; end if;
+  if v_tok.revoked_at is not null then return 'REVOKED'; end if;
+  if v_tok.locked_at is not null then return 'LOCKED'; end if;
+  if v_tok.expires_at <= now() then return 'EXPIRED'; end if;
+  return 'VALID';
+end;
+$$;

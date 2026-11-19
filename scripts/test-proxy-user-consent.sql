@@ -537,6 +537,9 @@ select pg_temp.assert(
     where token_hash = encode(sha256('tok-exp'::bytea), 'hex')),
   '정리된 예약의 미사용 동의 토큰은 폐기됨');
 select pg_temp.assert(
+  public.get_user_consent_token_state(encode(sha256('tok-exp'::bytea), 'hex')) = 'CLOSED',
+  '정리된 예약의 링크는 REVOKED·EXPIRED 가 아니라 CLOSED(취소·마감 안내)로 보임');
+select pg_temp.assert(
   (select count(*) = 1 from public.notifications
     where link = '/mypage/reservations/00000306-0000-4000-8000-0000000000e1'
       and recipient_id = '00000306-0000-4000-8000-000000000001'
