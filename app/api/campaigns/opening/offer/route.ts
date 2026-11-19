@@ -19,17 +19,21 @@ export async function GET(request: NextRequest) {
         p_reservation_id: id,
     });
     // 미등록이어도 소진/중지 상태는 표시하되 AVAILABLE로 결제 가능하다고 안내하지 않는다.
-    const offer = error
-        ? { eligible: false, state: "HIDDEN", discount: 0 }
-        : registered
-          ? data
-          : {
-                ...data,
-                eligible: false,
-                state: ["AVAILABLE", "HELD"].includes(data?.state)
-                    ? "PAUSED"
-                    : data?.state,
-            };
+    if (error) {
+        return NextResponse.json(
+            { eligible: false, state: "HIDDEN", discount: 0, failed: true },
+            { status: 500, headers: { "Cache-Control": "no-store" } },
+        );
+    }
+    const offer = registered
+        ? data
+        : {
+              ...data,
+              eligible: false,
+              state: ["AVAILABLE", "HELD"].includes(data?.state)
+                  ? "PAUSED"
+                  : data?.state,
+          };
     return NextResponse.json(offer, {
         headers: { "Cache-Control": "no-store" },
     });

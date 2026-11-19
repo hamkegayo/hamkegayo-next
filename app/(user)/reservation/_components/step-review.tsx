@@ -24,6 +24,9 @@ import {
     type TransportCode,
 } from "@/lib/handover";
 import { StepBand, StepNav } from "./step-band";
+import type { OpeningCoupon } from "@/lib/opening-coupon";
+import { OPENING_EVENT_CAPACITY } from "@/lib/opening-event";
+import { couponDiscountFor, useCouponStatus } from "@/lib/opening-coupon-offer";
 
 /**
  * STEP4 · 신청 내역 확인.
@@ -59,6 +62,41 @@ function Readonly({ label, value }: { label: string; value?: string }) {
     );
 }
 
+/**
+ * "쿠폰 적용 시 예상" 줄 (#282). 기존 예상 결제 금액은 그대로 두고 별도로만 보여준다.
+ * AVAILABLE 일 때만 보이며 확정이 아니다.
+ */
+export function CouponEstimateRow({
+    status,
+    plan,
+    amount,
+}: {
+    status: OpeningCoupon;
+    plan: "basic" | "plus" | "";
+    amount: number | null;
+}) {
+    if (status.state !== "AVAILABLE" || amount === null) return null;
+    const discount = couponDiscountFor(status, plan);
+    if (discount <= 0) return null;
+    return (
+        <div className="border-brand/30 bg-brand/5 rounded-lg border px-3 py-2.5 text-sm">
+            <div className="flex items-center justify-between">
+                <span className="text-brand font-semibold">
+                    쿠폰 적용 시 예상
+                </span>
+                <span className="text-brand text-lg font-extrabold">
+                    {Math.max(amount - discount, 0).toLocaleString()}원
+                </span>
+            </div>
+            <p className="text-description-foreground mt-1 text-xs leading-relaxed">
+                쿠폰 {discount.toLocaleString()}원 적용 가정이며 확정이
+                아닙니다. 결제 완료·예약 확정 선착순 {OPENING_EVENT_CAPACITY}
+                명에게 적용되고, 결제 단계에서 적용 여부를 선택합니다.
+            </p>
+        </div>
+    );
+}
+
 export function StepReview() {
     const { data, patch, next, prev, goStep } = useReservationStore();
     // 신규 방식(#300)이면 파트너 지원 대기 없이 바로 결제로 간다. 실제 방식은 서버가 정해 응답에 담는다.
@@ -73,6 +111,7 @@ export function StepReview() {
 
     // 예상비용 — 공휴일 판정이 서버에서만 가능해 서버 액션으로 받아온다(#46).
     const [quote, setQuote] = useState<ReservationQuote | null>(null);
+    const couponStatus = useCouponStatus();
     const { plan: planCode, useDate, duration } = data;
 
     useEffect(() => {
@@ -379,6 +418,12 @@ export function StepReview() {
                                             : "-"}
                                     </span>
                                 </div>
+
+                                <CouponEstimateRow
+                                    status={couponStatus}
+                                    plan={data.plan}
+                                    amount={quote ? quote.amount : null}
+                                />
 
                                 <p className="text-description-foreground text-xs leading-relaxed">
                                     시간당 {plan.price.toLocaleString()}원 ·
