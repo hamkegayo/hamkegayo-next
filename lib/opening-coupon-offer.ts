@@ -12,11 +12,19 @@ export type OpeningCouponOffer = {
     state: OpeningCouponState;
     /** 행사 종료 여부. 서버가 알려준 경우에만 true 로 들어간다. */
     ended?: boolean;
+    /** 일시적 조회 오류 여부. true 이면 미대상(HIDDEN) 안내를 노출하지 않는다. */
+    failed?: boolean;
 };
 export const EMPTY_COUPON_OFFER: OpeningCouponOffer = {
     eligible: false,
     discount: 0,
     state: "HIDDEN",
+};
+export const FAILED_COUPON_OFFER: OpeningCouponOffer = {
+    eligible: false,
+    discount: 0,
+    state: "HIDDEN",
+    failed: true,
 };
 
 export function parseCouponOffer(value: unknown): OpeningCouponOffer {
@@ -34,6 +42,7 @@ export function parseCouponOffer(value: unknown): OpeningCouponOffer {
         discount: Number.isInteger(discount) && discount > 0 ? discount : 0,
         state,
         ...(offer.ended === true ? { ended: true } : {}),
+        ...(offer.failed === true ? { failed: true } : {}),
     };
 }
 
@@ -122,10 +131,14 @@ export async function loadCouponOffer(
         cache: "no-store",
         signal,
     }).catch(() => null);
-    const response = await fetch(
-        `/api/campaigns/opening/offer?rid=${encodeURIComponent(reservationId)}`,
-        { cache: "no-store", signal },
-    );
-    if (!response.ok) return EMPTY_COUPON_OFFER;
-    return parseCouponOffer(await response.json());
+    try {
+        const response = await fetch(
+            `/api/campaigns/opening/offer?rid=${encodeURIComponent(reservationId)}`,
+            { cache: "no-store", signal },
+        );
+        if (!response.ok) return FAILED_COUPON_OFFER;
+        return parseCouponOffer(await response.json());
+    } catch {
+        return FAILED_COUPON_OFFER;
+    }
 }

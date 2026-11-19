@@ -21,6 +21,7 @@ import { OPENING_COUPON_MESSAGES } from "@/lib/opening-coupon";
 import { StepBand } from "./step-band";
 import {
     EMPTY_COUPON_OFFER,
+    FAILED_COUPON_OFFER,
     loadCouponOffer,
     type OpeningCouponOffer,
 } from "@/lib/opening-coupon-offer";
@@ -97,7 +98,7 @@ export function PaymentCouponSection({
     onCheckedChange: (checked: boolean) => void;
     gross: number;
 }) {
-    if (!loaded) return null;
+    if (!loaded || offer.failed) return null;
     if (!offer.eligible) {
         if (offer.state === "HIDDEN" && offer.ended) return null;
         return (
@@ -141,10 +142,15 @@ export function PaymentCouponSection({
                 />
                 <span className="leading-snug">
                     쿠폰함의 오픈 이벤트 쿠폰 적용 (
-                    {offer.discount.toLocaleString()}원){" "}
-                    <span className="text-brand font-semibold">
-                        · 이번 예약에 사용
-                    </span>
+                    {offer.discount.toLocaleString()}원)
+                    {checked && (
+                        <>
+                            {" "}
+                            <span className="text-brand font-semibold">
+                                · 이번 예약에 사용
+                            </span>
+                        </>
+                    )}
                 </span>
             </label>
             <p className="mt-1.5 font-semibold text-red-600 dark:text-red-400">
@@ -155,8 +161,18 @@ export function PaymentCouponSection({
                     <dt>적용 전 금액</dt>
                     <dd>{gross.toLocaleString()}원</dd>
                 </div>
-                <div className="text-brand flex justify-between font-bold">
-                    <dt>적용 후 결제 금액</dt>
+                <div
+                    className={
+                        checked
+                            ? "text-brand flex justify-between font-bold"
+                            : "text-muted-foreground flex justify-between font-medium"
+                    }
+                >
+                    <dt>
+                        {checked
+                            ? "적용 후 결제 금액"
+                            : "쿠폰 적용 시 결제 금액"}
+                    </dt>
                     <dd>{after.toLocaleString()}원</dd>
                 </div>
             </dl>
@@ -211,26 +227,40 @@ export function StepPayment() {
     const { data, patch, goStep } = useReservationStore();
     const plan = PLAN_INFO[data.plan || "basic"];
 
-    const [eventOffer, setEventOffer] =
+    const [eventOfferState, setEventOffer] =
         useState<OpeningCouponOffer>(EMPTY_COUPON_OFFER);
-    const [useOpeningEvent, setUseOpeningEvent] = useState(false);
-    // 조회가 끝나기 전에는 안내를 그리지 않는다(깜빡임 방지).
-    const [couponLoaded, setCouponLoaded] = useState(false);
+    const [useOpeningEventState, setUseOpeningEvent] = useState(false);
+    // 조회가 끝난 예약 ID 를 기록해, 예약 ID 변경 시 동기 setState 없이 즉시 미로딩·미적용으로 파생한다 (#301 리뷰).
+    const [loadedReservationId, setLoadedReservationId] = useState<
+        string | null
+    >(null);
+    const couponLoaded = Boolean(
+        data.reservationId && loadedReservationId === data.reservationId,
+    );
+    const eventOffer = couponLoaded ? eventOfferState : EMPTY_COUPON_OFFER;
+    const useOpeningEvent = couponLoaded && useOpeningEventState;
     // 사용자가 직접 바꾼 뒤에는 기본값 ON 이 덮어쓰지 않는다.
     const couponTouchedRef = useRef(false);
     useEffect(() => {
         let cancelled = false;
-        if (!data.reservationId) return;
-        void loadCouponOffer(data.reservationId)
+        const rid = data.reservationId;
+        couponTouchedRef.current = false;
+        if (!rid) return;
+        void loadCouponOffer(rid)
             .then((offer) => {
                 if (cancelled) return;
                 setEventOffer(offer);
-                if (offer.eligible && !couponTouchedRef.current)
-                    setUseOpeningEvent(true);
+                if (!offer.eligible) setUseOpeningEvent(false);
+                else if (!couponTouchedRef.current) setUseOpeningEvent(true);
             })
-            .catch(() => {})
+            .catch(() => {
+                if (!cancelled) {
+                    setEventOffer(FAILED_COUPON_OFFER);
+                    setUseOpeningEvent(false);
+                }
+            })
             .finally(() => {
-                if (!cancelled) setCouponLoaded(true);
+                if (!cancelled) setLoadedReservationId(rid);
             });
         return () => {
             cancelled = true;
@@ -312,16 +342,16 @@ export function StepPayment() {
                     // 해제 상태를 유지한다 — 재조회 결과가 다시 켜지 않도록 touched 로 표시.
                     couponTouchedRef.current = true;
                     setUseOpeningEvent(false);
-                    setCouponLoaded(false);
+                    setLoadedReservationId(null);
                     setEventOffer(EMPTY_COUPON_OFFER);
                     try {
                         setEventOffer(
                             await loadCouponOffer(data.reservationId),
                         );
                     } catch {
-                        /* 체크는 해제한 상태로 재시도 가능 */
+                        setEventOffer(FAILED_COUPON_OFFER);
                     }
-                    setCouponLoaded(true);
+                    setLoadedReservationId(data.reservationId);
                 }
                 // 결제창이 열리지 않았으니 다시 시도·이전 단계 이동이 가능해야 한다 (#259)
                 setSubmitting(false);
@@ -547,6 +577,12 @@ export function StepPayment() {
                                 1P = 1원. 결제 금액 전액을 포인트로 결제할 수는
                                 없습니다.
                             </p>
+                            {useOpeningEvent && (
+                                <p className="text-brand mt-1.5 text-xs font-medium">
+                                    오픈 이벤트 쿠폰 적용 중에는 포인트를 함께
+                                    사용할 수 없습니다.
+                                </p>
+                            )}
                         </div>
                     )}
 

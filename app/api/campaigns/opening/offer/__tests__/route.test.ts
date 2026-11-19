@@ -55,3 +55,18 @@ it("registered email returns the trusted offer", async () => {
         discount: 25000,
     });
 });
+it("rpc error returns 500 with failed flag so UI does not show HIDDEN notice", async () => {
+    mock.register.mockResolvedValue("registered");
+    mock.rpc.mockResolvedValue({
+        data: null,
+        error: { message: "db error" },
+    });
+    const res = await GET(request);
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({
+        eligible: false,
+        state: "HIDDEN",
+        discount: 0,
+        failed: true,
+    });
+});

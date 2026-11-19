@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
     EMPTY_COUPON_OFFER,
+    FAILED_COUPON_OFFER,
     HIDDEN_COUPON_STATUS,
     couponDiscountFor,
     loadCouponStatus,
@@ -88,10 +89,14 @@ describe("coupon review regressions", () => {
             discount: 25000,
         });
     });
-    it("failed offer clears eligibility", async () => {
+    it("failed offer clears eligibility and marks failed", async () => {
         vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
         expect(await loadCouponOffer("reservation")).toEqual(
-            EMPTY_COUPON_OFFER,
+            FAILED_COUPON_OFFER,
+        );
+        vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("net")));
+        expect(await loadCouponOffer("reservation")).toEqual(
+            FAILED_COUPON_OFFER,
         );
     });
 });

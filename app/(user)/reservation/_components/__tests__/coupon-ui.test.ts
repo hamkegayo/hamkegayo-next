@@ -138,10 +138,23 @@ describe("7번 결제 단계 쿠폰 영역", () => {
         expect(out).toContain("적용 후 결제 금액");
         expect(out).toContain("20,000원");
     });
-    it("체크를 해제하면 해제 상태로 그려진다", () => {
-        expect(section({ offer: ELIGIBLE, checked: false })).toContain(
-            'aria-checked="false"',
-        );
+    it("체크를 해제하면 해제 상태로 그려지고 라벨·금액 표현이 구분된다", () => {
+        const out = section({ offer: ELIGIBLE, checked: false });
+        expect(out).toContain('aria-checked="false"');
+        expect(out).not.toContain("이번 예약에 사용");
+        expect(out).toContain("쿠폰 적용 시 결제 금액");
+    });
+    it("조회 오류(failed)면 미대상 안내를 숨긴다", () => {
+        expect(
+            section({
+                offer: {
+                    eligible: false,
+                    discount: 0,
+                    state: "HIDDEN",
+                    failed: true,
+                },
+            }),
+        ).toBe("");
     });
     it("미대상자(HIDDEN)에게 안내와 쿠폰함·이벤트 링크를 보여준다", () => {
         const out = section({
