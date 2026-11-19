@@ -492,4 +492,69 @@ select pg_temp.assert(
      from public.reservations where id = '00000306-0000-4000-8000-0000000000c2'),
   '파기 후 proxy_reason_detail 은 비워지고 분류 코드·동의 이력은 유지됨(체크 제약 통과)');
 
+-- =============================================================
+-- Case 8: 서비스 시작 시각이 지난 본인 동의 대기 예약 자동 정리 (#310)
+--   e1 시작 시각 경과 + PENDING_USER  → CANCELLED / USER_CONSENT_EXPIRED, 토큰 폐기, 전용 안내
+--   e2 시작 시각 전   + PENDING_USER  → 그대로
+--   e3 시작 시각 경과 + 본인 동의 완료(CONFIRMED) → 기존과 같이 EXPIRED
+-- =============================================================
+select pg_temp.ins('00000306-0000-4000-8000-0000000000e1', 'T306-EXP-PENDING', '부모', 'USER_DIRECT', 'PENDING_USER',
+  null, null, false, now());
+select pg_temp.ins('00000306-0000-4000-8000-0000000000e2', 'T306-FUT-PENDING', '부모', 'USER_DIRECT', 'PENDING_USER',
+  null, null, false, now());
+select pg_temp.ins('00000306-0000-4000-8000-0000000000e3', 'T306-EXP-CONFIRMED', '부모', 'USER_DIRECT', 'CONFIRMED',
+  null, null, false, now(), now(), null, now(), '2026-09-06');
+update public.reservations
+   set use_date = (now() at time zone 'Asia/Seoul')::date - 1
+ where id in ('00000306-0000-4000-8000-0000000000e1', '00000306-0000-4000-8000-0000000000e3');
+insert into public.reservation_consent_tokens (reservation_id, token_hash, expires_at)
+values ('00000306-0000-4000-8000-0000000000e1', encode(sha256('tok-exp'::bytea), 'hex'), now() - interval '1 hour');
+
+create function pg_temp.consent_evidence(p_id uuid) returns jsonb
+language sql as $$
+  select to_jsonb(x) from (
+    select user_consent_mode, user_consent_status, user_consent_requested_at, user_consent_confirmed_at,
+         user_consent_channel, proxy_reason_code, proxy_reason_detail, proxy_authority_confirmed_at,
+         proxy_authority_version, share_medical_info,
+         pre_matching_health_consented_at, pre_matching_health_consent_version
+      from public.reservations where id = p_id
+  ) x
+$$;
+create temp table before_e1 as
+  select pg_temp.consent_evidence('00000306-0000-4000-8000-0000000000e1') as ev;
+
+select public.expire_past_matchings();
+
+select pg_temp.assert(
+  (select status = 'CANCELLED' and cancel_reason = 'USER_CONSENT_EXPIRED' and cancelled_at is not null
+     from public.reservations where id = '00000306-0000-4000-8000-0000000000e1'),
+  '시작 시각이 지난 PENDING_USER 예약은 USER_CONSENT_EXPIRED 로 취소됨');
+select pg_temp.assert(
+  pg_temp.consent_evidence('00000306-0000-4000-8000-0000000000e1') = (select ev from before_e1),
+  '정리 시 동의 증거 컬럼은 바뀌지 않음');
+select pg_temp.assert(
+  (select revoked_at is not null from public.reservation_consent_tokens
+    where token_hash = encode(sha256('tok-exp'::bytea), 'hex')),
+  '정리된 예약의 미사용 동의 토큰은 폐기됨');
+select pg_temp.assert(
+  (select count(*) = 1 from public.notifications
+    where link = '/mypage/reservations/00000306-0000-4000-8000-0000000000e1'
+      and recipient_id = '00000306-0000-4000-8000-000000000001'
+      and type = 'RESERVATION_CANCELLED'
+      and title = '이용자 본인 동의가 없어 예약이 취소되었어요'),
+  '예약자에게 본인 동의 미완료 사유로 안내함');
+select pg_temp.assert(
+  (select status = 'MATCHING' and cancel_reason is null and user_consent_status = 'PENDING_USER'
+     from public.reservations where id = '00000306-0000-4000-8000-0000000000e2'),
+  '시작 시각 전의 PENDING_USER 예약은 영향 없음');
+select pg_temp.assert(
+  (select status = 'CANCELLED' and cancel_reason = 'EXPIRED'
+     from public.reservations where id = '00000306-0000-4000-8000-0000000000e3'),
+  '동의 완료 예약은 기존과 같이 EXPIRED 로 만료됨(회귀)');
+select pg_temp.assert(
+  (select count(*) = 1 from public.notifications
+    where link = '/mypage/reservations/00000306-0000-4000-8000-0000000000e3'
+      and title = '서비스 시작 시각이 지나 예약이 취소되었어요'),
+  '동의 완료 예약은 기존 만료 문구로 안내함(회귀)');
+
 rollback;
