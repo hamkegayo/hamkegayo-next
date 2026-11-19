@@ -8,6 +8,7 @@ import {
     CUSTOMER_CENTER_TEL_HREF,
     DIRECT_CANCEL_NOTICE,
 } from "@/lib/direct-flow-copy";
+import { PhoneContactLink } from "@/components/contact/phone-contact-link";
 import {
     DIRECT_PHASE_LABEL,
     canCancelBeforeAssignment,
@@ -158,13 +159,13 @@ export function DirectReservationPanel({
             )}
 
             {(phase === "REFUND_DELAYED" || phase === "REFUND_IN_PROGRESS") && (
-                <a
+                <PhoneContactLink
                     href={CUSTOMER_CENTER_TEL_HREF}
                     className="border-border bg-background text-foreground hover:bg-muted mt-4 flex items-center justify-center gap-2 rounded-lg border px-6 py-3 text-sm font-bold transition-colors"
                 >
                     <Phone className="size-4" />
                     {CUSTOMER_CENTER_CALL_LABEL}
-                </a>
+                </PhoneContactLink>
             )}
         </div>
     );

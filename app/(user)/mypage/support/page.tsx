@@ -6,6 +6,7 @@ import { ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { COMPANY } from "@/lib/legal/company";
+import { PhoneContactLink } from "@/components/contact/phone-contact-link";
 
 /**
  * 고객센터 연락처 (#60).
@@ -146,7 +147,15 @@ export default function MypageSupport() {
                                 <span className="text-muted-foreground font-medium">
                                     {c.label}:{" "}
                                 </span>
-                                {c.href ? (
+                                {c.href?.startsWith("tel:") ? (
+                                    // PC 에서는 번호·QR·카카오톡 안내 모달을 연다 (#304)
+                                    <PhoneContactLink
+                                        href={c.href}
+                                        className="text-foreground hover:text-brand font-bold"
+                                    >
+                                        {c.value}
+                                    </PhoneContactLink>
+                                ) : c.href ? (
                                     <a
                                         href={c.href}
                                         className="text-foreground hover:text-brand font-bold"

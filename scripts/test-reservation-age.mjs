@@ -58,7 +58,7 @@ const validReservation = {
     userPhone: "010-1111-2222",
     guardianName: "보호자",
     guardianPhone: "010-3333-4444",
-    relation: "가족",
+    relation: "본인",
     treatment: "진료",
     purpose: "외래 진료",
     mobilityStatus: "INDEPENDENT",

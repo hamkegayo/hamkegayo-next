@@ -11,6 +11,7 @@ import { ConsentBanner } from "@/components/analytics/consent-banner";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { InstallTracker } from "@/components/pwa/install-tracker";
 import { InstallSheetHost } from "@/components/pwa/install-entry";
+import { PhoneContactModalHost } from "@/components/contact/phone-contact-modal";
 import { PwaDebug } from "@/components/pwa/pwa-debug";
 import { CAPTURE_SCRIPT } from "@/lib/pwa/install-event";
 import { HOME_TITLE, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/seo";
@@ -95,6 +96,8 @@ export default function RootLayout({
                 <InstallTracker />
                 {/* 메뉴의 "앱 설치하기"(#139)가 여는 안내 시트 — 드로어 밖에 둔다 */}
                 <InstallSheetHost />
+                {/* PC 에서 고객센터 전화 버튼이 여는 안내 모달(#304) — 한 번만 마운트한다 */}
+                <PhoneContactModalHost />
                 {/* 실기기 설치 진단 — ?pwa-debug=1 일 때만 보인다 */}
                 <PwaDebug />
             </body>

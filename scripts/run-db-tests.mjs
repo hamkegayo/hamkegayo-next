@@ -153,6 +153,10 @@ export const SUITES = [
         [sql("test-withdrawn-social-release.sql")],
     ],
     [
+        "운영자 회원 탈퇴 · 활성 관리자/MFA(is_admin_live) · 정확 일치 조회 · 연결 해제 동시 파기 · 거절 시 롤백 (#293)",
+        [sql("test-admin-member-withdrawal.sql")],
+    ],
+    [
         "선결제 후 운영자 직접 배정 · 매칭 대기 · 배정/재배정 · 전액 환불 · 동시성 (#300)",
         [
             sql("test-direct-assignment.sql"),

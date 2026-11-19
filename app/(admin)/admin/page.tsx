@@ -56,6 +56,8 @@ const ACTION_LABEL: Record<string, string> = {
     PARTNER_ACCOUNT_ISSUE: "파트너 계정 발급",
     SOCIAL_UNLINK_LIST: "카카오 연결 해제 목록 조회",
     SOCIAL_UNLINK_RESOLVE: "카카오 연결 해제 처리",
+    MEMBER_WITHDRAWAL_LOOKUP: "운영자 탈퇴 대상 회원 조회",
+    ADMIN_MEMBER_WITHDRAW: "운영자 회원 탈퇴 처리",
 };
 
 function formatAt(iso: string): string {
@@ -238,6 +240,12 @@ export default async function AdminHome() {
                 className="text-brand ml-5 font-semibold underline"
             >
                 후기 공개 관리
+            </Link>
+            <Link
+                href="/admin/withdrawals"
+                className="text-brand ml-5 font-semibold underline"
+            >
+                운영자 회원 탈퇴
             </Link>
             <div className="mt-6 inline-flex items-center gap-5">
                 <Link

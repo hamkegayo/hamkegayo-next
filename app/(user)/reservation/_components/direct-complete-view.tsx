@@ -7,6 +7,7 @@ import {
     CUSTOMER_CENTER_TEL_HREF,
     DIRECT_COMPLETE_PARAGRAPHS,
 } from "@/lib/direct-flow-copy";
+import { PhoneContactLink } from "@/components/contact/phone-contact-link";
 import { StepBand } from "./step-band";
 import { UrgentCallNotice } from "./urgent-call-notice";
 
@@ -68,13 +69,13 @@ export function DirectCompleteView({
                                 <p key={text}>{text}</p>
                             ))}
                         </div>
-                        <a
+                        <PhoneContactLink
                             href={CUSTOMER_CENTER_TEL_HREF}
                             className="bg-brand text-brand-foreground hover:bg-brand/90 mt-5 flex items-center justify-center gap-2 rounded-lg px-6 py-3.5 text-sm font-bold transition-colors"
                         >
                             <Phone className="size-4" />
                             {CUSTOMER_CENTER_CALL_LABEL}
-                        </a>
+                        </PhoneContactLink>
                     </div>
 
                     <div className="mt-4">
