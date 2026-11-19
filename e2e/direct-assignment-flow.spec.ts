@@ -81,7 +81,7 @@ async function fillReservationAndSubmit(
     await page.locator("#userPhone").fill("010-2222-3333");
     await page.locator("#guardianName").fill("김보호");
     await page.locator("#guardianPhone").fill("010-4444-5555");
-    await page.locator("#relation").selectOption("자녀");
+    await page.locator("#relation").selectOption("본인");
     await page.locator("#treatment").fill("정기 진료");
     await page.locator("#purpose").fill("정기 검진");
     await page.locator("#mobilityStatus").selectOption({ index: 1 });

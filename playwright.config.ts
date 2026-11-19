@@ -8,7 +8,9 @@ import { defineConfig, devices } from "@playwright/test";
  * `npm run test:e2e` 가 두 번을 모두 돌린다 (scripts/run-e2e.mjs).
  */
 export const DIRECT_FLOW = process.env.E2E_DIRECT_FLOW === "1";
-const PORT = DIRECT_FLOW ? 3101 : 3100;
+// 다른 워크트리의 개발 서버가 같은 포트를 쓰고 있으면 reuseExistingServer 가 그 서버(다른 코드)를 재사용한다.
+// 그럴 때는 E2E_PORT 로 포트를 바꿔 이 워크트리 코드를 직접 띄운다.
+const PORT = Number(process.env.E2E_PORT) || (DIRECT_FLOW ? 3101 : 3100);
 const BASE_URL = `http://localhost:${PORT}`;
 const CI = !!process.env.CI;
 

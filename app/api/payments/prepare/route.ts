@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     const { data: reservation, error: readError } = await admin
         .from("reservations")
         .select(
-            "id, code, customer_id, status, plan, duration_minutes, surcharge_rate, fee_rate, prepaid_amount, confirmed_partner_id, payment_deadline, use_date, matching_mode, paid_at",
+            "id, code, customer_id, status, plan, duration_minutes, surcharge_rate, fee_rate, prepaid_amount, confirmed_partner_id, payment_deadline, use_date, matching_mode, paid_at, user_consent_status",
         )
         .eq("id", reservationId)
         .maybeSingle();
@@ -125,6 +125,17 @@ export async function POST(request: NextRequest) {
     if (reservation.status !== "MATCHING") {
         return NextResponse.json(
             { error: "결제할 수 있는 상태가 아닙니다.", code: "NOT_MATCHING" },
+            { status: 409 },
+        );
+    }
+
+    // 처리방침 제10조 ①② — 이용자 본인 동의 전에는 결제를 받지 않는다 (DB 트리거도 결제 완료 기록을 막는다).
+    if (reservation.user_consent_status === "PENDING_USER") {
+        return NextResponse.json(
+            {
+                error: "이용자 본인의 동의가 확인된 뒤에 결제할 수 있습니다.",
+                code: "CONSENT_PENDING",
+            },
             { status: 409 },
         );
     }

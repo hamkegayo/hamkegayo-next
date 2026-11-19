@@ -15,6 +15,7 @@ import { StepHospitalInfo } from "./step-hospital-info";
 import { StepServiceSelect } from "./step-service-select";
 import { StepReview } from "./step-review";
 import { StepMatching } from "./step-matching";
+import { StepConsentPending } from "./step-consent-pending";
 import { StepPartnerSelect } from "./step-partner-select";
 import { StepPayment } from "./step-payment";
 import { StepComplete } from "./step-complete";
@@ -23,6 +24,8 @@ import { StepComplete } from "./step-complete";
 export function ReservationFlow() {
     const step = useReservationStore((s) => s.step);
     const introConfirmed = useReservationStore((s) => s.introConfirmed);
+    // 처리방침 제10조 — 이용자 본인 동의 대기 중이면 5단계 자리에 동의 안내 화면을 둔다 (#306)
+    const consentStatus = useReservationStore((s) => s.data.consentStatus);
     const router = useRouter();
     const params = useSearchParams();
 
@@ -185,7 +188,12 @@ export function ReservationFlow() {
             {step === 2 && <StepHospitalInfo />}
             {step === 3 && <StepServiceSelect />}
             {step === 4 && <StepReview />}
-            {step === 5 && <StepMatching />}
+            {step === 5 &&
+                (consentStatus === "PENDING_USER" ? (
+                    <StepConsentPending />
+                ) : (
+                    <StepMatching />
+                ))}
             {step === 6 && <StepPartnerSelect />}
             {step === 7 && <StepPayment />}
             {step === 8 && <StepComplete />}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AutoRefresh } from "@/components/auto-refresh";
+import { createClient } from "@/utils/supabase/server";
 import {
     getCustomerReservation,
     getDirectRefundState,
@@ -10,6 +11,7 @@ import { directPhase } from "@/lib/direct-reservation-status";
 import { DirectReservationView } from "./direct-reservation-view";
 import { getReservationDetail } from "../../_lib/detail.server";
 import { MatchingReservationView } from "./matching-reservation-view";
+import { ConsentPendingBanner } from "./consent-pending-banner";
 import { ReservationDetailView } from "./reservation-detail-view";
 
 function NotFound() {
@@ -41,6 +43,18 @@ export default async function ReservationDetailPage({
         return <NotFound />;
     }
 
+    // 처리방침 제10조 ①② — 이용자 본인 동의 대기 중이면 안내와 링크 재발급을 함께 보여준다 (#306).
+    let consentPending = false;
+    if (reservation.status === "MATCHING") {
+        const supabase = await createClient();
+        const { data: consent } = await supabase
+            .from("reservations")
+            .select("user_consent_status")
+            .eq("id", id)
+            .maybeSingle();
+        consentPending = consent?.user_consent_status === "PENDING_USER";
+    }
+
     // 신규 방식(#300): 결제 전·매칭 대기·취소/환불 진행은 전용 화면에서 보여준다.
     // 확정 이후와 환불 이력이 없는 취소는 기존 상세를 그대로 쓴다.
     if (reservation.matchingMode === "admin_direct") {
@@ -54,6 +68,11 @@ export default async function ReservationDetailPage({
                     <AutoRefresh />
                     <DirectReservationView
                         reservation={reservation}
+                        notice={
+                            consentPending ? (
+                                <ConsentPendingBanner reservationId={id} />
+                            ) : undefined
+                        }
                         phase={directPhase({
                             status: reservation.status,
                             paidAt: reservation.paidAt,
@@ -73,6 +92,11 @@ export default async function ReservationDetailPage({
             <MatchingReservationView
                 reservation={reservation}
                 applicants={applicants}
+                notice={
+                    consentPending ? (
+                        <ConsentPendingBanner reservationId={id} />
+                    ) : undefined
+                }
             />
         );
     }

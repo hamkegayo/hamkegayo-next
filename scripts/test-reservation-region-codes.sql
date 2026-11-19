@@ -22,7 +22,7 @@ insert into auth.users(id, email, raw_app_meta_data) values
 insert into public.profiles(id, name, role) values
 ('00000226-0000-4000-8000-000000000101', 'Region Code Owner', 'USER');
 insert into public.reservations(id, code, customer_id, plan, patient_name, patient_birth, patient_gender, patient_phone, guardian_name, guardian_phone, relation, treatment, purpose, use_date, arrive_time, reserve_time, duration, duration_minutes, depart_address, hospital_address, depart_region_code, hospital_region_code)
-values ('00000226-0000-4000-8000-000000000102', 'TEST-REGION-226', '00000226-0000-4000-8000-000000000101', 'basic', 'Test', '1960-01-01', 'female', '01000000000', 'Test', '01000000000', 'self', 'Test', 'Test', '2099-01-01', '09:00', '09:00', '2시간', 120,
+values ('00000226-0000-4000-8000-000000000102', 'TEST-REGION-226', '00000226-0000-4000-8000-000000000101', 'basic', 'Test', '1960-01-01', 'female', '01000000000', 'Test', '01000000000', '본인', 'Test', 'Test', '2099-01-01', '09:00', '09:00', '2시간', 120,
   '강원특별자치도 원주시 서원대로 33 101동', '서울특별시 송파구 올림픽로43길 88', '5113011000', '1171010300');
 
 select pg_temp.assert((select depart_region_code = '5113011000' and hospital_region_code = '1171010300' from public.reservations where id = '00000226-0000-4000-8000-000000000102'), 'searched address codes stored');
@@ -44,7 +44,7 @@ reset role;
 select pg_temp.assert((select depart_region_code = '5113025021' and hospital_region_code = '1171010300' from public.reservations where id = '00000226-0000-4000-8000-000000000102'), 'customer update cannot change region codes');
 set local role authenticated;
 insert into public.reservations(id, code, customer_id, plan, patient_name, patient_birth, patient_gender, patient_phone, guardian_name, guardian_phone, relation, treatment, purpose, use_date, arrive_time, reserve_time, duration, duration_minutes, depart_address, hospital_address, depart_region_code, hospital_region_code)
-values ('00000226-0000-4000-8000-000000000103', 'TEST-REGION-226-B', '00000226-0000-4000-8000-000000000101', 'basic', 'Test', '1960-01-01', 'female', '01000000000', 'Test', '01000000000', 'self', 'Test', 'Test', '2099-01-01', '09:00', '09:00', '2시간', 120,
+values ('00000226-0000-4000-8000-000000000103', 'TEST-REGION-226-B', '00000226-0000-4000-8000-000000000101', 'basic', 'Test', '1960-01-01', 'female', '01000000000', 'Test', '01000000000', '본인', 'Test', 'Test', '2099-01-01', '09:00', '09:00', '2시간', 120,
   '서울특별시 강남구 테헤란로 1', '서울특별시 강남구 테헤란로 1', '5113011000', '5113011000');
 reset role;
 select pg_temp.assert((select depart_region_code is null and hospital_region_code is null from public.reservations where id = '00000226-0000-4000-8000-000000000103'), 'customer insert cannot set region codes');

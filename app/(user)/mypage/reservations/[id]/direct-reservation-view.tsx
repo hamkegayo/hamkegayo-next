@@ -20,10 +20,12 @@ export function DirectReservationView({
     reservation,
     phase,
     refundReason,
+    notice,
 }: {
     reservation: CustomerReservation;
     phase: DirectPhase;
     refundReason: RefundReason | null;
+    notice?: React.ReactNode;
 }) {
     const router = useRouter();
     const [cancelOpen, setCancelOpen] = useState(false);
@@ -77,6 +79,7 @@ export function DirectReservationView({
                 resumeHref={`/reservation?pay=resume&rid=${reservation.id}`}
                 onCancelClick={() => setCancelOpen(true)}
                 onBack={() => router.push("/mypage")}
+                notice={notice}
             />
 
             <ConfirmModal

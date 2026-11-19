@@ -179,6 +179,10 @@ export const SUITES = [
         "매칭 전 건강정보 제공 별도 동의 · 미동의 노출 차단 · 불변성 (#285)",
         [sql("test-pre-matching-health-consent.sql")],
     ],
+    [
+        "대리 예약 이용자 본인 동의 · 대리 동의 사유·권한 · 매칭 차단 · 토큰 검증 (#306)",
+        [sql("test-proxy-user-consent.sql")],
+    ],
     // ⚠️ test:nicepay · test:payapi 는 넣지 않는다. NICEPAY 샌드박스 실호출이라
     //    외부 장애가 CI 실패로 둔갑한다 (테스트 가이드 3. 외부 연동 — https://app.notion.com/p/3f1169f76f9f819ca52ef036622c3fc1).
 ];

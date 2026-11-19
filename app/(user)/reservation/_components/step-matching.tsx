@@ -212,6 +212,14 @@ export function StepMatching() {
                             </div>
                         </div>
 
+                        {data.consentMode === "GUARDIAN_PROXY" && (
+                            <p className="text-description-foreground mt-4 text-sm leading-relaxed">
+                                보호자 대리 동의로 접수된 예약입니다. 진료
+                                내용은 이용자 본인이 동의하기 전까지 보호자에게
+                                전달되지 않습니다.
+                            </p>
+                        )}
+
                         {/* 통계 2칸 */}
                         <div className="mt-6 grid grid-cols-2 gap-3">
                             {[

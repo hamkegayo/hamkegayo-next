@@ -150,9 +150,19 @@ export function StepReview() {
                 reservationCode: res.code,
                 reservationId: res.id,
                 matchingMode: res.matchingMode,
+                consentStatus: res.consent ? "PENDING_USER" : "",
+                consentLink: res.consent?.link ?? "",
+                consentExpiresAt: res.consent?.expiresAt ?? "",
             });
             // 서버가 성공을 반환한 직후에만 예약 신청 완료 이벤트 전송
             if (data.plan) trackReservationComplete(data.plan, quote?.amount);
+
+            // 처리방침 제10조 ①② — 이용자 본인 동의 대기: 동의 링크 안내 화면으로 간다(5단계 자리).
+            // 동의가 끝나면 그 화면이 기존 흐름(매칭 또는 결제)으로 이어 준다.
+            if (res.consent) {
+                goStep(5);
+                return;
+            }
 
             if (res.matchingMode === "admin_direct") {
                 // 결제 화면이 쓰는 선결제 금액·포인트 잔액을 서버 값으로 채우고 바로 결제(STEP7)로 간다.
@@ -344,12 +354,27 @@ export function StepReview() {
                                     ]
                                 }
                             />
-                            <Readonly
-                                label="진료정보 보호자 전달"
-                                value={
-                                    data.shareMedicalInfo ? "동의" : "미동의"
-                                }
-                            />
+                            {data.consentMode === "USER_DIRECT" ? (
+                                <Readonly
+                                    label="이용자 본인 동의"
+                                    value="예약 후 동의 링크로 이용자 본인이 직접 진행 (동의 전까지 매칭 대기)"
+                                />
+                            ) : (
+                                <Readonly
+                                    label="진료정보 보호자 전달"
+                                    value={
+                                        data.shareMedicalInfo
+                                            ? "동의"
+                                            : "미동의"
+                                    }
+                                />
+                            )}
+                            {data.consentMode === "GUARDIAN_PROXY" && (
+                                <Readonly
+                                    label="보호자 대리 동의"
+                                    value="사유·대리 권한 확인 완료"
+                                />
+                            )}
                         </div>
                     </div>
 

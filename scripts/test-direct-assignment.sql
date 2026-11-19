@@ -35,7 +35,7 @@ begin
     guardian_name, guardian_phone, relation, treatment, purpose, use_date, arrive_time, reserve_time, duration,
     duration_minutes, depart_address, hospital_address, matching_mode, prepaid_amount, fee_rate)
   values (v_id, 'T300-'||p_n, p_customer, 'basic', 'Test', '1960-01-01', 'female', '01000000000', 'Test', '01000000000',
-    'self', 'Test', 'Test', v_kst::date, to_char(v_kst, 'HH24:MI'), to_char(v_kst, 'HH24:MI'), '2시간',
+    '본인', 'Test', 'Test', v_kst::date, to_char(v_kst, 'HH24:MI'), to_char(v_kst, 'HH24:MI'), '2시간',
     p_duration, 'Test', 'Test', p_mode, 40000, 0.2);
   return v_id;
 end $$;
@@ -111,7 +111,7 @@ insert into public.reservations(id, code, customer_id, plan, patient_name, patie
   guardian_name, guardian_phone, relation, treatment, purpose, use_date, arrive_time, reserve_time, duration, duration_minutes, depart_address,
   hospital_address, matching_mode, paid_at)
 values ('00000300-0001-4000-8000-000000000020', 'T300-20', '00000300-0000-4000-8000-000000000002', 'basic', 'T', '1960-01-01',
-  'female', '01000000000', 'T', '01000000000', 'self', 'T', 'T', '2099-01-01', '09:00', '09:00', '2시간', 120, 'T', 'T', 'admin_direct', now());
+  'female', '01000000000', 'T', '01000000000', '본인', 'T', 'T', '2099-01-01', '09:00', '09:00', '2시간', 120, 'T', 'T', 'admin_direct', now());
 select pg_temp.assert((select matching_mode from public.reservations where code = 'T300-20') = 'legacy_auto'
   and (select paid_at from public.reservations where code = 'T300-20') is null, 'customer insert cannot spoof admin_direct/paid_at');
 select pg_temp.denied($q$update public.reservations set paid_at = now() where code = 'T300-10'$q$, 'customer cannot set paid_at');
