@@ -36,12 +36,28 @@ const ACTION_LABEL: Record<string, string> = {
     CAMPAIGN_STATUS: "이벤트 상태 변경",
     TRANSFER_RESULT_RECORD: "은행 지급 결과 기록",
     TRANSFER_RESULT_VIEW: "은행 지급 결과 조회",
+    RESERVATION_WAITING_LIST: "매칭 대기 예약 목록 조회",
+    RESERVATION_CONFIRMED_LIST: "배정 완료 예약 목록 조회",
+    RESERVATION_DIRECT_VIEW: "직접 배정 예약 상세 조회",
+    RESERVATION_PARTNER_CANDIDATES: "배정 후보 조회",
+    RESERVATION_ASSIGN: "파트너 배정",
+    RESERVATION_REASSIGN: "파트너 재배정",
+    RESERVATION_INTAKE_ACK: "신규 접수 확인",
+    RESERVATION_INTAKE_RESEND: "신규 접수 알림 재발송",
+    RESERVATION_MATCH_FAILED: "매칭 실패 처리",
+    RESERVATION_FAILURE_NOTICE: "매칭 실패 고객 안내 기록",
+    RESERVATION_REFUND_ISSUES: "환불·안내 추적 목록 조회",
+    RESERVATION_REFUND_RETRY: "환불 재시도",
+    RESERVATION_REFUND_PG_CONFIRMED: "PG 취소 수동 확인",
+    RESERVATION_CUSTOMER_NOTICE: "확정 안내 문자 완료 기록",
     PAYMENT_INCIDENT_LIST: "결제 사고 목록 조회",
     PAYMENT_INCIDENT_STATUS: "결제 사고 상태 변경",
     PAYMENT_INCIDENT_CONTACT: "결제 사고 고객 안내 기록",
     PARTNER_ACCOUNT_ISSUE: "파트너 계정 발급",
     SOCIAL_UNLINK_LIST: "카카오 연결 해제 목록 조회",
     SOCIAL_UNLINK_RESOLVE: "카카오 연결 해제 처리",
+    MEMBER_WITHDRAWAL_LOOKUP: "운영자 탈퇴 대상 회원 조회",
+    ADMIN_MEMBER_WITHDRAW: "운영자 회원 탈퇴 처리",
 };
 
 function formatAt(iso: string): string {
@@ -68,7 +84,7 @@ export default async function AdminHome() {
             icon: ScrollText,
             label: "예약",
             value: overview.reservationCount,
-            href: null,
+            href: "/admin/reservations",
         },
         {
             icon: AlertTriangle,
@@ -224,6 +240,12 @@ export default async function AdminHome() {
                 className="text-brand ml-5 font-semibold underline"
             >
                 후기 공개 관리
+            </Link>
+            <Link
+                href="/admin/withdrawals"
+                className="text-brand ml-5 font-semibold underline"
+            >
+                운영자 회원 탈퇴
             </Link>
             <div className="mt-6 inline-flex items-center gap-5">
                 <Link

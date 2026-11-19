@@ -29,6 +29,8 @@ export type ReservationData = {
     purpose: string;
     mobilityStatus: string;
     cognitiveStatus: string;
+    /** 매칭 전 파트너에게 거동·인지 상태(민감정보) 제공 별도 동의 (#285) */
+    agreePreMatchingHealth: boolean;
     cautions: string;
     docPrescription: boolean;
     docReceipt: boolean;
@@ -36,6 +38,12 @@ export type ReservationData = {
     otherRequests: string;
     notifyTarget: string;
     shareMedicalInfo: boolean;
+    // STEP1 · 대리 예약 동의 방식 (처리방침 제10조, #306). 관계가 "본인"이면 쓰지 않는다.
+    /** USER_DIRECT 이용자 본인 직접 동의(원칙) / GUARDIAN_PROXY 보호자 대리 동의(예외) */
+    consentMode: "" | "USER_DIRECT" | "GUARDIAN_PROXY";
+    proxyReasonCode: string;
+    proxyReasonDetail: string;
+    proxyAuthorityPledge: boolean;
     // STEP2 · 병원 및 일정 정보
     useDate: string;
     arriveTime: string;
@@ -83,6 +91,17 @@ export type ReservationData = {
     prepaidAmount: number;
     /** STEP7 · 사용 가능한 포인트 잔액 */
     pointBalance: number;
+    /**
+     * 처리 방식 (#300). 서버가 예약 등록 때 정해 돌려준 값이다.
+     *  admin_direct — 파트너 지원·선택 없이 바로 결제 → 매칭 대기(운영자 배정)
+     *  legacy_auto  — 기존 흐름(지원 대기 → 고객 선택 → 결제 → 확정)
+     */
+    matchingMode: "legacy_auto" | "admin_direct";
+    /** 예약 등록 후 이용자 본인 동의 상태. PENDING_USER 면 동의 대기 화면을 보여준다 (#306) */
+    consentStatus: "" | "PENDING_USER" | "CONFIRMED";
+    /** 이번 세션에서 발급한 본인 동의 링크. 서버에는 해시만 있어 새로고침하면 재발급이 필요하다 */
+    consentLink: string;
+    consentExpiresAt: string;
 };
 
 const initialData: ReservationData = {
@@ -97,6 +116,8 @@ const initialData: ReservationData = {
     purpose: "",
     mobilityStatus: "",
     cognitiveStatus: "",
+    // Opt-in 원칙: 민감정보(거동·인지 상태) 매칭 전 파트너 제공은 별도 동의가 필요하다 (#285).
+    agreePreMatchingHealth: false,
     cautions: "",
     docPrescription: false,
     docReceipt: false,
@@ -106,6 +127,10 @@ const initialData: ReservationData = {
     // Opt-in 이 원칙이다. 진료정보는 민감정보라 기본 동의로 두면 이용자가
     // 인지하지 못한 채 보호자에게 전달될 수 있다 (2026-09-05 기획 확정).
     shareMedicalInfo: false,
+    consentMode: "",
+    proxyReasonCode: "",
+    proxyReasonDetail: "",
+    proxyAuthorityPledge: false,
     useDate: "",
     arriveTime: "",
     reserveTime: "",
@@ -136,6 +161,10 @@ const initialData: ReservationData = {
     paymentDeadline: "",
     prepaidAmount: 0,
     pointBalance: 0,
+    matchingMode: "legacy_auto",
+    consentStatus: "",
+    consentLink: "",
+    consentExpiresAt: "",
 };
 
 type ReservationState = {

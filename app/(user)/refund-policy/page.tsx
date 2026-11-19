@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { Section } from "@/app/(user)/_components/home/section";
 import { ArticleBody } from "@/components/legal/legal-document";
+import { PhoneContactLink } from "@/components/contact/phone-contact-link";
 import { COMPANY } from "@/lib/legal/company";
 import { TERMS, termsArticle } from "@/lib/legal/terms";
 import { POINT_RESTORE_NOTE, REFUND_METHOD_NOTE } from "@/lib/legal/refund";
@@ -127,12 +128,12 @@ export default function RefundPolicyPage() {
                             고객센터
                         </dt>
                         <dd>
-                            <a
+                            <PhoneContactLink
                                 href={`tel:${COMPANY.tel}`}
                                 className="hover:text-brand underline-offset-4 hover:underline"
                             >
                                 {COMPANY.tel}
-                            </a>
+                            </PhoneContactLink>
                             <span className="ml-2">({COMPANY.hours})</span>
                         </dd>
                     </div>

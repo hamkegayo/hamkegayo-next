@@ -13,6 +13,12 @@ import {
     SERVICE_HOURS,
 } from "@/lib/service-hours";
 import { parseDurationMinutes } from "@/lib/pricing";
+import {
+    isSelfRelation,
+    PROXY_REASON_CODES,
+    PROXY_REASON_DETAIL_MAX,
+    PROXY_REASON_DETAIL_MIN,
+} from "@/lib/proxy-consent";
 import { isPastSlot, MIN_LEAD_MINUTES, reservationStartAt } from "./options";
 
 const required = "필수 입력 항목입니다.";
@@ -36,11 +42,26 @@ export const step1Schema = z.object({
     relation: z.string().min(1, "관계를 선택해 주세요."),
     treatment: z.string().min(1, required),
     purpose: z.string().min(1, required),
-    // 거동·인지 상태의 매칭 전 제공에는 별도 동의가 필요하다 (처리방침 제5조 ② [단계 1]·④⑥).
-    // 이 필수 입력 검증은 제3자 제공 동의 수집·접근 게이트를 구현하지 않는다.
+    // 처리방침 제3조 ② · 제5조 ② [단계 1]·④⑥ — 거동·인지 상태는 아래 agreePreMatchingHealth
+    // 별도 동의를 받은 경우에만 매칭 전(단계 1) 파트너에게 제공된다 (#285).
     // 파트너가 수행 가능 여부를 판단하는 근거라 필수로 받는다.
     mobilityStatus: z.string().min(1, "거동 상태를 선택해 주세요."),
     cognitiveStatus: z.string().min(1, "인지 상태를 선택해 주세요."),
+    // 처리방침 제3조 ② · 제5조 ② [단계 1]·④⑥ — 거동·인지 상태의 매칭 전 파트너 제공 별도 동의.
+    // 본인 예약·보호자 대리 동의에서는 필수이고(아래 checkConsentMode), 이용자 본인 직접 동의에서는
+    // 이용자가 동의 링크에서 직접 하므로 이 화면에서 받지 않는다 (처리방침 제10조 ①②, #306).
+    agreePreMatchingHealth: z.boolean(),
+    // 처리방침 제10조 — 본인이 아닌 관계(대리 예약)는 동의 방식을 골라야 한다.
+    //   USER_DIRECT    원칙: 이용자 본인이 링크에서 직접 동의 (제10조 ①②)
+    //   GUARDIAN_PROXY 예외: 직접 동의가 불가능할 때만 보호자 대리 동의 (제10조 ③)
+    // 화면 스토어의 미선택 값("")을 그대로 받는다. 검증은 checkConsentMode 가 한다.
+    consentMode: z
+        .enum(["USER_DIRECT", "GUARDIAN_PROXY"])
+        .or(z.literal(""))
+        .optional(),
+    proxyReasonCode: z.enum(PROXY_REASON_CODES).or(z.literal("")).optional(),
+    proxyReasonDetail: z.string().max(PROXY_REASON_DETAIL_MAX).optional(),
+    proxyAuthorityPledge: z.boolean().optional(),
     cautions: z.string().optional(),
     docPrescription: z.boolean().optional(),
     docReceipt: z.boolean().optional(),
@@ -55,6 +76,81 @@ export const step1Schema = z.object({
     // 매뉴얼 10단계·대응카드 16 이 이 값을 전달 근거로 삼는다.
     shareMedicalInfo: z.boolean(),
 });
+
+const PRE_MATCHING_HEALTH_REQUIRED =
+    "거동·인지 상태의 매칭 전 파트너 제공에 동의하지 않으면 예약할 수 없습니다.";
+
+/**
+ * 본인·대리 예약에 따른 동의 규칙 (처리방침 제10조 ①-④, #306).
+ *
+ *  - 관계가 "본인"이면 기존 흐름 그대로 거동·인지 상태 제공 동의(#285)를 이 화면에서 받는다.
+ *  - 그 밖의 관계는 이용자 본인 직접 동의(원칙) 또는 보호자 대리 동의(예외)를 골라야 한다.
+ *  - 본인 직접 동의: 거동·인지 상태 제공 동의와 진료 내용 전달 동의는 이용자 본인이 동의 링크에서 한다.
+ *  - 보호자 대리 동의: 사유 분류·상세·대리 권한 확인 서약이 필수이고, 거동·인지 상태 제공 동의를 함께 받는다.
+ */
+function checkConsentMode(
+    v: {
+        relation: string;
+        agreePreMatchingHealth: boolean;
+        consentMode?: "USER_DIRECT" | "GUARDIAN_PROXY" | "";
+        proxyReasonCode?: string;
+        proxyReasonDetail?: string;
+        proxyAuthorityPledge?: boolean;
+    },
+    ctx: z.RefinementCtx,
+) {
+    const needsHealthConsent = () => {
+        if (v.agreePreMatchingHealth !== true) {
+            ctx.addIssue({
+                code: "custom",
+                path: ["agreePreMatchingHealth"],
+                message: PRE_MATCHING_HEALTH_REQUIRED,
+            });
+        }
+    };
+
+    if (isSelfRelation(v.relation)) {
+        needsHealthConsent();
+        return;
+    }
+
+    if (!v.consentMode) {
+        ctx.addIssue({
+            code: "custom",
+            path: ["consentMode"],
+            message: "동의 방식을 선택해 주세요.",
+        });
+        return;
+    }
+    if (v.consentMode === "USER_DIRECT") return;
+
+    needsHealthConsent();
+    if (!v.proxyReasonCode) {
+        ctx.addIssue({
+            code: "custom",
+            path: ["proxyReasonCode"],
+            message: "대리 동의가 필요한 사유를 선택해 주세요.",
+        });
+    }
+    const detail = v.proxyReasonDetail?.trim() ?? "";
+    if (detail.length < PROXY_REASON_DETAIL_MIN) {
+        ctx.addIssue({
+            code: "custom",
+            path: ["proxyReasonDetail"],
+            message: `사유를 ${PROXY_REASON_DETAIL_MIN}자 이상 구체적으로 적어 주세요.`,
+        });
+    }
+    if (v.proxyAuthorityPledge !== true) {
+        ctx.addIssue({
+            code: "custom",
+            path: ["proxyAuthorityPledge"],
+            message: "대리 권한 확인에 동의해 주세요.",
+        });
+    }
+}
+
+/** STEP1 폼·서버 공통 검증 (본인/대리 예약 동의 규칙 포함) */
+export const step1Form = step1Schema.superRefine(checkConsentMode);
 
 /** STEP2 · 병원 및 일정 정보 */
 export const step2Schema = z.object({
@@ -263,6 +359,8 @@ export const reservationServerSchema = step1Schema
     .superRefine(requireHandover)
     .superRefine(checkSchedule)
     // 화면을 우회한 직접 요청도 미성년 이용자 예약을 만들 수 없다.
-    .superRefine(checkPatientAge);
+    .superRefine(checkPatientAge)
+    // 화면을 우회한 직접 요청도 대리 예약의 동의 방식·사유·권한 확인을 건너뛸 수 없다 (제10조).
+    .superRefine(checkConsentMode);
 
 export type ReservationInput = z.infer<typeof reservationServerSchema>;

@@ -9,6 +9,8 @@ import {
     isBeyondAdvanceReservationWindow,
 } from "@/lib/reservation-window";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { isAdminDirect } from "@/lib/direct-assignment";
+import { scheduleIntakeDispatch } from "@/lib/intake-notification.server";
 
 /**
  * 선결제 승인 (#53) — NICEPAY 결제창이 인증 결과를 POST 하는 지점이다.
@@ -23,6 +25,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
  *    ④ 예약일·상태 재확인    60일 초과·만료·선택 해제면 승인하지 않는다
  *    ⑤ PG 승인               ← 여기서 돈이 빠진다
  *    ⑥ finalize_payment()    PAID 전이 + 예약 확정을 한 트랜잭션에
+ *                            (신규 방식 #300 은 확정이 아니라 매칭 대기 + 운영자 접수 행 기록)
  *    ⑦ 실패 시 승인 취소 + 포인트 복원
  *
  *  브라우저가 POST 로 이동해 오므로 응답은 JSON 이 아니라 **redirect** 다.
@@ -121,7 +124,7 @@ export async function POST(request: NextRequest) {
     const { data: payment } = await admin
         .from("payments")
         .select(
-            "id, reservation_id, type, status, gross_amount, discount_amount, campaign_discount_amount, token_expires_at, reservations!inner(id, code, status, confirmed_partner_id, payment_deadline, use_date)",
+            "id, reservation_id, type, status, gross_amount, discount_amount, campaign_discount_amount, token_expires_at, reservations!inner(id, code, status, confirmed_partner_id, payment_deadline, use_date, matching_mode, paid_at)",
         )
         .eq("order_id", auth.orderId)
         .maybeSingle();
@@ -147,11 +150,16 @@ export async function POST(request: NextRequest) {
         confirmed_partner_id: string | null;
         payment_deadline: string | null;
         use_date: string;
+        matching_mode?: string | null;
+        paid_at?: string | null;
     };
 
     // 추가결제(#75)는 이미 확정된 예약에 붙는 청구다. 예약 상태 검증(④)과
     // 확정(⑥)이 적용되지 않으므로 여기서 갈라 둔다.
     const isExtension = payment.type === "EXTENSION";
+    // 신규 방식(#300): 파트너 선택 없이 결제하고, 승인·저장 후 확정이 아니라 매칭 대기가 된다.
+    // 예약의 matching_mode 가 정한다 — 플래그를 바꿔도 이미 만든 예약은 자기 방식을 따른다.
+    const direct = !isExtension && isAdminDirect(reservation.matching_mode);
     if (isExtension) {
         const exception = await admin
             .from("services")
@@ -177,6 +185,8 @@ export async function POST(request: NextRequest) {
 
     // 이미 승인이 끝난 결제 — 새로고침이나 중복 전송이다. 완료 화면으로 보낸다.
     if (payment.status === "PAID") {
+        // 재콜백 — 접수 알림이 아직 안 나갔다면 이어서 보낸다(큐가 중복 발송을 막는다).
+        if (direct) scheduleIntakeDispatch();
         return isExtension
             ? extensionResult(request, {
                   status: "done",
@@ -228,17 +238,23 @@ export async function POST(request: NextRequest) {
 
     //  추가결제는 링크 토큰의 유효기간으로 대신한다. 예약은 이미 확정됐고
     //  파트너 선택이 풀리는 일도 없다.
-    const expired = isExtension
-        ? payment.token_expires_at != null &&
-          new Date(payment.token_expires_at).getTime() <= Date.now()
-        : reservation.payment_deadline != null &&
-          new Date(reservation.payment_deadline).getTime() <= Date.now();
+    //  신규 방식은 "선택 후 30분" 기한이 없다. 결제창 기한(+10분)이 지나도 결제 자체는 막지 않고,
+    //  취소·이미 결제된 예약만 걸러낸다(쿠폰 확보 만료는 확정 트리거가 따로 검사한다).
+    const expired = direct
+        ? false
+        : isExtension
+          ? payment.token_expires_at != null &&
+            new Date(payment.token_expires_at).getTime() <= Date.now()
+          : reservation.payment_deadline != null &&
+            new Date(reservation.payment_deadline).getTime() <= Date.now();
 
     if (
         expired ||
         (!isExtension &&
             (reservation.status !== "MATCHING" ||
-                !reservation.confirmed_partner_id))
+                (direct
+                    ? reservation.paid_at != null
+                    : !reservation.confirmed_partner_id)))
     ) {
         // 정상 흐름이다(사용자가 늦었거나 선택이 풀렸다). 사고가 아니므로 로그만 남긴다.
         console.warn(
@@ -409,6 +425,13 @@ export async function POST(request: NextRequest) {
             status: "done",
             code: reservation.code,
         });
+    }
+
+    if (direct) {
+        // 신규 방식 — 확정이 아니라 매칭 대기다. 파트너에게는 알리지 않고(배정 시점에 알린다)
+        // 운영자 접수 알림을 즉시 시도한다. 접수 행은 finalize_payment 가 이미 같은 트랜잭션에 남겼다.
+        scheduleIntakeDispatch();
+        return redirectTo(request, { pay: "done", rid });
     }
 
     // 확정됐으니 파트너에게 알린다 — 선택 시점이 아니라 결제 완료 시점이다(제9조 ④).

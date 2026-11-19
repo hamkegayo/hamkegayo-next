@@ -152,6 +152,17 @@ export const SUITES = [
         "탈퇴 회원 소셜 연결 해제 · 탈퇴 회원만 · 이메일 연결 유지 (#293)",
         [sql("test-withdrawn-social-release.sql")],
     ],
+    [
+        "운영자 회원 탈퇴 · 활성 관리자/MFA(is_admin_live) · 정확 일치 조회 · 연결 해제 동시 파기 · 거절 시 롤백 (#293)",
+        [sql("test-admin-member-withdrawal.sql")],
+    ],
+    [
+        "선결제 후 운영자 직접 배정 · 매칭 대기 · 배정/재배정 · 전액 환불 · 동시성 (#300)",
+        [
+            sql("test-direct-assignment.sql"),
+            node("test-direct-assignment-concurrency.mjs"),
+        ],
+    ],
     ["정산 계좌 열람 통제 (#51)", [npm("test:payout")]],
     [
         "이메일 인증 연락처 변경 · 목적/대상/일회 소비 (#64)",
@@ -164,6 +175,14 @@ export const SUITES = [
     ["비밀번호 재설정·세션 실효 (#127)", [npm("test:reset")]],
     // 개정 고지: 약관 제4조 ③ · 처리방침 게시본(2026-09-06) 제16조 ② / Notion 원문(2026-09-10) 제16조 ③.
     ["약관 재동의 안내·중복 방지 (#91)", [npm("test:reconsent")]],
+    [
+        "매칭 전 건강정보 제공 별도 동의 · 미동의 노출 차단 · 불변성 (#285)",
+        [sql("test-pre-matching-health-consent.sql")],
+    ],
+    [
+        "대리 예약 이용자 본인 동의 · 대리 동의 사유·권한 · 매칭 차단 · 토큰 검증 (#306)",
+        [sql("test-proxy-user-consent.sql")],
+    ],
     // ⚠️ test:nicepay · test:payapi 는 넣지 않는다. NICEPAY 샌드박스 실호출이라
     //    외부 장애가 CI 실패로 둔갑한다 (테스트 가이드 3. 외부 연동 — https://app.notion.com/p/3f1169f76f9f819ca52ef036622c3fc1).
 ];

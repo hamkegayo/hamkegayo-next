@@ -3,9 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getAdminReservationForIncident } from "../../payments/_lib/payment-incidents.server";
+import {
+    getAssignablePartners,
+    getDirectReservation,
+} from "../_lib/direct-reservations.server";
+import { DirectDetailView } from "./direct-detail-view";
 
 export const metadata: Metadata = {
-    title: "결제 사고 관련 예약",
+    title: "예약 상세",
     robots: { index: false, follow: false },
 };
 
@@ -20,6 +25,20 @@ export default async function AdminReservationIncidentPage({
         params,
         searchParams,
     ]);
+    // 결제 사고 링크(?incident=)는 기존 열람 화면을 그대로 쓴다. 그 밖(알림 메일 링크 등)은 운영 상세다.
+    if (!incident) {
+        const { detail, loadError } = await getDirectReservation(id);
+        if (loadError)
+            return (
+                <p role="alert" className="text-sm font-bold text-red-600">
+                    예약을 불러오지 못했습니다. 관리자 권한·2단계 인증을
+                    확인하고 다시 시도해 주세요.
+                </p>
+            );
+        if (!detail) notFound();
+        const partners = await getAssignablePartners(id);
+        return <DirectDetailView detail={detail} partners={partners} />;
+    }
     const reservation = await getAdminReservationForIncident(id, incident);
     if (!reservation) notFound();
 

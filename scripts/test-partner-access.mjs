@@ -18,6 +18,7 @@
 //
 // 멱등: code 가 TEST-66 으로 시작하는 예약과 전용 테스트 파트너만 지운다.
 
+import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -142,6 +143,8 @@ async function seedReservation(customerId, code, extra = {}) {
             hospital_name: "테스트정형외과",
             mobility_status: "부축 필요",
             cognitive_status: "의사소통 원활",
+            pre_matching_health_consented_at: new Date().toISOString(),
+            pre_matching_health_consent_version: "2026-09-06",
             // 수행 조건 (#77). 이동 3종은 단계 1 에 나가고,
             // 인계자는 제3자 개인정보라 확정 후에만 나가야 한다.
             transport_to: "TAXI",
@@ -334,6 +337,142 @@ async function main() {
         "거동·인지 상태는 제공됨 (처리방침 제5조 ② [단계 1]·④)",
         row?.mobility_status === "부축 필요" &&
             row?.cognitive_status === "의사소통 원활",
+    );
+
+    // #285: 별도 동의가 없는 예약은 단계 1 목록·상세에서 거동·인지 상태가 null 이어야 한다.
+    const unconsentedId = await seedReservation(
+        customer.id,
+        `${CODE_PREFIX}-NOCONSENT`,
+        {
+            pre_matching_health_consented_at: null,
+            pre_matching_health_consent_version: null,
+        },
+    );
+    const unconsentedList = await partnerClient.rpc(
+        "partner_list_open_reservations",
+        { p_limit: 100 },
+    );
+    const unconsentedListRow = (unconsentedList.data ?? []).find(
+        (r) => r.id === unconsentedId,
+    );
+    const unconsentedDetail = await partnerClient.rpc(
+        "partner_get_open_reservation",
+        { p_id: unconsentedId },
+    );
+    const unconsentedDetailRow = unconsentedDetail.data?.[0];
+    check(
+        "별도 동의 없는 예약은 목록·상세 모두 거동·인지 상태가 null임 (#285)",
+        !unconsentedList.error &&
+            !!unconsentedListRow &&
+            unconsentedListRow.mobility_status === null &&
+            unconsentedListRow.cognitive_status === null &&
+            !unconsentedDetail.error &&
+            !!unconsentedDetailRow &&
+            unconsentedDetailRow.mobility_status === null &&
+            unconsentedDetailRow.cognitive_status === null,
+        unconsentedList.error?.message ?? unconsentedDetail.error?.message,
+    );
+
+    // #306: 대리 예약의 이용자 본인 동의 대기(처리방침 제10조 ①②) 건은 단계 1 목록·상세·일치 여부에서 빠지고,
+    // 지원도 막힌다. 본인 동의가 확정되면(서버 전용 RPC) 거동·인지 상태와 함께 다시 보인다.
+    const pendingId = await seedReservation(
+        customer.id,
+        `${CODE_PREFIX}-PENDINGUSER`,
+        {
+            user_consent_mode: "USER_DIRECT",
+            user_consent_status: "PENDING_USER",
+            user_consent_requested_at: new Date().toISOString(),
+            pre_matching_health_consented_at: null,
+            pre_matching_health_consent_version: null,
+            share_medical_info: false,
+        },
+    );
+    const pendingList = await partnerClient.rpc(
+        "partner_list_open_reservations",
+        { p_limit: 200 },
+    );
+    check(
+        "본인 동의 대기 예약은 파트너 목록에 없음 (제10조 ①②, #306)",
+        !pendingList.error &&
+            !(pendingList.data ?? []).some((r) => r.id === pendingId),
+        pendingList.error?.message,
+    );
+    const pendingDetail = await partnerClient.rpc(
+        "partner_get_open_reservation",
+        { p_id: pendingId },
+    );
+    check(
+        "본인 동의 대기 예약 상세는 거절됨",
+        !!pendingDetail.error && pendingDetail.error.code === "42501",
+        pendingDetail.error?.message,
+    );
+    const pendingMatch = await partnerClient.rpc(
+        "partner_open_reservation_matches",
+        { p_ids: [pendingId] },
+    );
+    check(
+        "본인 동의 대기 예약은 일치 여부 조회에도 없음",
+        !pendingMatch.error && (pendingMatch.data ?? []).length === 0,
+        pendingMatch.error?.message,
+    );
+    const pendingApply = await partnerClient
+        .from("reservation_applications")
+        .insert({
+            reservation_id: pendingId,
+            partner_id: partner.id,
+            status: "ACCEPTED",
+        });
+    check(
+        "본인 동의 대기 예약에는 파트너가 지원할 수 없음",
+        !!pendingApply.error,
+        pendingApply.error?.message,
+    );
+    const pendingNotify = await admin.rpc("notify_partners_new_request", {
+        p_reservation: pendingId,
+        p_day_kind: "WEEKDAY",
+        p_title: "t",
+        p_body: "b",
+    });
+    check(
+        "본인 동의 대기 예약은 새 요청 알림 대상이 아님",
+        !pendingNotify.error && (pendingNotify.data ?? []).length === 0,
+        pendingNotify.error?.message,
+    );
+
+    // 본인 동의 확정(service_role 전용 RPC) 후에는 목록·상세에 거동·인지 상태가 함께 보인다.
+    const tokenHash = createHash("sha256")
+        .update(`${CODE_PREFIX}-token`)
+        .digest("hex");
+    await admin.from("reservation_consent_tokens").insert({
+        reservation_id: pendingId,
+        token_hash: tokenHash,
+        expires_at: new Date(Date.now() + 3600_000).toISOString(),
+    });
+    const submitted = await admin.rpc("submit_user_consent", {
+        p_token_hash: tokenHash,
+        p_birth: "1948-05-11",
+        p_phone_last4: "6666",
+        p_agree_health: true,
+        p_share_medical: false,
+        p_policy_version: "2026-09-06",
+    });
+    check(
+        "본인 확인 후 동의가 확정됨",
+        !submitted.error && submitted.data?.[0]?.result === "OK",
+        submitted.error?.message,
+    );
+    const afterList = await partnerClient.rpc(
+        "partner_list_open_reservations",
+        {
+            p_limit: 200,
+        },
+    );
+    const afterRow = (afterList.data ?? []).find((r) => r.id === pendingId);
+    check(
+        "본인 동의 완료 후에는 목록에 거동·인지 상태와 함께 노출됨",
+        !!afterRow &&
+            afterRow.mobility_status === "부축 필요" &&
+            afterRow.cognitive_status === "의사소통 원활",
     );
 
     // =============================================================

@@ -7,6 +7,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { getConsentedPartnerAvatars } from "@/lib/partner-avatars.server";
 import { kstStamp } from "@/lib/format";
 import type { PartnerDetail } from "@/lib/partner-details";
+import { cancelBeforeAssignment } from "@/lib/payments/direct-refund";
 
 /** DB RPC가 소유권·수락 관계를 검증한 후 공개 필드만 반환한다. */
 export async function getReservationPartnerDetail(
@@ -164,7 +165,8 @@ export async function getReservationApplicantsDetailed(
 }
 
 /** 예약 취소 사유 — DB 의 reservations.cancel_reason 과 같은 값이다. */
-export type CancelReason = "EXPIRED" | "USER" | "REFUND" | "ADMIN" | null;
+export type CancelReason =
+    "EXPIRED" | "USER_CONSENT_EXPIRED" | "USER" | "REFUND" | "ADMIN" | null;
 
 export type MatchingState = {
     /** 예약이 사라졌거나 남의 예약이면 null */
@@ -234,6 +236,25 @@ export async function cancelReservation(
     } = await supabase.auth.getUser();
     if (!user) {
         return { ok: false, message: "로그인이 필요합니다." };
+    }
+
+    // 신규 방식(#300)에서 결제를 마치고 배정을 기다리는 예약은 전액 환불 경로로 취소한다.
+    // 일반 취소 RPC 는 이런 예약을 거절한다(돈을 받은 채 예약만 닫히는 것을 막는다).
+    const { data: current } = await supabase
+        .from("reservations")
+        .select("matching_mode, paid_at")
+        .eq("id", reservationId)
+        .maybeSingle<{ matching_mode: string; paid_at: string | null }>();
+    if (current?.matching_mode === "admin_direct" && current.paid_at) {
+        const result = await cancelBeforeAssignment(supabase, reservationId);
+        if (!result.ok) return { ok: false, message: result.message };
+        if (!result.refund.ok) {
+            // 예약은 닫혔지만 환불은 아직이다. 운영자 추적 목록에 남아 있으므로 안내만 한다.
+            revalidatePath("/mypage");
+            return { ok: false, message: result.refund.message };
+        }
+        revalidatePath("/mypage");
+        return { ok: true };
     }
 
     // 취소 사유(USER)를 함께 남겨야 해서 RPC 로 옮겼다. 직접 update 하면

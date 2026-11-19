@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatUseDate, toHhmm } from "@/lib/format";
 import { useReservationStore, PLAN_INFO } from "../_store/reservation-store";
+import { totalStepsFor } from "../_lib/flow-branch";
 import {
     OPENING_EVENT_CAPACITY,
     OPENING_EVENT_CHANGE_NOTICE,
@@ -19,8 +20,14 @@ import {
 } from "@/lib/opening-event";
 import { OPENING_COUPON_MESSAGES } from "@/lib/opening-coupon";
 import { StepBand } from "./step-band";
+import { UrgentCallNotice } from "./urgent-call-notice";
+import { armDirectPayment } from "../_actions/payment";
+import { DIRECT_CANCEL_NOTICE } from "@/lib/direct-flow-copy";
+import { useRouter } from "next/navigation";
 import {
+    couponIneligibleMessage,
     EMPTY_COUPON_OFFER,
+    FAILED_COUPON_OFFER,
     loadCouponOffer,
     type OpeningCouponOffer,
 } from "@/lib/opening-coupon-offer";
@@ -79,25 +86,202 @@ function OrderRow({ label, value }: { label: string; value: string }) {
     );
 }
 
+/**
+ * 오픈 이벤트 쿠폰 영역 (#282). 조회가 끝난 뒤에만 그린다(로딩 중 깜빡임 방지).
+ *  - 적용 가능: 체크박스(기본 ON) + 적용 전/후 금액 + 복원 불가 안내
+ *  - 그 밖: 상태별 안내. HIDDEN(미대상자)은 종료가 아닐 때 쿠폰함·이벤트 안내 링크를 함께 보여준다.
+ */
+export function PaymentCouponSection({
+    loaded,
+    offer,
+    checked,
+    onCheckedChange,
+    gross,
+}: {
+    loaded: boolean;
+    offer: OpeningCouponOffer;
+    checked: boolean;
+    onCheckedChange: (checked: boolean) => void;
+    gross: number;
+}) {
+    if (!loaded || offer.failed) return null;
+    if (!offer.eligible) {
+        if (offer.state === "HIDDEN" && offer.ended) return null;
+        return (
+            <p
+                role="status"
+                className="text-muted-foreground mt-4 rounded-2xl border p-5 text-sm"
+            >
+                {couponIneligibleMessage(offer) ??
+                    OPENING_COUPON_MESSAGES[offer.state]}{" "}
+                <Link
+                    href="/mypage/coupons"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand underline"
+                >
+                    쿠폰함 보기
+                </Link>
+                {offer.state === "HIDDEN" && (
+                    <>
+                        {" "}
+                        <Link
+                            href="/event/opening"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-brand underline"
+                        >
+                            이벤트 안내 보기
+                        </Link>
+                    </>
+                )}
+            </p>
+        );
+    }
+    const after = Math.max(gross - offer.discount, 0);
+    return (
+        <div className="border-brand bg-brand/5 mt-4 rounded-2xl border p-5 text-sm">
+            <label className="flex cursor-pointer items-start gap-2 font-bold">
+                <Checkbox
+                    checked={checked}
+                    onCheckedChange={(v) => onCheckedChange(v === true)}
+                    className="mt-0.5"
+                />
+                <span className="leading-snug">
+                    쿠폰함의 오픈 이벤트 쿠폰 적용 (
+                    {offer.discount.toLocaleString()}원)
+                    {checked && (
+                        <>
+                            {" "}
+                            <span className="text-brand font-semibold">
+                                · 이번 예약에 사용
+                            </span>
+                        </>
+                    )}
+                </span>
+            </label>
+            <p className="mt-1.5 font-semibold text-red-600 dark:text-red-400">
+                고객 취소·노쇼 시 혜택이 복원되지 않습니다.
+            </p>
+            <dl className="border-brand/15 mt-3 space-y-1.5 border-y py-3">
+                <div className="text-muted-foreground flex justify-between">
+                    <dt>적용 전 금액</dt>
+                    <dd>{gross.toLocaleString()}원</dd>
+                </div>
+                <div
+                    className={
+                        checked
+                            ? "text-brand flex justify-between font-bold"
+                            : "text-muted-foreground flex justify-between font-medium"
+                    }
+                >
+                    <dt>
+                        {checked
+                            ? "적용 후 결제 금액"
+                            : "쿠폰 적용 시 결제 금액"}
+                    </dt>
+                    <dd>{after.toLocaleString()}원</dd>
+                </div>
+            </dl>
+            <p className="text-muted-foreground mt-3 text-xs leading-relaxed">
+                결제 완료·예약 확정 선착순 {OPENING_EVENT_CAPACITY}명 한정 ·
+                보유만으로 혜택이 확보되지 않으며 포인트와 중복 적용되지
+                않습니다.
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <Link
+                    href="/event/opening"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand cursor-pointer underline"
+                >
+                    이벤트 조건·이메일 식별정보 처리 안내 보기 (새 창)
+                </Link>
+                <Link
+                    href="/mypage/coupons"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand underline"
+                >
+                    쿠폰함 보기
+                </Link>
+            </div>
+            <details className="text-muted-foreground mt-3 text-xs">
+                <summary className="hover:text-foreground cursor-pointer font-medium">
+                    적용 조건 및 상세 안내
+                </summary>
+                <div className="mt-2 space-y-2 leading-relaxed">
+                    <p>
+                        쿠폰 보유만으로 혜택이 확보되지는 않습니다.{" "}
+                        {OPENING_EVENT_DEADLINE_LABEL}까지 결제 완료·예약 확정
+                        선착순 {OPENING_EVENT_CAPACITY}명에게 적용합니다. 이
+                        시각까지 결제가 확정되지 않으면 쿠폰이 적용되지
+                        않습니다. 포인트와 중복 적용하지 않습니다.
+                    </p>
+                    <p>{OPENING_EVENT_CHANGE_NOTICE}</p>
+                    <ul className="list-disc space-y-1.5 pl-4">
+                        {OPENING_EVENT_TERMS.map((term) => (
+                            <li key={term}>{term}</li>
+                        ))}
+                    </ul>
+                </div>
+            </details>
+        </div>
+    );
+}
+
 export function StepPayment() {
     const { data, patch, goStep } = useReservationStore();
     const plan = PLAN_INFO[data.plan || "basic"];
+    const router = useRouter();
+    // 신규 방식(#300): 파트너 선택·선택 기한 없이 선결제한다. 결제 후에는 확정이 아니라 매칭 대기다.
+    const direct = data.matchingMode === "admin_direct";
 
-    const [eventOffer, setEventOffer] =
+    const [eventOfferState, setEventOffer] =
         useState<OpeningCouponOffer>(EMPTY_COUPON_OFFER);
-    const [useOpeningEvent, setUseOpeningEvent] = useState(false);
+    const [useOpeningEventState, setUseOpeningEvent] = useState(false);
+    // 조회가 끝난 예약 ID 를 기록해, 예약 ID 변경 시 동기 setState 없이 즉시 미로딩·미적용으로 파생한다 (#301 리뷰).
+    const [loadedReservationId, setLoadedReservationId] = useState<
+        string | null
+    >(null);
+    const couponLoaded = Boolean(
+        data.reservationId && loadedReservationId === data.reservationId,
+    );
+    const eventOffer = couponLoaded ? eventOfferState : EMPTY_COUPON_OFFER;
+    const useOpeningEvent = couponLoaded && useOpeningEventState;
+    // 사용자가 직접 바꾼 뒤에는 기본값 ON 이 덮어쓰지 않는다.
+    const couponTouchedRef = useRef(false);
     useEffect(() => {
         let cancelled = false;
-        if (!data.reservationId) return;
-        void loadCouponOffer(data.reservationId)
+        const rid = data.reservationId;
+        couponTouchedRef.current = false;
+        if (!rid) return;
+        // 신규 방식은 결제 기한이 비어 있어 쿠폰 제안이 "사용 불가" 로 나온다. 결제 창을 먼저 열고 조회한다.
+        void (
+            direct
+                ? armDirectPayment(rid).catch(() => null)
+                : Promise.resolve(null)
+        )
+            .then(() => loadCouponOffer(rid))
             .then((offer) => {
-                if (!cancelled) setEventOffer(offer);
+                if (cancelled) return;
+                setEventOffer(offer);
+                if (!offer.eligible) setUseOpeningEvent(false);
+                else if (!couponTouchedRef.current) setUseOpeningEvent(true);
             })
-            .catch(() => {});
+            .catch(() => {
+                if (!cancelled) {
+                    setEventOffer(FAILED_COUPON_OFFER);
+                    setUseOpeningEvent(false);
+                }
+            })
+            .finally(() => {
+                if (!cancelled) setLoadedReservationId(rid);
+            });
         return () => {
             cancelled = true;
         };
-    }, [data.reservationId]);
+    }, [data.reservationId, direct]);
 
     const [sdkReady, setSdkReady] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -127,7 +311,8 @@ export function StepPayment() {
 
     // ---------- 카운트다운 ----------
     useEffect(() => {
-        if (!data.paymentDeadline) return;
+        // 신규 방식에는 파트너 선택 기한이 없다. 결제창 창구 기한은 서버가 결제 준비 때 다시 건다.
+        if (direct || !data.paymentDeadline) return;
         const deadline = new Date(data.paymentDeadline).getTime();
 
         const tick = () => {
@@ -147,7 +332,7 @@ export function StepPayment() {
         tick();
         const id = setInterval(tick, 1000);
         return () => clearInterval(id);
-    }, [data.paymentDeadline, goStep]);
+    }, [data.paymentDeadline, direct, goStep]);
 
     // ---------- 결제창 호출 ----------
     const onPay = useCallback(async () => {
@@ -171,18 +356,27 @@ export function StepPayment() {
             if (!res.ok) {
                 toast.error(body.error ?? "결제를 시작할 수 없습니다.");
                 if (body.code === "CAMPAIGN_UNAVAILABLE") {
+                    // 해제 상태를 유지한다 — 재조회 결과가 다시 켜지 않도록 touched 로 표시.
+                    couponTouchedRef.current = true;
                     setUseOpeningEvent(false);
+                    setLoadedReservationId(null);
                     setEventOffer(EMPTY_COUPON_OFFER);
                     try {
                         setEventOffer(
                             await loadCouponOffer(data.reservationId),
                         );
                     } catch {
-                        /* 체크는 해제한 상태로 재시도 가능 */
+                        setEventOffer(FAILED_COUPON_OFFER);
                     }
+                    setLoadedReservationId(data.reservationId);
                 }
                 // 결제창이 열리지 않았으니 다시 시도·이전 단계 이동이 가능해야 한다 (#259)
                 setSubmitting(false);
+                if (direct) {
+                    // 이미 결제가 끝났다면 결제 화면에 머물 이유가 없다. 예약 현황에서 상태를 본다.
+                    if (body.code === "ALREADY_PAID") router.push("/mypage");
+                    return;
+                }
                 // 선택이 풀렸거나 기한이 지난 경우 → 파트너 재선택으로
                 if (
                     body.code === "PAYMENT_EXPIRED" ||
@@ -231,6 +425,8 @@ export function StepPayment() {
         useOpeningEvent,
         patch,
         goStep,
+        direct,
+        router,
     ]);
 
     const urgent = remain !== null && remain <= 5 * 60 * 1000;
@@ -245,122 +441,82 @@ export function StepPayment() {
             />
 
             <StepBand
-                index={7}
+                index={direct ? 5 : 7}
+                totalSteps={totalStepsFor(data.matchingMode)}
                 title="결제를 진행해주세요."
-                subtitles={[
-                    "선결제가 완료되면 예약이 확정됩니다.",
-                    "카드 정보는 결제사가 직접 처리하며 저희는 저장하지 않습니다.",
-                ]}
+                subtitles={
+                    direct
+                        ? [
+                              "결제가 완료되면 동행 파트너 확인이 시작됩니다.",
+                              "카드 정보는 결제사가 직접 처리하며 저희는 저장하지 않습니다.",
+                          ]
+                        : [
+                              "선결제가 완료되면 예약이 확정됩니다.",
+                              "카드 정보는 결제사가 직접 처리하며 저희는 저장하지 않습니다.",
+                          ]
+                }
             />
 
             <Section>
-                {!eventOffer.eligible && eventOffer.state !== "HIDDEN" && (
-                    <p
-                        role="status"
-                        className="text-muted-foreground mx-auto mb-6 max-w-3xl rounded-xl border p-4 text-sm"
-                    >
-                        {OPENING_COUPON_MESSAGES[eventOffer.state]}{" "}
-                        <Link
-                            href="/mypage/coupons"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-brand underline"
-                        >
-                            쿠폰함 보기
-                        </Link>
-                    </p>
-                )}
-                {eventOffer.eligible && (
-                    <div className="border-brand bg-brand/5 mx-auto mb-6 max-w-3xl rounded-xl border p-4 text-sm">
-                        <label className="flex items-center gap-2 font-bold">
-                            <Checkbox
-                                checked={useOpeningEvent}
-                                onCheckedChange={(checked) =>
-                                    setUseOpeningEvent(checked === true)
-                                }
-                            />
-                            쿠폰함의 오픈 이벤트 쿠폰 적용 (
-                            {eventOffer.discount.toLocaleString()}원)
-                        </label>
-                        <p className="mt-2">
-                            <Link
-                                href="/event/opening"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-brand cursor-pointer underline"
-                            >
-                                이벤트 조건·이메일 식별정보 처리 안내 보기 (새
-                                창)
-                            </Link>
-                        </p>
-                        <p className="text-muted-foreground mt-2">
-                            쿠폰 보유만으로 혜택이 확보되지는 않습니다.{" "}
-                            {OPENING_EVENT_DEADLINE_LABEL}까지 결제 완료·예약
-                            확정 선착순 {OPENING_EVENT_CAPACITY}명에게
-                            적용합니다. 이 시각까지 결제가 확정되지 않으면
-                            쿠폰이 적용되지 않습니다. 포인트와 중복 적용하지
-                            않습니다.{" "}
-                            <Link
-                                href="/mypage/coupons"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-brand underline"
-                            >
-                                쿠폰함 보기
-                            </Link>
-                        </p>
-                        <p className="text-muted-foreground mt-2">
-                            {OPENING_EVENT_CHANGE_NOTICE}
-                        </p>
-                        <details className="mt-2">
-                            <summary className="cursor-pointer">
-                                적용 조건
-                            </summary>
-                            <ul className="mt-2 space-y-2">
-                                {OPENING_EVENT_TERMS.map((term) => (
-                                    <li key={term}>{term}</li>
-                                ))}
-                            </ul>
-                        </details>
-                    </div>
-                )}
                 <div className="mx-auto max-w-xl">
-                    {/* 남은 시간 */}
-                    <div
-                        className={
-                            urgent
-                                ? "flex items-center justify-between rounded-2xl border border-red-200 bg-red-50 px-5 py-4 dark:border-red-900/50 dark:bg-red-950/30"
-                                : "border-border bg-muted/30 flex items-center justify-between rounded-2xl border px-5 py-4"
-                        }
-                    >
-                        <div className="flex items-center gap-2">
-                            <Clock
-                                className={
-                                    urgent
-                                        ? "size-5 text-red-600 dark:text-red-400"
-                                        : "text-muted-foreground size-5"
-                                }
+                    {/* 급한 예약 전화 상담 안내 (#300) — 24시간 미만이면 강조, 결제는 막지 않는다 */}
+                    {direct && (
+                        <div className="mb-4">
+                            <UrgentCallNotice
+                                useDate={data.useDate}
+                                time={data.arriveTime || data.reserveTime}
                             />
-                            <span className="text-foreground text-sm font-semibold">
-                                결제 남은 시간
-                            </span>
                         </div>
-                        <span
+                    )}
+
+                    {/* 남은 시간 */}
+                    {!direct && (
+                        <div
                             className={
                                 urgent
-                                    ? "text-xl font-extrabold text-red-600 tabular-nums dark:text-red-400"
-                                    : "text-foreground text-xl font-extrabold tabular-nums"
+                                    ? "flex items-center justify-between rounded-2xl border border-red-200 bg-red-50 px-5 py-4 dark:border-red-900/50 dark:bg-red-950/30"
+                                    : "border-border bg-muted/30 flex items-center justify-between rounded-2xl border px-5 py-4"
                             }
                         >
-                            {remain === null ? "--:--" : formatRemain(remain)}
-                        </span>
-                    </div>
+                            <div className="flex items-center gap-2">
+                                <Clock
+                                    className={
+                                        urgent
+                                            ? "size-5 text-red-600 dark:text-red-400"
+                                            : "text-muted-foreground size-5"
+                                    }
+                                />
+                                <span className="text-foreground text-sm font-semibold">
+                                    결제 남은 시간
+                                </span>
+                            </div>
+                            <span
+                                className={
+                                    urgent
+                                        ? "text-xl font-extrabold text-red-600 tabular-nums dark:text-red-400"
+                                        : "text-foreground text-xl font-extrabold tabular-nums"
+                                }
+                            >
+                                {remain === null
+                                    ? "--:--"
+                                    : formatRemain(remain)}
+                            </span>
+                        </div>
+                    )}
 
-                    <p className="text-description-foreground mt-2 flex items-start gap-1.5 text-xs leading-relaxed">
-                        <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-                        시간 안에 결제하지 않으면 파트너 선택이 해제되고 다시
-                        선택하셔야 합니다. 결제창에 들어가면 10분이 연장됩니다.
-                    </p>
+                    {direct ? (
+                        <p className="text-description-foreground flex items-start gap-1.5 text-xs leading-relaxed">
+                            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                            {DIRECT_CANCEL_NOTICE}
+                        </p>
+                    ) : (
+                        <p className="text-description-foreground mt-2 flex items-start gap-1.5 text-xs leading-relaxed">
+                            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                            시간 안에 결제하지 않으면 파트너 선택이 해제되고
+                            다시 선택하셔야 합니다. 결제창에 들어가면 10분이
+                            연장됩니다.
+                        </p>
+                    )}
 
                     {/* 선택한 파트너 */}
                     {data.confirmedPartnerName && (
@@ -373,6 +529,18 @@ export function StepPayment() {
                             </p>
                         </div>
                     )}
+
+                    {/* 오픈 이벤트 쿠폰 — 결제 금액 요약 바로 위 (#282) */}
+                    <PaymentCouponSection
+                        loaded={couponLoaded}
+                        offer={eventOffer}
+                        checked={useOpeningEvent}
+                        onCheckedChange={(checked) => {
+                            couponTouchedRef.current = true;
+                            setUseOpeningEvent(checked);
+                        }}
+                        gross={gross}
+                    />
 
                     {/* 결제 금액 */}
                     <div className="bg-panel-muted mt-4 rounded-2xl p-6">
@@ -463,6 +631,12 @@ export function StepPayment() {
                                 1P = 1원. 결제 금액 전액을 포인트로 결제할 수는
                                 없습니다.
                             </p>
+                            {useOpeningEvent && (
+                                <p className="text-brand mt-1.5 text-xs font-medium">
+                                    오픈 이벤트 쿠폰 적용 중에는 포인트를 함께
+                                    사용할 수 없습니다.
+                                </p>
+                            )}
                         </div>
                     )}
 
@@ -543,14 +717,25 @@ export function StepPayment() {
                               : `${charge.toLocaleString()}원 결제하기`}
                     </button>
 
-                    <button
-                        type="button"
-                        onClick={() => goStep(6)}
-                        disabled={submitting}
-                        className="border-border bg-background text-foreground hover:bg-muted mt-3 w-full rounded-lg border px-6 py-3 text-sm font-bold transition-colors disabled:opacity-60"
-                    >
-                        파트너 다시 선택
-                    </button>
+                    {direct ? (
+                        <div className="mt-4 text-center">
+                            <Link
+                                href="/mypage"
+                                className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-4 transition-colors"
+                            >
+                                예약 현황으로 이동
+                            </Link>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => goStep(6)}
+                            disabled={submitting}
+                            className="border-border bg-background text-foreground hover:bg-muted mt-3 w-full rounded-lg border px-6 py-3 text-sm font-bold transition-colors disabled:opacity-60"
+                        >
+                            파트너 다시 선택
+                        </button>
+                    )}
                 </div>
             </Section>
         </>

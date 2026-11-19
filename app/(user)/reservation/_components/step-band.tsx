@@ -1,10 +1,16 @@
 import { cn } from "@/lib/utils";
 import { TOTAL_STEPS } from "../_store/reservation-store";
 
-function StepDots({ current }: { current: number }) {
+function StepDots({
+    current,
+    total = TOTAL_STEPS,
+}: {
+    current: number;
+    total?: number;
+}) {
     return (
         <div className="mt-6 flex items-center justify-center gap-2">
-            {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+            {Array.from({ length: total }).map((_, i) => (
                 <span
                     key={i}
                     className={cn(
@@ -22,15 +28,21 @@ export function StepBand({
     index,
     title,
     subtitles,
+    totalSteps = TOTAL_STEPS,
 }: {
     index: number;
     title: string;
     subtitles: string[];
+    totalSteps?: number;
 }) {
     return (
         <div className="border-border bg-muted/70 border-b">
             <div className="mx-auto max-w-3xl px-4 py-12 text-center">
-                <h1 className="text-foreground text-2xl font-extrabold md:text-3xl">
+                <h1
+                    id="reservation-step-title"
+                    tabIndex={-1}
+                    className="text-foreground text-2xl font-extrabold outline-none md:text-3xl"
+                >
                     <span className="text-brand">{index}.</span> {title}
                 </h1>
                 {subtitles.map((s, i) => (
@@ -44,7 +56,7 @@ export function StepBand({
                         {s}
                     </p>
                 ))}
-                <StepDots current={index} />
+                <StepDots current={index} total={totalSteps} />
             </div>
         </div>
     );

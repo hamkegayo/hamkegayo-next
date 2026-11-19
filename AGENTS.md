@@ -26,6 +26,9 @@
 4. **커밋** — 코드 작성 후 커밋한다. 형식: `Feat : 내용`, `Fix : 내용`, `Refactor`, `Style`, `Test`, `Chore`, `Docs`.
 5. **검증** — 변경 범위에 맞게 실행한다: `npm run typecheck`, `npm run lint`, `npm run test:unit`, DB 변경 시 `npm run test:db`, 화면 흐름 변경 시 `npm run test:e2e`.
 6. **PR** — `dev` 대상, `.github/PULL_REQUEST_TEMPLATE.md` 구조 그대로 채운다. 섹션을 임의로 추가·삭제하지 않는다. 이슈는 `Refs #번호` (닫기 키워드는 `main` 머지 때만 동작한다).
+    - **화면(UI·컴포넌트·스타일) 변경이 있으면 `## 스크린샷` 섹션에 변경된 화면 캡처를 이미지로 넣는다.** 글로만 설명하거나 "나중에 첨부"로 두지 않는다.
+    - 이미지는 `pr-assets/pr-<PR번호>` 브랜치의 `pr-<PR번호>/` 폴더에 올리고 `![설명](https://github.com/hamkegayo/hamkegayo-next/blob/pr-assets/pr-<PR번호>/pr-<PR번호>/<파일>?raw=true)` 로 참조한다. 이 브랜치는 `dev` 에 머지하지 않는다.
+    - 화면 변경이 없으면 섹션에 "화면 변경 없음"이라고 적는다.
 7. **리뷰 대응** — 리뷰 코멘트에 대응한 뒤 같은 스레드에 무엇을 바꿨는지 답한다.
 
 ## 브랜치와 배포

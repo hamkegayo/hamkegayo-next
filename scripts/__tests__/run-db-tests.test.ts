@@ -29,7 +29,7 @@ describe("test:db 인자 해석", () => {
         expect(parseArgs(argv)).toEqual({ error });
     });
 
-    it("CI 목록 34개 묶음을 유지한다 (#293 탈퇴 회원 소셜 연결 해제 추가)", () => {
-        expect(SUITES).toHaveLength(34);
+    it("CI 목록 38개 묶음을 유지한다 (#285 매칭 전 건강정보 동의 · #293 운영자 탈퇴 · #306 대리 예약 본인 동의 추가)", () => {
+        expect(SUITES).toHaveLength(38);
     });
 });

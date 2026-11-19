@@ -1,4 +1,12 @@
 import { createClient } from "@/utils/supabase/server";
+import { createAdminClient } from "@/utils/supabase/admin";
+import { isAdminDirect } from "@/lib/direct-assignment";
+import {
+    DIRECT_PHASE_LABEL,
+    directPhase,
+    type DirectPhase,
+    type RefundStatus,
+} from "@/lib/direct-reservation-status";
 import { runExpirySweep } from "@/lib/expire-matchings";
 import { weekdayOf } from "@/lib/format";
 import {
@@ -31,6 +39,16 @@ export type MatchingReservationView = {
      * null = 조회 실패 — "지원자 없음"으로 보이지 않게 구분한다.
      */
     applicantCount: number | null;
+    /**
+     * 신규 방식(#300) 예약이면 결제 전/결제 완료·배정 대기 구분. 기존 방식은 null 이다.
+     * 신규 방식에는 지원자·고객 선택이 없으므로 applicantCount 는 쓰지 않는다.
+     */
+    directPhase: DirectPhase | null;
+    /**
+     * 이용자 본인 동의 대기(PENDING_USER, #306) — 동의 전에는 파트너 매칭·결제가 열리지 않는다.
+     * 서비스 시작 예정시각까지 동의가 없으면 자동 취소된다 (#310).
+     */
+    consentPending: boolean;
 };
 
 /** 최근 예약 내역(완료/취소) */
@@ -51,6 +69,10 @@ type Row = {
     use_date: string;
     reserve_time: string;
     created_at: string;
+    matching_mode?: string | null;
+    paid_at?: string | null;
+    user_consent_status?: string | null;
+    cancel_reason?: string | null;
 };
 
 /** "YYYY-MM-DD" + "HH:mm" → "YYYY.MM.DD (요일) 오전/오후 h:mm" */
@@ -102,7 +124,7 @@ export async function getMyReservations(): Promise<{
         const { data, error } = await supabase
             .from("reservations")
             .select(
-                "id, status, plan, hospital_address, use_date, reserve_time, created_at",
+                "id, status, plan, hospital_address, use_date, reserve_time, created_at, matching_mode, paid_at, user_consent_status, cancel_reason",
             )
             .eq("customer_id", user.id)
             .order("created_at", { ascending: false })
@@ -114,6 +136,8 @@ export async function getMyReservations(): Promise<{
         const matchingRows = data.filter((r) => r.status === "MATCHING");
         const applicantCounts = await Promise.all(
             matchingRows.map(async (r) => {
+                // 신규 방식은 파트너 지원자가 없다. 조회하지 않는다.
+                if (isAdminDirect(r.matching_mode)) return null;
                 const { data: applicants, error: applicantsError } =
                     await supabase.rpc("get_reservation_applicants", {
                         p_reservation_id: r.id,
@@ -129,6 +153,14 @@ export async function getMyReservations(): Promise<{
                 datetimeLabel: formatDateTime(r.use_date, r.reserve_time),
                 planLabel: planLabel(r.plan),
                 applicantCount: applicantCounts[i],
+                directPhase: isAdminDirect(r.matching_mode)
+                    ? directPhase({
+                          status: r.status,
+                          paidAt: r.paid_at ?? null,
+                          refundStatus: null,
+                      })
+                    : null,
+                consentPending: r.user_consent_status === "PENDING_USER",
             }),
         );
 
@@ -174,24 +206,69 @@ export async function getMyReservations(): Promise<{
               }
             : null;
 
-        const recent: RecentReservationView[] = data
+        const recentRows = data
             .filter(
                 (r) =>
                     (r.status === "COMPLETED" || r.status === "CANCELLED") &&
                     r.id !== activeRow?.id,
             )
-            .slice(0, 10)
-            .map((r) => ({
+            .slice(0, 10);
+
+        // 신규 방식 취소 건은 환불 진행 상태를 함께 보여준다 (#300). 환불 행은 관리자만 읽을 수 있어
+        // 위 RLS 조회로 확인한 본인 예약 id 만 서비스 권한으로 읽는다.
+        const refundByReservation = await loadRefundStatuses(
+            recentRows
+                .filter(
+                    (r) =>
+                        r.status === "CANCELLED" &&
+                        isAdminDirect(r.matching_mode),
+                )
+                .map((r) => r.id),
+        );
+
+        const recent: RecentReservationView[] = recentRows.map((r) => {
+            const refundStatus = refundByReservation.get(r.id) ?? null;
+            return {
                 id: r.id,
                 hospital: r.hospital_address,
                 datetimeLabel: formatDateTime(r.use_date, r.reserve_time),
                 planLabel: planLabel(r.plan),
                 status: r.status,
-                statusLabel: RESERVATION_STATUS_LABEL[r.status] ?? r.status,
-            }));
+                statusLabel: refundStatus
+                    ? DIRECT_PHASE_LABEL[
+                          directPhase({
+                              status: r.status,
+                              paidAt: r.paid_at ?? null,
+                              refundStatus,
+                          })
+                      ]
+                    : r.cancel_reason === "USER_CONSENT_EXPIRED"
+                      ? "예약 취소 · 본인 동의 없음"
+                      : (RESERVATION_STATUS_LABEL[r.status] ?? r.status),
+            };
+        });
 
         return { matching, current, recent };
     } catch {
         return { matching: [], current: null, recent: [] };
     }
+}
+
+/** 예약별 환불 진행 상태. 조회 실패 시 빈 맵(= 기존 취소 라벨). */
+async function loadRefundStatuses(
+    reservationIds: string[],
+): Promise<Map<string, RefundStatus>> {
+    const map = new Map<string, RefundStatus>();
+    if (reservationIds.length === 0) return map;
+    try {
+        const { data } = await createAdminClient()
+            .from("reservation_refunds")
+            .select("reservation_id, status")
+            .in("reservation_id", reservationIds)
+            .returns<{ reservation_id: string; status: RefundStatus }[]>();
+        for (const row of data ?? []) map.set(row.reservation_id, row.status);
+    } catch {
+        /* 라벨만 기본값으로 돌아간다 */
+    }
+    return map;
 }

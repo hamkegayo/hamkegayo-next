@@ -7,10 +7,9 @@
  *
  * 매칭 전에 나가지 않는 것 — 제5조 ③
  *   이용자 성명 · 연락처 · 상세 출발지 주소 · 병원 주소 · 진료·검사 · 진료 목적 · 요청사항
- * 매칭 전에 나가는 것 — 제5조 ② [단계 1]·④, 제9조 ② (정책상 최소 건강정보는 별도 동의 필요)
- * 별도 동의 수집·접근 게이트는 이 조회 함수에 구현되어 있지 않다.
+ * 매칭 전에 나가는 것 — 제5조 ② [단계 1]·④⑥, 제9조 ②
  *   일자 · 도착 희망시간 · 진료 예약시간 · 예상 소요시간 · 서비스 종류
- *   · 병원명 · 지역(동 단위) · 거동상태 · 인지상태
+ *   · 병원명 · 지역(동 단위) · 거동상태 · 인지상태(별도 동의가 없는 예약은 RPC에서 null 반환, #285)
  */
 
 import { createClient } from "@/utils/supabase/server";
@@ -371,8 +370,8 @@ export async function getPartnerRequestDetail(
                 hasBackupHandover: row.has_backup_handover === true,
             },
             condition: {
-                mobility: row.mobility_status?.trim() || "정보 없음",
-                cognitive: row.cognitive_status?.trim() || "정보 없음",
+                mobility: row.mobility_status?.trim() || "제공 동의 없음",
+                cognitive: row.cognitive_status?.trim() || "제공 동의 없음",
             },
         };
     } catch {

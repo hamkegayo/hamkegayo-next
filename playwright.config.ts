@@ -2,7 +2,15 @@ import { defineConfig, devices } from "@playwright/test";
 
 // 브라우저 E2E(계층 4, #214). 로컬 Supabase + 모의 PG 위에서 핵심 흐름만 검증한다.
 // 실제 NICEPAY·메일은 호출하지 않는다 — 테스트 가이드(Notion) https://app.notion.com/p/3f1169f76f9f819ca52ef036622c3fc1
-const PORT = 3100;
+/**
+ * 신규 방식(선결제 후 운영자 직접 배정, #300) 피처 플래그. `NEXT_PUBLIC_` 값은 빌드에 인라인되고
+ * 서버 하나는 한 값만 가지므로, 기존 흐름(꺼짐)과 신규 흐름(켜짐)을 서버를 따로 띄워 두 번 실행한다.
+ * `npm run test:e2e` 가 두 번을 모두 돌린다 (scripts/run-e2e.mjs).
+ */
+export const DIRECT_FLOW = process.env.E2E_DIRECT_FLOW === "1";
+// 다른 워크트리의 개발 서버가 같은 포트를 쓰고 있으면 reuseExistingServer 가 그 서버(다른 코드)를 재사용한다.
+// 그럴 때는 E2E_PORT 로 포트를 바꿔 이 워크트리 코드를 직접 띄운다.
+const PORT = Number(process.env.E2E_PORT) || (DIRECT_FLOW ? 3101 : 3100);
 const BASE_URL = `http://localhost:${PORT}`;
 const CI = !!process.env.CI;
 
@@ -16,7 +24,9 @@ export const E2E_PAYMENT = {
 export default defineConfig({
     testDir: "./e2e",
     // e2e/support/__tests__ 의 *.test.ts 는 Vitest 단위 테스트다. 스펙만 수집한다.
-    testMatch: "**/*.spec.ts",
+    // 플래그 꺼짐 실행은 기존 흐름 스펙, 켜짐 실행은 direct-*.spec.ts 만 수집한다.
+    testMatch: DIRECT_FLOW ? "**/direct-*.spec.ts" : "**/*.spec.ts",
+    testIgnore: DIRECT_FLOW ? [] : "**/direct-*.spec.ts",
     globalSetup: "./e2e/support/global-setup.ts",
     globalTeardown: "./e2e/support/global-teardown.ts",
     // 여러 역할이 같은 예약을 순서대로 다루므로 직렬로 실행한다.
@@ -61,6 +71,11 @@ export default defineConfig({
                 NICEPAY_SECRET_KEY: E2E_PAYMENT.secretKey,
                 NICEPAY_API_BASE_URL: E2E_PAYMENT.apiBase,
                 NEXT_PUBLIC_SITE_URL: BASE_URL,
+                NEXT_PUBLIC_DIRECT_ASSIGNMENT_FLOW: DIRECT_FLOW
+                    ? "true"
+                    : "false",
+                // 외부 메일은 호출하지 않는다 — .env.local 에 실제 키가 있어도 비운다(빈 값은 미설정).
+                RESEND_API_KEY: "",
             },
         },
     ],

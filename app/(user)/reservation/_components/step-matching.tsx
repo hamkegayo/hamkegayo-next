@@ -27,6 +27,8 @@ const POLL_MS = 5000;
 const CANCEL_NOTE: Record<NonNullable<CancelReason>, string> = {
     EXPIRED:
         "파트너가 정해지지 않은 채 서비스 시작 예정시각이 지나 자동으로 취소되었습니다. 다시 예약하실 때는 여유 있는 시간으로 선택해 주세요.",
+    USER_CONSENT_EXPIRED:
+        "서비스 시작 예정시각까지 이용자 본인의 동의가 완료되지 않아 자동으로 취소되었습니다. 결제 전 예약이라 결제된 금액은 없습니다.",
     USER: "요청하신 대로 매칭을 취소했습니다.",
     REFUND: "결제 취소·환불 처리로 예약이 취소되었습니다.",
     ADMIN: "운영센터에서 예약을 취소했습니다. 자세한 내용은 고객센터로 문의해 주세요.",
@@ -211,6 +213,14 @@ export function StepMatching() {
                                 </p>
                             </div>
                         </div>
+
+                        {data.consentMode === "GUARDIAN_PROXY" && (
+                            <p className="text-description-foreground mt-4 text-sm leading-relaxed">
+                                보호자 대리 동의로 접수된 예약입니다. 진료
+                                내용은 이용자 본인이 동의하기 전까지 보호자에게
+                                전달되지 않습니다.
+                            </p>
+                        )}
 
                         {/* 통계 2칸 */}
                         <div className="mt-6 grid grid-cols-2 gap-3">
