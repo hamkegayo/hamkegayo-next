@@ -7,17 +7,17 @@ import {
     parseDirectAssignmentFlag,
 } from "@/lib/direct-assignment";
 
-// 신규 예약의 처리 방식 피처 플래그 (#300). 기본값은 기존 방식이다.
+// 신규 예약의 처리 방식 (#300). 기본값은 바로 적용(admin_direct)이며, false 로 명시할 때만 기존 방식으로 되돌린다.
 describe("direct assignment flag", () => {
     afterEach(() => vi.unstubAllEnvs());
 
-    it("defaults to the legacy flow when unset or unrecognised", () => {
-        expect(parseDirectAssignmentFlag(undefined)).toBe("legacy_auto");
-        expect(parseDirectAssignmentFlag("")).toBe("legacy_auto");
-        expect(parseDirectAssignmentFlag("maybe")).toBe("legacy_auto");
+    it("defaults to the direct-assignment flow when unset or unrecognised", () => {
+        expect(parseDirectAssignmentFlag(undefined)).toBe("admin_direct");
+        expect(parseDirectAssignmentFlag("")).toBe("admin_direct");
+        expect(parseDirectAssignmentFlag("maybe")).toBe("admin_direct");
     });
 
-    it("turns on only for explicit truthy values", () => {
+    it("falls back to legacy only for explicit falsy values", () => {
         for (const v of ["1", "true", "TRUE", " on "])
             expect(parseDirectAssignmentFlag(v)).toBe("admin_direct");
         for (const v of ["0", "false", "off"])
