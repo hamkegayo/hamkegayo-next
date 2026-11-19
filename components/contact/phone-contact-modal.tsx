@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import dynamic from "next/dynamic";
 import { Check, Copy, MessageCircle, Phone, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -33,13 +34,23 @@ import {
     getServerPhoneContactModal,
     subscribePhoneContactModal,
 } from "./phone-contact-store";
-import { PhoneQrCode } from "./phone-qr-code";
 
-export {
-    closePhoneContactModal,
-    openPhoneContactModal,
-    subscribePhoneContactModal,
-} from "./phone-contact-store";
+/**
+ * qrcode 라이브러리는 모달을 처음 열 때만 받는다. 이 모듈은 root layout 에서
+ * 정적으로 import 되므로 phone-qr-code 를 정적 import 하면 모든 페이지 번들에
+ * 실린다. 자리(size-40)를 미리 잡아 두어 로딩 중 레이아웃이 밀리지 않는다.
+ */
+const PhoneQrCode = dynamic(
+    () => import("./phone-qr-code").then((m) => m.PhoneQrCode),
+    {
+        ssr: false,
+        loading: () => <div aria-hidden className="size-40 bg-white" />,
+    },
+);
+
+// ⚠️ 여닫기 함수를 이 모듈에서 다시 export 하지 않는다. 링크가 이 모듈을 경유해
+//    import 하면 위 QR 지연 로딩이 깨져 모든 링크 번들에 모달이 실린다.
+//    여닫기는 ./phone-contact-store 에서 직접 가져온다.
 
 const COPIED_FEEDBACK_MS = 2000;
 
@@ -123,11 +134,15 @@ export function PhoneContactModal({
     onClose,
 }: {
     open: boolean;
-    /** 모달을 연 시각(ms). null 이면 상담 가능 여부 배지를 그리지 않는다 */
+    /**
+     * 모달을 연 시각(ms). null 이면 상담 시간 배지를 그리지 않는다.
+     * 열려 있는 동안 18:00 을 넘겨도 배지는 바뀌지 않는다 — 열었을 때 기준으로 고정(의도).
+     */
     openedAt: number | null;
     onClose: () => void;
 }) {
     // 연 시각으로만 판정한다 — 서버 렌더에는 openedAt 이 없어 배지가 없다.
+    // 배지는 "시간 내/외" 사실만 말한다. 통화 중·부재일 수 있어 "상담 가능"으로 쓰지 않는다.
     const within =
         openedAt === null ? null : isWithinSupportHours(new Date(openedAt));
 
@@ -210,7 +225,7 @@ export function PhoneContactModal({
                                 )}
                             >
                                 {within
-                                    ? "현재 상담 가능"
+                                    ? "현재 상담 시간 내"
                                     : "현재 상담 시간 외"}
                             </span>
                         )}
@@ -224,9 +239,8 @@ export function PhoneContactModal({
                                 : "text-muted-foreground",
                         )}
                     >
-                        상담 시간 외에는 전화 연결이 어려울 수 있으며, 카카오톡
-                        문의를 남겨주시면 운영 시간에 순차적으로 안내해
-                        드립니다.
+                        상담 시간 외에는 전화 연결이 어려울 수 있습니다.
+                        카카오톡으로도 문의하실 수 있습니다.
                     </p>
                 </div>
 

@@ -103,7 +103,7 @@ async function expectModalContents(page: Page) {
     await expect(modal.getByText(`상담 시간: ${COMPANY.hours}`)).toBeVisible();
     await expect(
         modal.getByText(
-            "상담 시간 외에는 전화 연결이 어려울 수 있으며, 카카오톡 문의를 남겨주시면 운영 시간에 순차적으로 안내해 드립니다.",
+            "상담 시간 외에는 전화 연결이 어려울 수 있습니다. 카카오톡으로도 문의하실 수 있습니다.",
         ),
     ).toBeVisible();
     await expect(modal).not.toContainText("평일");
@@ -153,7 +153,7 @@ test.describe("PC — 고객센터 전화 버튼이 안내 모달을 연다", ()
         await expect(page).toHaveURL(new URL("/", baseURL!).href);
         const modal = await expectModalContents(page);
         const badge = modal.getByTestId("phone-contact-hours-badge");
-        await expect(badge).toHaveText("현재 상담 가능");
+        await expect(badge).toHaveText("현재 상담 시간 내");
         await shot(page, "pc-modal-open.png");
 
         await modal.getByRole("button", { name: "전화번호 복사" }).click();
