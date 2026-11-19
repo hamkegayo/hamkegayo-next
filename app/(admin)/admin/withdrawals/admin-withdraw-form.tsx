@@ -39,6 +39,7 @@ export function AdminWithdrawForm({
             const result = await withdrawMemberByAdmin({
                 userId,
                 reason,
+                confirmed: confirmedIntent,
                 socialUnlinkId,
             });
             if (!result.ok) {

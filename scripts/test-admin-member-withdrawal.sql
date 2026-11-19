@@ -229,6 +229,23 @@ select pg_temp.assert(
             and subject_id is null and target_id is null),
   'no-result lookup is logged without subject');
 
+-- 여러 회원이 일치하면 열람한 회원마다 접속기록이 남는다(제13조)
+update public.profiles set phone='01029300111' where id='00000293-0000-4000-8000-000000000112';
+select pg_temp.as_user('00000293-0000-4000-8000-000000000101');
+set local role authenticated;
+select pg_temp.assert(
+  (select count(*) from public.admin_find_member_for_withdrawal('01029300111')) = 2,
+  'shared phone returns both members');
+reset role;
+select pg_temp.assert(
+  (select count(distinct subject_id) from public.access_logs
+    where actor_id='00000293-0000-4000-8000-000000000101' and action='MEMBER_WITHDRAWAL_LOOKUP'
+      and subject_id in ('00000293-0000-4000-8000-000000000111','00000293-0000-4000-8000-000000000112')) = 2
+  and (select count(*) from public.access_logs
+        where actor_id='00000293-0000-4000-8000-000000000101' and action='MEMBER_WITHDRAWAL_LOOKUP') = 13,
+  'each viewed member gets its own lookup log');
+update public.profiles set phone='01029300112' where id='00000293-0000-4000-8000-000000000112';
+
 -- =============================================================
 -- 대상 제한 · 사유 길이
 -- =============================================================
@@ -420,5 +437,51 @@ select pg_temp.assert(
      from public.settlements where id='00000293-0000-4000-8000-000000000522')
   and exists(select 1 from public.services where id='00000293-0000-4000-8000-000000000322' and status='COMPLETED'),
   'settlement and service record kept');
+
+-- =============================================================
+-- 탈퇴 후 auth 잠금 재시도 · 결과 기록
+-- =============================================================
+select pg_temp.as_user('00000293-0000-4000-8000-000000000101');
+set local role authenticated;
+select public.admin_prepare_auth_lock_retry('00000293-0000-4000-8000-000000000121');
+select pg_temp.rejects($q$select public.admin_prepare_auth_lock_retry('00000293-0000-4000-8000-000000000112')$q$,
+  'NOT_WITHDRAWN', 'active member is not a lock retry target');
+select pg_temp.rejects($q$select public.admin_prepare_auth_lock_retry('00000293-0000-4000-8000-000000000104')$q$,
+  'ADMIN_NOT_ALLOWED', 'admin is not a lock retry target');
+select pg_temp.rejects($q$select public.admin_prepare_auth_lock_retry(gen_random_uuid())$q$,
+  'PROFILE_NOT_FOUND', 'unknown member rejected');
+select public.admin_record_auth_lock('00000293-0000-4000-8000-000000000121', false, false);
+select public.admin_record_auth_lock('00000293-0000-4000-8000-000000000121', true, true);
+select pg_temp.rejects($q$select public.admin_record_auth_lock('00000293-0000-4000-8000-000000000112', true, false)$q$,
+  'NOT_WITHDRAWN', 'lock result of active member rejected');
+reset role;
+select pg_temp.assert(
+  exists(select 1 from public.access_logs where action='ADMIN_AUTH_LOCK_FAILED'
+          and subject_id='00000293-0000-4000-8000-000000000121')
+  and exists(select 1 from public.access_logs where action='ADMIN_AUTH_LOCK_OK'
+          and subject_id='00000293-0000-4000-8000-000000000121' and reason='탈퇴 후 auth 잠금 재시도'),
+  'lock failure and retry success are logged');
+
+do $$
+declare
+  v_case record;
+begin
+  for v_case in
+    select * from (values
+      ('00000293-0000-4000-8000-000000000112', 'plain user'),
+      ('00000293-0000-4000-8000-000000000102', 'admin pw change'),
+      ('00000293-0000-4000-8000-000000000103', 'suspended admin')
+    ) as t(uid, label)
+  loop
+    perform pg_temp.as_user(v_case.uid);
+    set local role authenticated;
+    perform pg_temp.rejects($q$select public.admin_prepare_auth_lock_retry('00000293-0000-4000-8000-000000000121')$q$,
+      'forbidden', v_case.label || ' cannot prepare lock retry');
+    perform pg_temp.rejects($q$select public.admin_record_auth_lock('00000293-0000-4000-8000-000000000121', true, true)$q$,
+      'forbidden', v_case.label || ' cannot record lock result');
+    reset role;
+  end loop;
+end;
+$$;
 
 rollback;

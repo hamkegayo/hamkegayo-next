@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 
 import {
     classifyMemberLookupQuery,
@@ -9,7 +10,11 @@ import {
 import { kstDateTime } from "@/lib/format";
 
 import { AdminWithdrawForm } from "./admin-withdraw-form";
-import { findMemberForWithdrawal, type MemberForWithdrawal } from "./actions";
+import {
+    findMemberForWithdrawal,
+    retryAuthLockByAdmin,
+    type MemberForWithdrawal,
+} from "./actions";
 
 const ROLE_LABEL: Record<string, string> = {
     USER: "회원(USER)",
@@ -40,6 +45,13 @@ export function WithdrawalSearchConsole() {
             }
             setMessage(null);
             setMembers(result.members);
+        });
+
+    const retryLock = (userId: string) =>
+        startTransition(async () => {
+            const result = await retryAuthLockByAdmin(userId);
+            if (result.ok) toast.success(result.message);
+            else toast.error(result.message);
         });
 
     const valid = classifyMemberLookupQuery(query).kind !== "invalid";
@@ -152,9 +164,21 @@ export function WithdrawalSearchConsole() {
                                     )}
                                 </dl>
                                 {withdrawn ? (
-                                    <p className="text-description-foreground mt-3 text-sm">
-                                        이미 탈퇴 처리된 회원입니다.
-                                    </p>
+                                    <div className="mt-3 space-y-2">
+                                        <p className="text-description-foreground text-sm leading-relaxed break-keep">
+                                            이미 탈퇴 처리된 회원입니다. 탈퇴
+                                            직후 로그인 잠금이 실패했다면 아래
+                                            버튼으로 다시 걸 수 있습니다.
+                                        </p>
+                                        <button
+                                            type="button"
+                                            disabled={pending}
+                                            onClick={() => retryLock(m.id)}
+                                            className="bg-background rounded-lg border px-3 py-1.5 text-sm font-semibold disabled:opacity-50"
+                                        >
+                                            로그인 잠금 다시 시도
+                                        </button>
+                                    </div>
                                 ) : blocker ? (
                                     <p className="mt-3 text-sm leading-relaxed break-keep text-red-700 dark:text-red-300">
                                         {blocker} 때문에 지금은 탈퇴 처리할 수

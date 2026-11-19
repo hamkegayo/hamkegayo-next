@@ -96,6 +96,9 @@ export const ADMIN_WITHDRAW_ERROR_MESSAGE: Record<string, string> = {
         "연결 해제 건이 이미 처리됐습니다. 새로고침해 주세요.",
     SOCIAL_UNLINK_USER_MISMATCH:
         "연결 해제 건의 회원과 탈퇴 대상 회원이 다릅니다.",
+    NOT_WITHDRAWN: "탈퇴 처리된 회원이 아닙니다. 새로고침해 주세요.",
+    intent_not_confirmed:
+        "고객문의 채널로 회원 본인의 탈퇴 의사를 확인한 경우에만 처리할 수 있습니다.",
     invalid_reason: `처리 근거를 ${WITHDRAWAL_REASON_MIN}-${WITHDRAWAL_REASON_MAX}자로 입력해 주세요.`,
     invalid_input: "탈퇴 대상 회원이 올바르지 않습니다.",
     invalid_query:

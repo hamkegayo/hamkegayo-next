@@ -28,7 +28,7 @@
 --    개인정보처리방침 제11조 ① — 처리 목적이 달성된 개인정보는 지체 없이 파기
 --    개인정보처리방침 제11조 ③ — 보관이 필요한 정보는 분리하거나 접근을 제한하여 보관
 --    개인정보처리방침 제12조 ③ — 회원탈퇴는 서비스 내 기능 또는 고객문의 채널로 요청
---    개인정보처리방침 제13조 — 접근권한 관리·접근통제(모든 활성 관리자 + MFA + 접속기록)
+--    개인정보처리방침 제13조 — 접근권한 관리·접근통제 조치의 일환으로 활성 관리자 + MFA + 접속기록을 적용(범위 해석이며 방침 원문이 "모든 활성 관리자"를 명시하는 것은 아님)
 -- =============================================================
 
 -- ---------- ① 탈퇴 대상 조회 ----------
@@ -52,6 +52,7 @@ declare
   v_digits text;
   v_kind   text;
   v_ids    uuid[];
+  v_id     uuid;
 begin
   if not public.is_admin_live() then
     raise exception 'forbidden' using errcode = '42501';
@@ -88,10 +89,20 @@ begin
     ) s;
 
   -- 검색어 원문(이메일·전화번호)은 남기지 않는다. 검색 종류만 기록한다.
-  perform public.log_access(
-    'MEMBER_WITHDRAWAL_LOOKUP', 'profiles', v_ids[1], v_ids[1],
-    '운영자 탈퇴 대상 조회 (' || v_kind || ')'
-  );
+  -- 열람한 회원마다 한 건씩 남긴다(제13조 — 최대 5건 반환). 결과가 없으면 대상 없이 한 건.
+  if coalesce(array_length(v_ids, 1), 0) = 0 then
+    perform public.log_access(
+      'MEMBER_WITHDRAWAL_LOOKUP', 'profiles', null, null,
+      '운영자 탈퇴 대상 조회 (' || v_kind || ')'
+    );
+  else
+    foreach v_id in array v_ids loop
+      perform public.log_access(
+        'MEMBER_WITHDRAWAL_LOOKUP', 'profiles', v_id, v_id,
+        '운영자 탈퇴 대상 조회 (' || v_kind || ')'
+      );
+    end loop;
+  end if;
 
   -- 차단 사유는 사전 안내용이다. 실제 차단은 withdraw_member 가 원자적으로 재검증한다.
   return query
@@ -217,3 +228,70 @@ comment on function public.admin_withdraw_member(uuid, text, uuid) is
 
 revoke all on function public.admin_withdraw_member(uuid, text, uuid) from public, anon;
 grant execute on function public.admin_withdraw_member(uuid, text, uuid) to authenticated;
+
+-- ---------- ③ 탈퇴 후 auth 잠금 재시도 · 결과 기록 ----------
+--  DB 탈퇴가 커밋된 뒤 auth 잠금(이메일 .invalid 치환·밴)이 실패하면 admin_withdraw_member 는
+--  ALREADY_WITHDRAWN 으로 거절하므로 화면에서 다시 걸 수 없었다. 서버 액션이 service_role 로
+--  잠금을 걸기 전에 admin_prepare_auth_lock_retry 로 권한·대상을 확인하고,
+--  잠금 결과(성공·실패)를 admin_record_auth_lock 으로 접속기록에 남긴다.
+create or replace function public.admin_prepare_auth_lock_retry(p_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_profile public.profiles%rowtype;
+begin
+  if not public.is_admin_live() then
+    raise exception 'forbidden' using errcode = '42501';
+  end if;
+  if p_user_id is null then
+    raise exception 'invalid_input' using errcode = '22023';
+  end if;
+
+  select * into v_profile from public.profiles where id = p_user_id;
+  if not found then
+    raise exception 'PROFILE_NOT_FOUND' using errcode = 'P0002';
+  end if;
+  if v_profile.role not in ('USER'::public.user_role, 'PARTNER'::public.user_role) then
+    raise exception 'ADMIN_NOT_ALLOWED' using errcode = '42501';
+  end if;
+  if v_profile.status <> 'WITHDRAWN'::public.account_status then
+    raise exception 'NOT_WITHDRAWN' using errcode = 'P0001';
+  end if;
+end;
+$$;
+
+comment on function public.admin_prepare_auth_lock_retry(uuid) is
+  '탈퇴 완료된 USER·PARTNER 의 auth 잠금 재시도 사전 확인(#293). 활성 관리자(is_admin_live)만, 탈퇴 상태가 아니면 NOT_WITHDRAWN.';
+
+revoke all on function public.admin_prepare_auth_lock_retry(uuid) from public, anon;
+grant execute on function public.admin_prepare_auth_lock_retry(uuid) to authenticated;
+
+create or replace function public.admin_record_auth_lock(
+  p_user_id uuid,
+  p_ok      boolean,
+  p_retry   boolean default false
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.admin_prepare_auth_lock_retry(p_user_id);
+
+  perform public.log_access(
+    case when coalesce(p_ok, false) then 'ADMIN_AUTH_LOCK_OK' else 'ADMIN_AUTH_LOCK_FAILED' end,
+    'profiles', p_user_id, p_user_id,
+    case when coalesce(p_retry, false) then '탈퇴 후 auth 잠금 재시도' else '운영자 탈퇴 직후 auth 잠금' end
+  );
+end;
+$$;
+
+comment on function public.admin_record_auth_lock(uuid, boolean, boolean) is
+  '탈퇴 후 auth 잠금 결과 접속기록(#293). 실패 건(ADMIN_AUTH_LOCK_FAILED)을 나중에 찾아 재시도할 수 있게 한다.';
+
+revoke all on function public.admin_record_auth_lock(uuid, boolean, boolean) from public, anon;
+grant execute on function public.admin_record_auth_lock(uuid, boolean, boolean) to authenticated;
