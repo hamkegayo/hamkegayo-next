@@ -95,10 +95,59 @@ export async function deleteE2eReservations(hospitalPrefix: string) {
             .like("link", `%${id}%`);
         if (nErr) throw nErr;
     }
+    // 신규 방식(#300)의 환불 기록은 예약 삭제를 막는 FK(on delete 없음)라 먼저 지운다.
+    const { error: fErr } = await admin
+        .from("reservation_refunds")
+        .delete()
+        .in("reservation_id", ids);
+    if (fErr) throw fErr;
     const { error: rErr } = await admin
         .from("reservations")
         .delete()
         .in("id", ids);
     if (rErr) throw rErr;
     return ids.length;
+}
+
+/** 직접 배정 E2E 가 재배정 대상으로 쓰는 임시 파트너 (#300). 시드 파트너 한 명으로는 재배정을 볼 수 없다. */
+export const E2E_SECOND_PARTNER = {
+    email: "e2e-second-partner@partner.hamkegayo.internal",
+    name: "E2E두번째파트너",
+} as const;
+
+/** 활동 중인 두 번째 파트너를 만든다(이미 있으면 재사용). 반환값은 profiles.id */
+export async function ensureSecondPartner(): Promise<string> {
+    const admin = localSupabaseAdmin();
+    const { data } = await admin.auth.admin.listUsers({ perPage: 1000 });
+    let id = data?.users.find((u) => u.email === E2E_SECOND_PARTNER.email)?.id;
+    if (!id) {
+        const created = await admin.auth.admin.createUser({
+            email: E2E_SECOND_PARTNER.email,
+            password: "e2e-second-1234!",
+            email_confirm: true,
+        });
+        if (created.error || !created.data.user) {
+            throw created.error ?? new Error("임시 파트너 생성 실패");
+        }
+        id = created.data.user.id;
+    }
+    const { error } = await admin.from("profiles").upsert({
+        id,
+        role: "PARTNER",
+        name: E2E_SECOND_PARTNER.name,
+        email: E2E_SECOND_PARTNER.email,
+        phone: "01099990000",
+        phone_verified_at: new Date().toISOString(),
+        status: "ACTIVE",
+    });
+    if (error) throw error;
+    return id;
+}
+
+/** 임시 파트너를 지운다. 예약이 먼저 지워진 뒤에 부른다. */
+export async function deleteSecondPartner() {
+    const admin = localSupabaseAdmin();
+    const { data } = await admin.auth.admin.listUsers({ perPage: 1000 });
+    const u = data?.users.find((x) => x.email === E2E_SECOND_PARTNER.email);
+    if (u) await admin.auth.admin.deleteUser(u.id);
 }

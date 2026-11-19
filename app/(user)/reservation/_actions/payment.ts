@@ -2,6 +2,10 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { matchingModeOf } from "@/lib/direct-assignment";
+
+/** 신규 방식 결제 화면의 결제 기한 창. 결제 준비 라우트와 같은 10분이다. */
+const DIRECT_PAYMENT_WINDOW_MS = 10 * 60 * 1000;
 
 /**
  * 결제 단계(STEP7·8) 지원 서버 액션 (#54).
@@ -21,6 +25,7 @@ export type ResumeState = {
     plan: string;
     useDate: string;
     reserveTime: string;
+    arriveTime: string;
     duration: string;
     hospitalName: string;
     hospitalAddress: string;
@@ -30,6 +35,10 @@ export type ResumeState = {
     prepaidAmount: number;
     /** 사용 가능한 포인트 잔액 */
     pointBalance: number;
+    /** 처리 방식 — admin_direct 는 선결제 후 운영자 배정(#300) */
+    matchingMode: "legacy_auto" | "admin_direct";
+    /** 신규 방식에서 결제 승인·저장이 끝난 시각. 없으면 결제 전 */
+    paidAt: string;
 };
 
 /**
@@ -56,7 +65,7 @@ export async function resumeReservation(
     const { data: r } = await supabase
         .from("reservations")
         .select(
-            "id, code, status, confirmed_partner_id, payment_deadline, plan, use_date, reserve_time, duration, hospital_name, hospital_address, patient_name, patient_phone, prepaid_amount",
+            "id, code, status, confirmed_partner_id, payment_deadline, plan, use_date, reserve_time, arrive_time, duration, hospital_name, hospital_address, patient_name, patient_phone, prepaid_amount, matching_mode, paid_at",
         )
         .eq("id", reservationId)
         .maybeSingle();
@@ -88,6 +97,7 @@ export async function resumeReservation(
         plan: r.plan ?? "basic",
         useDate: r.use_date ?? "",
         reserveTime: r.reserve_time ?? "",
+        arriveTime: r.arrive_time ?? "",
         duration: r.duration ?? "",
         hospitalName: r.hospital_name ?? "",
         hospitalAddress: r.hospital_address ?? "",
@@ -95,7 +105,56 @@ export async function resumeReservation(
         userPhone: r.patient_phone ?? "",
         prepaidAmount: r.prepaid_amount ?? 0,
         pointBalance: balance ?? 0,
+        matchingMode: matchingModeOf(r.matching_mode),
+        paidAt: r.paid_at ?? "",
     };
+}
+
+/**
+ * 신규 방식(#300) 결제 화면 준비 — 결제 기한 창을 연다.
+ *
+ *  신규 방식에는 "파트너 선택 +30분" 기한이 없다. 그런데 이벤트 쿠폰 제안·확보는 살아 있는 결제 기한
+ *  (payment_deadline)을 요구하므로, 기한이 비어 있으면 결제 화면이 열려도 쿠폰이 보이지 않는다.
+ *  결제 화면에 들어올 때(그리고 결제 준비 때) +10분 창을 건다. 결제 완료(paid_at)가 되면 DB 가 비운다.
+ *
+ *  고객 권한으로는 신규 방식 예약의 기한을 바꿀 수 없으므로(DB 가드) 서비스 권한으로 쓴다.
+ *  소유·상태는 고객 세션(RLS)으로 먼저 확인한다. 기존 방식 예약에는 아무 일도 하지 않는다.
+ */
+export async function armDirectPayment(
+    reservationId: string,
+): Promise<{ ok: boolean }> {
+    const supabase = await createClient();
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { ok: false };
+
+    const { data: r } = await supabase
+        .from("reservations")
+        .select("id, status, matching_mode, paid_at")
+        .eq("id", reservationId)
+        .maybeSingle();
+    if (
+        !r ||
+        r.matching_mode !== "admin_direct" ||
+        r.status !== "MATCHING" ||
+        r.paid_at
+    )
+        return { ok: false };
+
+    const admin = createAdminClient();
+    const { error } = await admin
+        .from("reservations")
+        .update({
+            payment_deadline: new Date(
+                Date.now() + DIRECT_PAYMENT_WINDOW_MS,
+            ).toISOString(),
+        })
+        .eq("id", r.id)
+        .eq("customer_id", user.id)
+        .eq("status", "MATCHING")
+        .is("paid_at", null);
+    return { ok: !error };
 }
 
 /*

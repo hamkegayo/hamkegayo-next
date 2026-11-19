@@ -3,8 +3,11 @@ import Link from "next/link";
 import { AutoRefresh } from "@/components/auto-refresh";
 import {
     getCustomerReservation,
+    getDirectRefundState,
     getReservationApplicants,
 } from "../../_lib/matching.server";
+import { directPhase } from "@/lib/direct-reservation-status";
+import { DirectReservationView } from "./direct-reservation-view";
 import { getReservationDetail } from "../../_lib/detail.server";
 import { MatchingReservationView } from "./matching-reservation-view";
 import { ReservationDetailView } from "./reservation-detail-view";
@@ -36,6 +39,31 @@ export default async function ReservationDetailPage({
 
     if (!reservation) {
         return <NotFound />;
+    }
+
+    // 신규 방식(#300): 결제 전·매칭 대기·취소/환불 진행은 전용 화면에서 보여준다.
+    // 확정 이후와 환불 이력이 없는 취소는 기존 상세를 그대로 쓴다.
+    if (reservation.matchingMode === "admin_direct") {
+        const refund =
+            reservation.status === "CANCELLED"
+                ? await getDirectRefundState(id)
+                : null;
+        if (reservation.status === "MATCHING" || refund) {
+            return (
+                <>
+                    <AutoRefresh />
+                    <DirectReservationView
+                        reservation={reservation}
+                        phase={directPhase({
+                            status: reservation.status,
+                            paidAt: reservation.paidAt,
+                            refundStatus: refund?.status ?? null,
+                        })}
+                        refundReason={refund?.reason ?? null}
+                    />
+                </>
+            );
+        }
     }
 
     // 매칭 대기중: 지원 파트너 선택 화면

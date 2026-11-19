@@ -31,6 +31,25 @@ export function parseCouponOffer(value: unknown): OpeningCouponOffer {
     };
 }
 
+export function couponIneligibleMessage(
+    offer: OpeningCouponOffer,
+): string | null {
+    // 사용 가능(AVAILABLE)·비대상(HIDDEN) 상태는 비적용 배너를 띄우지 않는다.
+    if (
+        offer.eligible ||
+        offer.state === "HIDDEN" ||
+        offer.state === "AVAILABLE"
+    ) {
+        return null;
+    }
+    // HELD 인데 eligible=false 는 다른 예약 결제에서 쿠폰을 임시 확보 중인 경우다.
+    // 이 예약에 확보된 것처럼 오해되지 않게 구분해 안내한다.
+    if (offer.state === "HELD") {
+        return "다른 결제 중인 예약에 쿠폰이 임시 확보되어 있어 이 예약에는 바로 적용할 수 없습니다.";
+    }
+    return OPENING_COUPON_MESSAGES[offer.state];
+}
+
 export async function loadCouponOffer(
     reservationId: string,
     signal?: AbortSignal,

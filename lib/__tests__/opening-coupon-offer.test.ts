@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+    couponIneligibleMessage,
     EMPTY_COUPON_OFFER,
     loadCouponOffer,
     parseCouponOffer,
@@ -89,5 +90,29 @@ describe("coupon review regressions", () => {
         expect(await loadCouponOffer("reservation")).toEqual(
             EMPTY_COUPON_OFFER,
         );
+    });
+    it("does not display current-reservation HELD notice when another checkout holds the coupon", () => {
+        const msg = couponIneligibleMessage({
+            eligible: false,
+            state: "HELD",
+            discount: 20000,
+        });
+        expect(msg).not.toBeNull();
+        expect(msg).not.toContain("결제 중인 예약에 쿠폰을 임시 확보했습니다");
+        expect(msg).toContain("다른 결제 중인 예약");
+        expect(
+            couponIneligibleMessage({
+                eligible: false,
+                state: "AVAILABLE",
+                discount: 20000,
+            }),
+        ).toBeNull();
+        expect(
+            couponIneligibleMessage({
+                eligible: true,
+                state: "HELD",
+                discount: 20000,
+            }),
+        ).toBeNull();
     });
 });

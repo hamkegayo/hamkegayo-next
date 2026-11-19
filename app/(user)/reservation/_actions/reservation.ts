@@ -9,9 +9,13 @@ import { generateReservationCode } from "@/lib/reservation";
 import { reservationServerSchema } from "../_lib/schema";
 import { quoteReservation } from "../_lib/quote.server";
 import { notifyPartnersOfNewRequest } from "@/lib/partner-new-request.server";
+import {
+    newReservationMatchingMode,
+    type MatchingMode,
+} from "@/lib/direct-assignment";
 
 export type CreateReservationResult =
-    | { ok: true; code: string; id: string }
+    | { ok: true; code: string; id: string; matchingMode: MatchingMode }
     | {
           ok: false;
           reason: "auth" | "validation" | "error" | "unpaid";
@@ -162,6 +166,44 @@ export async function createReservation(
 
         if (!error && data) {
             await recordRegionCodes(data.id, user.id, regionCodes);
+
+            // 처리 방식은 서버가 정한다 (#300). 고객 권한 INSERT 는 DB 가드가 항상 legacy_auto 로 되돌리므로
+            // 신규 방식(admin_direct) 전환은 서비스 권한으로 기록한다. 플래그가 꺼져 있으면 기존 그대로다.
+            // 전환에 실패한 채 두면 고객이 다른 흐름을 만나므로 예약을 지우고 실패로 돌려준다.
+            if (newReservationMatchingMode() === "admin_direct") {
+                const admin = createAdminClient();
+                const { error: modeError } = await admin
+                    .from("reservations")
+                    .update({ matching_mode: "admin_direct" })
+                    .eq("id", data.id)
+                    .eq("customer_id", user.id)
+                    .eq("status", "MATCHING");
+                if (modeError) {
+                    console.error(
+                        "[createReservation] 처리 방식 기록 실패:",
+                        modeError,
+                    );
+                    await admin
+                        .from("reservations")
+                        .delete()
+                        .eq("id", data.id)
+                        .eq("customer_id", user.id);
+                    return {
+                        ok: false,
+                        reason: "error",
+                        message:
+                            "예약 등록에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+                    };
+                }
+                // 신규 방식은 파트너 알림·지원을 받지 않는다. DB 도 notify_partners_new_request 에서 막는다.
+                return {
+                    ok: true,
+                    code: data.code,
+                    id: data.id,
+                    matchingMode: "admin_direct",
+                };
+            }
+
             // 활동 지역·시간이 맞는 파트너에게 새 요청 알림 (#255). 응답을 막지 않게 응답 후 처리한다.
             after(() =>
                 notifyPartnersOfNewRequest({
@@ -172,7 +214,12 @@ export async function createReservation(
                     hospitalAddress: v.hospitalAddress,
                 }),
             );
-            return { ok: true, code: data.code, id: data.id };
+            return {
+                ok: true,
+                code: data.code,
+                id: data.id,
+                matchingMode: "legacy_auto",
+            };
         }
         if (error?.code === "23505") continue; // 예약번호 중복 → 재생성
         if (error) {

@@ -152,6 +152,13 @@ export const SUITES = [
         "탈퇴 회원 소셜 연결 해제 · 탈퇴 회원만 · 이메일 연결 유지 (#293)",
         [sql("test-withdrawn-social-release.sql")],
     ],
+    [
+        "선결제 후 운영자 직접 배정 · 매칭 대기 · 배정/재배정 · 전액 환불 · 동시성 (#300)",
+        [
+            sql("test-direct-assignment.sql"),
+            node("test-direct-assignment-concurrency.mjs"),
+        ],
+    ],
     ["정산 계좌 열람 통제 (#51)", [npm("test:payout")]],
     [
         "이메일 인증 연락처 변경 · 목적/대상/일회 소비 (#64)",
