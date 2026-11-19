@@ -169,6 +169,10 @@ select pg_temp.expect_sqlstate(
       where id = '00000306-0000-4000-8000-0000000000c1'$q$,
   '42501', '고객이 본인 동의 상태를 직접 CONFIRMED 로 UPDATE 불가');
 select pg_temp.expect_sqlstate(
+  $q$update public.reservations set user_consent_channel = 'SMS'
+      where id = '00000306-0000-4000-8000-0000000000c1'$q$,
+  '42501', '고객이 동의 확정 링크 전달 방식을 UPDATE 불가');
+select pg_temp.expect_sqlstate(
   $q$update public.reservations set user_consent_mode = 'GUARDIAN_PROXY'
       where id = '00000306-0000-4000-8000-0000000000c1'$q$,
   '42501', '고객이 동의 모드를 사후 변경 불가');
@@ -360,8 +364,9 @@ select pg_temp.assert(
   (select user_consent_status = 'CONFIRMED' and user_consent_confirmed_at = now()
           and pre_matching_health_consented_at = now() and pre_matching_health_consent_version = '2026-09-06'
           and share_medical_info = true
+          and user_consent_channel = 'MANUAL_LINK'
      from public.reservations where id = '00000306-0000-4000-8000-0000000000c1'),
-  '본인 동의 완료 시 상태·서버 시각·매칭 전 건강정보 동의·진료내용 전달 동의가 기록됨');
+  '본인 동의 완료 시 상태·서버 시각·매칭 전 건강정보 동의·진료내용 전달 동의·확정 링크 전달 방식이 기록됨');
 
 set local role service_role;
 select pg_temp.assert(

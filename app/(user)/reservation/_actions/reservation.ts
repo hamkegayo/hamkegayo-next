@@ -246,11 +246,19 @@ export async function createReservation(
                     patientPhone: v.userPhone,
                 });
                 if (!issued.ok) {
-                    await createAdminClient()
+                    const { error: rollbackError } = await createAdminClient()
                         .from("reservations")
                         .delete()
                         .eq("id", data.id)
                         .eq("customer_id", user.id);
+                    if (rollbackError) {
+                        // 삭제까지 실패하면 링크 없는 PENDING_USER 예약이 남는다 — 운영이 찾을 수 있게 남긴다.
+                        console.error(
+                            "[createReservation] 동의 링크 발급 실패 후 예약 삭제 실패:",
+                            data.id,
+                            rollbackError.message,
+                        );
+                    }
                     return {
                         ok: false,
                         reason: "error",

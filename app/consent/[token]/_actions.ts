@@ -149,21 +149,32 @@ export async function submitUserConsent(input: {
     // 동의가 확정되어 매칭이 열렸다 — 보류했던 새 요청 알림을 보낸다 (기존 방식 예약만).
     const reservationId = row.reservation_id as string;
     after(async () => {
-        const { data: r } = await admin
-            .from("reservations")
-            .select(
-                "use_date, arrive_time, plan, hospital_address, matching_mode",
-            )
-            .eq("id", reservationId)
-            .maybeSingle();
-        if (!r || r.matching_mode !== "legacy_auto") return;
-        await notifyPartnersOfNewRequest({
-            reservationId,
-            useDate: r.use_date as string,
-            arriveTime: r.arrive_time as string,
-            plan: r.plan as string,
-            hospitalAddress: r.hospital_address as string,
-        });
+        // 동의는 이미 확정됐다. 알림만 빠지면 재시도가 없으므로 실패를 예약 ID 와 함께 남긴다.
+        // 나갔는지 점검할 때는 알림 중복 방지 키 new-request:<예약 ID> 로 notifications 를 조회한다.
+        try {
+            const { data: r, error } = await admin
+                .from("reservations")
+                .select(
+                    "use_date, arrive_time, plan, hospital_address, matching_mode",
+                )
+                .eq("id", reservationId)
+                .maybeSingle();
+            if (error) throw error;
+            if (!r || r.matching_mode !== "legacy_auto") return;
+            await notifyPartnersOfNewRequest({
+                reservationId,
+                useDate: r.use_date as string,
+                arriveTime: r.arrive_time as string,
+                plan: r.plan as string,
+                hospitalAddress: r.hospital_address as string,
+            });
+        } catch (e) {
+            console.error(
+                "[consent] 동의 확정 후 파트너 알림 실패:",
+                reservationId,
+                e instanceof Error ? e.message : e,
+            );
+        }
     });
     return { ok: true };
 }

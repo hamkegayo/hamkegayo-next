@@ -29,7 +29,10 @@ alter table public.reservations
   add column if not exists proxy_reason_code text,
   add column if not exists proxy_reason_detail text,
   add column if not exists proxy_authority_confirmed_at timestamptz,
-  add column if not exists proxy_authority_version text;
+  add column if not exists proxy_authority_version text,
+  -- 본인 동의를 확정한 링크의 전달 방식(MANUAL_LINK·SMS·ALIMTALK). 수동 전달 확정인지 사후에 구분하는 증거 수준 표시.
+  -- 예약 행에 두므로 보유기간은 예약 개인정보와 같다(토큰 행은 예약 삭제 때 cascade).
+  add column if not exists user_consent_channel text;
 
 alter table public.reservations
   drop constraint if exists reservations_user_consent_check;
@@ -113,7 +116,8 @@ begin
        or new.proxy_reason_code is distinct from old.proxy_reason_code
        or new.proxy_reason_detail is distinct from old.proxy_reason_detail
        or new.proxy_authority_confirmed_at is distinct from old.proxy_authority_confirmed_at
-       or new.proxy_authority_version is distinct from old.proxy_authority_version then
+       or new.proxy_authority_version is distinct from old.proxy_authority_version
+       or new.user_consent_channel is distinct from old.user_consent_channel then
       raise exception 'user_consent_immutable' using errcode = '42501';
     end if;
     -- 처리방침 제10조 ④ — 진료 내용 전달 동의는 실제 이용자만 정한다. 대리 예약(USER_DIRECT·GUARDIAN_PROXY)은
@@ -127,6 +131,7 @@ begin
   end if;
 
   -- INSERT
+  new.user_consent_channel := null;
   -- 처리방침 제10조 ① — 본인이 아닌 관계의 예약은 본인 예약(SELF)으로 등록할 수 없다.
   if new.user_consent_mode = 'SELF' then
     if new.relation is distinct from '본인' then
@@ -611,6 +616,10 @@ begin
   update public.reservations
      set user_consent_status = 'CONFIRMED',
          user_consent_confirmed_at = now(),
+         user_consent_channel = (
+           select t.delivery_channel from public.reservation_consent_tokens t
+            where t.token_hash = p_token_hash
+         ),
          pre_matching_health_consented_at = now(),
          pre_matching_health_consent_version = p_policy_version,
          -- 처리방침 제10조 ④ — 실제 이용자가 직접 선택한 값

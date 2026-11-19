@@ -657,6 +657,12 @@ export function StepUserInfo() {
                                                         },
                                                     )}
                                                 />
+                                                <p className="text-description-foreground mt-1.5 text-xs leading-relaxed">
+                                                    병명 등 구체적인 건강정보는
+                                                    적지 마세요. 직접 동의하기
+                                                    어려운 상황만 간단히 적어
+                                                    주세요.
+                                                </p>
                                                 <FieldError id="proxyReasonDetail-error">
                                                     {
                                                         errors.proxyReasonDetail
