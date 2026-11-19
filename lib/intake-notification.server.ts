@@ -66,9 +66,16 @@ export type IntakeDispatchResult = {
     skipped?: "EMAIL_NOT_CONFIGURED" | "NO_RECIPIENT";
 };
 
-/** 발송 대기 중인 접수 알림을 보낸다. 실패해도 던지지 않는다. */
-export async function dispatchIntakeNotifications(
-    limit = 10,
+type ClaimedIntakeRow = {
+    intake_id: string;
+    reservation_id: string;
+    reservation_code: string;
+};
+
+async function runIntakeDispatch(
+    claim: (
+        admin: ReturnType<typeof createAdminClient>,
+    ) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
 ): Promise<IntakeDispatchResult> {
     const result: IntakeDispatchResult = { claimed: 0, sent: 0, failed: 0 };
     try {
@@ -87,19 +94,13 @@ export async function dispatchIntakeNotifications(
         }
 
         const admin = createAdminClient();
-        const { data, error } = await admin.rpc("claim_intake_notifications", {
-            p_limit: limit,
-        });
+        const { data, error } = await claim(admin);
         if (error) {
             console.error("[intake] 발송 대상 조회 실패:", error.message);
             return result;
         }
 
-        const rows = (data ?? []) as {
-            intake_id: string;
-            reservation_id: string;
-            reservation_code: string;
-        }[];
+        const rows = (data ?? []) as ClaimedIntakeRow[];
         result.claimed = rows.length;
         const sender = getEmailSender();
 
@@ -141,6 +142,26 @@ export async function dispatchIntakeNotifications(
         console.error("[intake] 접수 알림 처리 실패:", e);
     }
     return result;
+}
+
+/** 발송 대기 중인 접수 알림을 보낸다. 실패해도 던지지 않는다. */
+export async function dispatchIntakeNotifications(
+    limit = 10,
+): Promise<IntakeDispatchResult> {
+    return runIntakeDispatch((admin) =>
+        admin.rpc("claim_intake_notifications", { p_limit: limit }),
+    );
+}
+
+/** 특정 예약 1건의 접수 알림만 대상으로 임대·발송한다 (관리자 수동 재발송용). */
+export async function dispatchIntakeNotificationForReservation(
+    reservationId: string,
+): Promise<IntakeDispatchResult> {
+    return runIntakeDispatch((admin) =>
+        admin.rpc("claim_intake_notification_for_reservation", {
+            p_reservation: reservationId,
+        }),
+    );
 }
 
 /** 요청 응답을 막지 않게 발송을 예약한다. 요청 범위 밖이면 바로 시도한다. */

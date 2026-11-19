@@ -10,7 +10,7 @@ import {
     validateFailureNoticeInput,
     type DirectActionResult,
 } from "@/lib/direct-admin";
-import { dispatchIntakeNotifications } from "@/lib/intake-notification.server";
+import { dispatchIntakeNotificationForReservation } from "@/lib/intake-notification.server";
 import {
     failMatchingAndRefund,
     retryDirectRefund,
@@ -162,7 +162,9 @@ export async function resendIntakeEmailAction(input: {
             message: "배정 대기 중인 예약만 재발송할 수 있습니다.",
         };
 
-    const result = await dispatchIntakeNotifications(1);
+    const result = await dispatchIntakeNotificationForReservation(
+        input.reservationId,
+    );
     refresh(input.reservationId);
     if (result.skipped)
         return {
@@ -171,6 +173,12 @@ export async function resendIntakeEmailAction(input: {
                 result.skipped === "NO_RECIPIENT"
                     ? "운영자 수신 주소(PAYMENT_ALERT_EMAIL)가 설정되지 않아 보내지 못했습니다. 설정 후 다시 시도해 주세요."
                     : "이메일 발송 키(RESEND_API_KEY)가 설정되지 않아 보내지 못했습니다(모의 발송은 성공으로 치지 않습니다).",
+        };
+    if (result.claimed === 0)
+        return {
+            ok: false,
+            message:
+                "다른 요청이 발송 중이거나 이미 처리되었습니다. 잠시 후 상태를 확인해 주세요.",
         };
     if (result.sent > 0)
         return { ok: true, message: "접수 알림 메일을 발송했습니다." };

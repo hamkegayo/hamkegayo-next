@@ -16,6 +16,7 @@ vi.mock("@/lib/email", () => ({
 
 import {
     buildIntakeEmail,
+    dispatchIntakeNotificationForReservation,
     dispatchIntakeNotifications,
     intakeRecipients,
 } from "@/lib/intake-notification.server";
@@ -117,5 +118,21 @@ describe("dispatchIntakeNotifications", () => {
             failed: 0,
         });
         expect(mock.send).not.toHaveBeenCalled();
+    });
+
+    it("claims and sends only the targeted reservation on manual resend", async () => {
+        mock.rpc.mockImplementation(async (name: string) =>
+            name === "claim_intake_notification_for_reservation"
+                ? { data: [claimed[1]], error: null }
+                : { data: null, error: null },
+        );
+        const result = await dispatchIntakeNotificationForReservation("RES-2");
+        expect(result).toEqual({ claimed: 1, sent: 1, failed: 0 });
+        expect(mock.rpc).toHaveBeenCalledWith(
+            "claim_intake_notification_for_reservation",
+            { p_reservation: "RES-2" },
+        );
+        expect(mock.send).toHaveBeenCalledTimes(1);
+        expect(mock.send.mock.calls[0][1]).toContain("R-2");
     });
 });

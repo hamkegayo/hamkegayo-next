@@ -27,6 +27,20 @@ export type WaitingRow = {
     acknowledged_at: string | null;
 };
 
+export type ConfirmedDirectRow = {
+    id: string;
+    code: string;
+    plan: string;
+    use_date: string;
+    arrive_time: string;
+    hospital_name: string | null;
+    partner_name: string | null;
+    service_status: string | null;
+    service_started_at: string | null;
+    customer_notice_at: string | null;
+    partner_accepted_at: string | null;
+};
+
 export type RefundIssueRow = {
     reservation_id: string;
     code: string;
@@ -124,6 +138,24 @@ export async function getWaitingReservations(): Promise<{
         ).rpc("admin_list_waiting_reservations");
         if (error) return { rows: [], loadError: true };
         return { rows: (data ?? []) as WaitingRow[], loadError: false };
+    } catch {
+        return { rows: [], loadError: true };
+    }
+}
+
+export async function getConfirmedDirectReservations(): Promise<{
+    rows: ConfirmedDirectRow[];
+    loadError: boolean;
+}> {
+    try {
+        const { data, error } = await (
+            await createClient()
+        ).rpc("admin_list_confirmed_direct_reservations");
+        if (error) return { rows: [], loadError: true };
+        return {
+            rows: (data ?? []) as ConfirmedDirectRow[],
+            loadError: false,
+        };
     } catch {
         return { rows: [], loadError: true };
     }

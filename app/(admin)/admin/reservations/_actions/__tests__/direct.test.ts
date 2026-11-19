@@ -15,7 +15,7 @@ vi.mock("@/utils/supabase/server", () => ({
     }),
 }));
 vi.mock("@/lib/intake-notification.server", () => ({
-    dispatchIntakeNotifications: mock.dispatch,
+    dispatchIntakeNotificationForReservation: mock.dispatch,
 }));
 vi.mock("@/lib/payments/direct-refund", () => ({
     failMatchingAndRefund: mock.fail,
@@ -233,12 +233,20 @@ describe("resendIntakeEmailAction", () => {
         expect(mock.dispatch).not.toHaveBeenCalled();
     });
 
-    it("requeues then dispatches immediately", async () => {
+    it("requeues then dispatches only the targeted reservation", async () => {
         mock.rpc.mockResolvedValue({ data: "REQUEUED", error: null });
         mock.dispatch.mockResolvedValue({ claimed: 1, sent: 1, failed: 0 });
         const r = await resendIntakeEmailAction({ reservationId: "R" });
         expect(r.ok).toBe(true);
-        expect(mock.dispatch).toHaveBeenCalledTimes(1);
+        expect(mock.dispatch).toHaveBeenCalledWith("R");
+    });
+
+    it("does not report success when another worker already claimed it", async () => {
+        mock.rpc.mockResolvedValue({ data: "REQUEUED", error: null });
+        mock.dispatch.mockResolvedValue({ claimed: 0, sent: 0, failed: 0 });
+        const r = await resendIntakeEmailAction({ reservationId: "R" });
+        expect(r.ok).toBe(false);
+        expect(!r.ok && r.message).toContain("발송 중이거나 이미 처리");
     });
 
     it("does not report success when email is not configured (mock send)", async () => {

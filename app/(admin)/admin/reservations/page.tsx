@@ -4,6 +4,7 @@ import Link from "next/link";
 import { formatElapsed, intakeNotifyLabel } from "@/lib/direct-admin";
 import { formatUseDate, kstDateTime } from "@/lib/format";
 import {
+    getConfirmedDirectReservations,
     getRefundIssues,
     getWaitingReservations,
 } from "./_lib/direct-reservations.server";
@@ -28,9 +29,17 @@ const REFUND_LABEL: Record<string, string> = {
     REFUNDED: "환불 완료",
 };
 
+const SERVICE_LABEL: Record<string, string> = {
+    SCHEDULED: "진행 예정 · 재배정 가능",
+    IN_PROGRESS: "서비스 진행 중",
+    COMPLETED: "서비스 완료",
+    CANCELLED: "취소됨",
+};
+
 export default async function AdminReservationsPage() {
-    const [waiting, issues] = await Promise.all([
+    const [waiting, confirmed, issues] = await Promise.all([
         getWaitingReservations(),
+        getConfirmedDirectReservations(),
         getRefundIssues(),
     ]);
     const overdueCount = waiting.rows.filter((r) => r.overdue).length;
@@ -133,6 +142,70 @@ export default async function AdminReservationsPage() {
                                             결제 후{" "}
                                             {formatElapsed(r.elapsed_minutes)}{" "}
                                             경과
+                                        </p>
+                                    </Link>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
+            </section>
+
+            <section className="mt-8">
+                <h2 className="text-foreground text-lg font-bold">
+                    배정 완료 (재배정·이력){" "}
+                    {confirmed.loadError ? "" : `(${confirmed.rows.length})`}
+                </h2>
+                {confirmed.loadError ? (
+                    <p
+                        role="alert"
+                        className="mt-3 text-sm font-bold text-red-600"
+                    >
+                        배정 완료 목록을 불러오지 못했습니다.
+                    </p>
+                ) : confirmed.rows.length === 0 ? (
+                    <p className="text-muted-foreground mt-3 text-sm">
+                        배정 완료된 예약이 없습니다.
+                    </p>
+                ) : (
+                    <ul className="mt-3 space-y-3">
+                        {confirmed.rows.map((r) => {
+                            const reassignable =
+                                r.service_status === "SCHEDULED" &&
+                                !r.service_started_at;
+                            return (
+                                <li key={r.id}>
+                                    <Link
+                                        href={`/admin/reservations/${r.id}`}
+                                        className="border-border bg-background hover:border-brand block rounded-2xl border p-4"
+                                    >
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-foreground font-extrabold">
+                                                {r.code}
+                                            </span>
+                                            <span
+                                                className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${reassignable ? TONE.ok : TONE.neutral}`}
+                                            >
+                                                {SERVICE_LABEL[
+                                                    r.service_status ?? ""
+                                                ] ??
+                                                    r.service_status ??
+                                                    "확정"}
+                                            </span>
+                                            <span
+                                                className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${r.customer_notice_at ? TONE.ok : TONE.warn}`}
+                                            >
+                                                {r.customer_notice_at
+                                                    ? "확정 문자 완료"
+                                                    : "확정 문자 미기록"}
+                                            </span>
+                                        </div>
+                                        <p className="text-foreground mt-2 text-sm">
+                                            {formatUseDate(r.use_date)}{" "}
+                                            {r.arrive_time} ·{" "}
+                                            {r.hospital_name || "병원 미입력"} ·{" "}
+                                            {r.plan} · 담당:{" "}
+                                            <b>{r.partner_name || "미확인"}</b>
                                         </p>
                                     </Link>
                                 </li>
