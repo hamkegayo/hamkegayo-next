@@ -467,9 +467,16 @@ test.describe("선결제 → 매칭 대기 → 관리자 배정(#300)", () => {
             await admin
                 .getByRole("button", { name: "매칭 실패 처리 및 전액 환불" })
                 .click();
+            // 처리가 끝나면 상세가 다시 그려져 폼이 사라지고, 폼 안의 완료 메시지도 함께 사라진다.
+            // 프로덕션 빌드(CI)에서는 메시지가 보이기 전에 사라질 수 있으므로 남는 상태 패널로 확인한다.
             await expect(
-                admin.getByText("PG 전액 환불까지 완료했습니다."),
+                admin.getByRole("heading", { name: "매칭 실패 · 환불 상태" }),
             ).toBeVisible({ timeout: 30_000 });
+            await expect(
+                admin
+                    .locator("dt", { hasText: "PG 환불 상태" })
+                    .locator("xpath=following-sibling::dd[1]"),
+            ).toHaveText("환불 완료");
 
             const after = await reservationByHospital(hospital);
             expect(after.status).toBe("CANCELLED");
