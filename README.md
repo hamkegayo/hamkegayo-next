@@ -70,31 +70,32 @@ npm run dev                    # http://localhost:3000
 
 `.env.example`에 전체 목록과 설명이 있습니다. 실제 값은 `.env.local`과 Vercel 환경 변수에만 넣습니다.
 
-| 변수                                                          | 필수    | 용도                                                                                  |
-| ------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`                                    | ✅      | Supabase 프로젝트 URL                                                                 |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`                               | ✅      | 클라이언트·SSR 공개 키 (RLS 적용)                                                     |
-| `SUPABASE_SERVICE_ROLE_KEY`                                   | ✅      | 서버 전용 키 (RLS 우회)                                                               |
-| `POLICY_RELEASE_EFFECTIVE_DATE`                               | 운영 ✅ | 약관·방침 시행일 (`YYYY-MM-DD`). **Production에서 없으면 /terms·/privacy가 오류**     |
-| `NEXT_PUBLIC_NICEPAY_CLIENT_KEY`                              | –       | 결제창 호출용 (노출 전제)                                                             |
-| `NICEPAY_SECRET_KEY`                                          | –       | 승인 API 인증용                                                                       |
-| `NEXT_PUBLIC_SITE_URL`                                        | –       | 결제 링크·메일의 절대 주소. 미설정 시 운영 주소로 폴백                                |
-| `RESEND_API_KEY` · `EMAIL_FROM`                               | –       | 메일 발송. 미설정 시 콘솔 Mock·기본 발신주소                                          |
-| `PAYMENT_ALERT_EMAIL`                                         | –       | 결제 사고 수신자. 미설정 시 적재만 하고 발송 안 함                                    |
-| `CRON_SECRET`                                                 | –       | Vercel Cron 인증. 미설정 시 크론 엔드포인트가 거부                                    |
-| `NEXT_PUBLIC_DIRECT_ASSIGNMENT_FLOW`                          | –       | 신규 예약 선결제·운영자 직접 배정 흐름(기본 켜짐, `false`로 비상 되돌리기 가능, #300) |
-| `DATA_GO_KR_SERVICE_KEY`                                      | –       | 공휴일 판정. 미설정 시 폴백 테이블                                                    |
-| `OPENING_EVENT_EMAIL_HMAC_KEY`                                | –       | 첫 1시간 이벤트 중복 참여 방지 키. 환경별로 다르게, 행사 중 교체 금지                 |
-| `NEXT_PUBLIC_GA_MEASUREMENT_ID` · `NEXT_PUBLIC_META_PIXEL_ID` | –       | 애널리틱스. 운영 호스트 + 사용자 동의일 때만 로드                                     |
-| `NEXT_PUBLIC_SW_KILL`                                         | –       | `1`이면 서비스워커를 해제 (비상 되돌리기)                                             |
-| `SEED_TARGET_REF`                                             | –       | 원격 시드·테스트 대상 ref. 운영 ref는 입력해도 차단                                   |
+| 변수                                                          | 필수    | 용도                                                                                                                                   |
+| ------------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`                                    | ✅      | Supabase 프로젝트 URL                                                                                                                  |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`                               | ✅      | 클라이언트·SSR 공개 키 (RLS 적용)                                                                                                      |
+| `SUPABASE_SERVICE_ROLE_KEY`                                   | ✅      | 서버 전용 키 (RLS 우회)                                                                                                                |
+| `POLICY_RELEASE_EFFECTIVE_DATE`                               | 운영 ✅ | 약관·방침 시행일 (`YYYY-MM-DD`). **Production에서 없으면 /terms·/privacy가 오류**                                                      |
+| `NEXT_PUBLIC_NICEPAY_CLIENT_KEY`                              | –       | 결제창 호출용 (노출 전제)                                                                                                              |
+| `NICEPAY_SECRET_KEY`                                          | –       | 승인 API 인증용                                                                                                                        |
+| `NEXT_PUBLIC_SITE_URL`                                        | –       | 결제 링크·메일의 절대 주소. 미설정 시 운영 주소로 폴백                                                                                 |
+| `RESEND_API_KEY` · `EMAIL_FROM`                               | –       | 메일 발송. 미설정 시 콘솔 Mock·기본 발신주소                                                                                           |
+| `PAYMENT_ALERT_EMAIL`                                         | –       | 결제 사고 수신자. 미설정 시 적재만 하고 발송 안 함                                                                                     |
+| `INTAKE_ALERT_EMAIL`                                          | –       | 신규 예약 접수 알림 수신자(쉼표로 여러 명). `PAYMENT_ALERT_EMAIL` 과 둘 다 있으면 중복 제거 후 모두에게 발송, 둘 다 없으면 "발송 대기" |
+| `CRON_SECRET`                                                 | –       | Vercel Cron 인증. 미설정 시 크론 엔드포인트가 거부                                                                                     |
+| `NEXT_PUBLIC_DIRECT_ASSIGNMENT_FLOW`                          | –       | 신규 예약 선결제·운영자 직접 배정 흐름(기본 켜짐, `false`로 비상 되돌리기 가능, #300)                                                  |
+| `DATA_GO_KR_SERVICE_KEY`                                      | –       | 공휴일 판정. 미설정 시 폴백 테이블                                                                                                     |
+| `OPENING_EVENT_EMAIL_HMAC_KEY`                                | –       | 첫 1시간 이벤트 중복 참여 방지 키. 환경별로 다르게, 행사 중 교체 금지                                                                  |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` · `NEXT_PUBLIC_META_PIXEL_ID` | –       | 애널리틱스. 운영 호스트 + 사용자 동의일 때만 로드                                                                                      |
+| `NEXT_PUBLIC_SW_KILL`                                         | –       | `1`이면 서비스워커를 해제 (비상 되돌리기)                                                                                              |
+| `SEED_TARGET_REF`                                             | –       | 원격 시드·테스트 대상 ref. 운영 ref는 입력해도 차단                                                                                    |
 
 ### 선결제 후 운영자 직접 배정 흐름 (#300)
 
 - **기본값**: 바로 적용(`admin_direct`). 별도 환경변수 없이 새 예약이 선결제 → 매칭 대기 → 운영자 직접 배정 흐름으로 생성됩니다.
 - **비상 되돌리기**: 기존 방식(파트너 지원 → 고객 선택 → 결제 → 확정)으로 되돌려야 할 때만 `NEXT_PUBLIC_DIRECT_ASSIGNMENT_FLOW=false`를 설정하고 재배포합니다. `NEXT_PUBLIC_` 값은 빌드에 인라인됩니다.
 - **기존 예약 보존**: 예약마다 `reservations.matching_mode`(`legacy_auto` / `admin_direct`)가 저장되고 이후 모든 서버·DB 처리는 이 값을 따릅니다. 설정을 바꿔도 이미 만든 예약의 지원·선택·결제·만료 처리는 바뀌지 않습니다.
-- **검수 순서**: 예약 생성 → 파트너 선택 없이 결제 → 예약이 `MATCHING` + `paid_at`(매칭 대기)인지, `reservation_intakes`에 접수 행이 1건인지 확인 → 운영자 접수 메일(`PAYMENT_ALERT_EMAIL`·`RESEND_API_KEY` 필요, 없으면 "발송 대기"로 남음) → 관리자 배정(`/admin/reservations`)으로 확정.
+- **검수 순서**: 예약 생성 → 파트너 선택 없이 결제 → 예약이 `MATCHING` + `paid_at`(매칭 대기)인지, `reservation_intakes`에 접수 행이 1건인지 확인 → 운영자 접수 메일(`INTAKE_ALERT_EMAIL`(또는 `PAYMENT_ALERT_EMAIL`)·`RESEND_API_KEY` 필요, 없으면 "발송 대기"로 남음) → 관리자 배정(`/admin/reservations`)으로 확정.
 - **E2E**: `npm run test:e2e`는 `NEXT_PUBLIC_DIRECT_ASSIGNMENT_FLOW=false`(기존 흐름 회귀, 포트 3100)와 `true`(`e2e/direct-assignment-flow.spec.ts`, 포트 3101)를 각각 서버를 띄워 두 번 실행합니다. 한쪽만 돌리려면 `E2E_ONLY=legacy` 또는 `E2E_ONLY=direct`. 로컬 Supabase·시드 계정이 필요하고, NICEPAY는 모의 서버, 메일은 `RESEND_API_KEY`를 비워 호출하지 않습니다.
 - **접수 알림 재시도**: 승인 직후 즉시 발송을 시도하고, 못 나간 건은 `GET /api/cron/intake-notifications`(`Authorization: Bearer $CRON_SECRET`)가 다시 보냅니다. Hobby 크론 한도(2개)가 차서 `vercel.json`에는 넣지 않았습니다. 외부 스케줄러가 5-10분 간격으로 호출하세요.
 - ⚠️ 약관 제9조 ④⑤(파트너 선택 후 선결제·확정)와 순서가 다르고, 배정 전 전액 환불·운영자 직접 배정/재배정은 현재 공개 약관에 근거 조항이 없습니다. 운영 출시 전 약관 개정·고지가 필요합니다.
