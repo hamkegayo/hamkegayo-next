@@ -171,7 +171,7 @@ export async function resendIntakeEmailAction(input: {
             ok: false,
             message:
                 result.skipped === "NO_RECIPIENT"
-                    ? "운영자 수신 주소(INTAKE_ALERT_EMAIL)가 설정되지 않아 보내지 못했습니다. 설정 후 다시 시도해 주세요."
+                    ? "운영자 수신 주소(INTAKE_ALERT_EMAIL 또는 PAYMENT_ALERT_EMAIL)가 설정되지 않아 보내지 못했습니다. 설정 후 다시 시도해 주세요."
                     : "이메일 발송 키(RESEND_API_KEY)가 설정되지 않아 보내지 못했습니다(모의 발송은 성공으로 치지 않습니다).",
         };
     if (result.claimed === 0)

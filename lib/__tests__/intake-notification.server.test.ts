@@ -133,28 +133,37 @@ describe("dispatchIntakeNotifications", () => {
         expect(mock.send).toHaveBeenCalledTimes(4); // 2건 × 2명
     });
 
-    it("sends to both and dedupes overlapping addresses when both are set", async () => {
-        vi.stubEnv(
-            "PAYMENT_ALERT_EMAIL",
-            "Ops@Example.invalid, pay@example.invalid",
-        );
+    it("uses only INTAKE_ALERT_EMAIL and ignores PAYMENT_ALERT_EMAIL when both are set", async () => {
+        vi.stubEnv("PAYMENT_ALERT_EMAIL", "pay@example.invalid");
         vi.stubEnv(
             "INTAKE_ALERT_EMAIL",
-            " ops@example.invalid ,in@example.invalid",
+            "ops@example.invalid, in@example.invalid",
         );
         await dispatchIntakeNotifications();
-        // 2건 × 3명(ops 중복 제거)
-        expect(mock.send).toHaveBeenCalledTimes(6);
+        // 2건 × 2명(INTAKE_ALERT_EMAIL 만)
+        expect(mock.send).toHaveBeenCalledTimes(4);
+        const recipients = new Set(sentTo().map((a) => a.toLowerCase()));
+        expect(recipients).toEqual(
+            new Set(["ops@example.invalid", "in@example.invalid"]),
+        );
+        expect(recipients.has("pay@example.invalid")).toBe(false);
+    });
+
+    it("deduplicates repeated addresses within the same variable", async () => {
+        vi.stubEnv("PAYMENT_ALERT_EMAIL", "");
+        vi.stubEnv(
+            "INTAKE_ALERT_EMAIL",
+            "Ops@Example.invalid, ops@example.invalid, in@example.invalid",
+        );
+        await dispatchIntakeNotifications();
+        // 2건 × 2명(대소문자 무시 중복 제거)
+        expect(mock.send).toHaveBeenCalledTimes(4);
         const perRow = sentTo().map((a) => a.toLowerCase());
         expect(perRow.filter((a) => a === "ops@example.invalid")).toHaveLength(
             2,
         );
         expect(new Set(perRow)).toEqual(
-            new Set([
-                "ops@example.invalid",
-                "pay@example.invalid",
-                "in@example.invalid",
-            ]),
+            new Set(["ops@example.invalid", "in@example.invalid"]),
         );
     });
 

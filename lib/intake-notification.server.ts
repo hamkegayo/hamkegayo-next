@@ -9,8 +9,8 @@ import { createAdminClient } from "@/utils/supabase/admin";
  *  접수 행(reservation_intakes)은 결제 승인·저장과 같은 DB 트랜잭션에서 만들어진다(finalize_payment).
  *  여기서는 그 행을 읽어 발송하고 결과를 기록한다. 결제 응답을 막지 않도록 after() 에서 부른다.
  *
- *  · 수신자 — INTAKE_ALERT_EMAIL (쉼표로 여러 명). 하위 호환으로 PAYMENT_ALERT_EMAIL 도 함께 쓰며,
- *    둘 다 있으면 중복 주소를 제거하고 합쳐 보낸다. 값은 코드·로그에 남기지 않는다.
+ *  · 수신자 — INTAKE_ALERT_EMAIL (쉼표로 여러 명). 설정되면 이 수신자에게만 보내며,
+ *    미설정 시 하위 호환으로 PAYMENT_ALERT_EMAIL 로 폴백한다. 값은 코드·로그에 남기지 않는다.
  *  · 중복 방지 — DB 큐의 claim(SKIP LOCKED + 임대)이 같은 건의 동시 발송을 막고, 접수 행이
  *    결제당 하나(unique)라 재콜백·재요청이 새 접수를 만들지 않는다. SENT 가 된 건은 다시 집지 않는다.
  *  · 재시도 — 실패는 지수 백오프(최대 60분)로 8회까지. 그 이후는 관리자 목록에 FAILED 로 남아 운영자가 본다.
@@ -44,22 +44,22 @@ export function intakeRecipients(raw: string | undefined | null): string[] {
 }
 
 /**
- * 접수 알림 최종 수신자. INTAKE_ALERT_EMAIL 과 PAYMENT_ALERT_EMAIL(하위 호환)을 합치고
- * 대소문자·공백을 무시해 중복 주소를 한 번만 남긴다.
+ * 접수 알림 최종 수신자. INTAKE_ALERT_EMAIL 이 설정되면 이 수신자만 사용하고,
+ * 미설정 시 PAYMENT_ALERT_EMAIL 로 폴백한다. 대소문자를 무시해 중복 주소를 한 번만 남긴다.
  */
 export function resolveIntakeRecipients(): string[] {
+    const intake = intakeRecipients(process.env.INTAKE_ALERT_EMAIL);
+    const list =
+        intake.length > 0
+            ? intake
+            : intakeRecipients(process.env.PAYMENT_ALERT_EMAIL); // 하위 호환
     const seen = new Set<string>();
-    const result: string[] = [];
-    for (const address of [
-        ...intakeRecipients(process.env.INTAKE_ALERT_EMAIL),
-        ...intakeRecipients(process.env.PAYMENT_ALERT_EMAIL),
-    ]) {
+    return list.filter((address) => {
         const key = address.toLowerCase();
-        if (seen.has(key)) continue;
+        if (seen.has(key)) return false;
         seen.add(key);
-        result.push(address);
-    }
-    return result;
+        return true;
+    });
 }
 
 export function buildIntakeEmail(
@@ -102,7 +102,7 @@ async function runIntakeDispatch(
         const to = resolveIntakeRecipients();
         if (to.length === 0) {
             console.error(
-                "[intake] 운영자 수신 주소(INTAKE_ALERT_EMAIL)가 설정되지 않아 접수 알림을 보내지 않습니다.",
+                "[intake] 운영자 수신 주소(INTAKE_ALERT_EMAIL 또는 PAYMENT_ALERT_EMAIL)가 설정되지 않아 접수 알림을 보내지 않습니다.",
             );
             return { ...result, skipped: "NO_RECIPIENT" };
         }
