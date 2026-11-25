@@ -14,6 +14,7 @@ import { InstallSheetHost } from "@/components/pwa/install-entry";
 import { PhoneContactModalHost } from "@/components/contact/phone-contact-modal";
 import { PwaDebug } from "@/components/pwa/pwa-debug";
 import { CAPTURE_SCRIPT } from "@/lib/pwa/install-event";
+import { PWA_THEME_COLOR } from "@/lib/pwa/theme";
 import { HOME_TITLE, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/seo";
 
 // 전역 폰트: Pretendard (Variable)
@@ -59,9 +60,9 @@ export const metadata: Metadata = {
     },
 };
 
-// 주소창·상태바 색 — manifest theme_color 와 같은 --brand
+// 주소창·상태바 색 — manifest theme_color 와 같은 PWA_THEME_COLOR (#ffffff)
 export const viewport: Viewport = {
-    themeColor: "#2e9ce6",
+    themeColor: PWA_THEME_COLOR,
 };
 
 export default function RootLayout({
