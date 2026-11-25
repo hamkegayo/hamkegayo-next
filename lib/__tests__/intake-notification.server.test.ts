@@ -114,7 +114,7 @@ describe("dispatchIntakeNotifications", () => {
 
     const sentTo = () => mock.send.mock.calls.map(([to]) => to).sort();
 
-    it("falls back to PAYMENT_ALERT_EMAIL when only it is set", async () => {
+    it("uses PAYMENT_ALERT_EMAIL when only it is set", async () => {
         vi.stubEnv("INTAKE_ALERT_EMAIL", "");
         await dispatchIntakeNotifications();
         expect(new Set(sentTo())).toEqual(new Set(["ops@example.invalid"]));
