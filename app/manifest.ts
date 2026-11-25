@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { PWA_THEME_COLOR } from "@/lib/pwa/theme";
 
 /**
  * PWA 매니페스트 (#116) — `/manifest.webmanifest` 로 서빙된다.
@@ -37,8 +38,8 @@ export default function manifest(): MetadataRoute.Manifest {
         scope: "/",
         display: "standalone",
         background_color: "#ffffff",
-        // 페이지 배경색 — layout 의 viewport.themeColor 와 같은 #ffffff
-        theme_color: "#ffffff",
+        // 페이지 배경색 — layout 의 viewport.themeColor 와 같은 PWA_THEME_COLOR (#ffffff)
+        theme_color: PWA_THEME_COLOR,
         icons: [
             {
                 src: "/common/icon192.png",
