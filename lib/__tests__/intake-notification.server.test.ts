@@ -105,9 +105,57 @@ describe("dispatchIntakeNotifications", () => {
 
     it("skips quietly when no operator recipient is configured", async () => {
         vi.stubEnv("PAYMENT_ALERT_EMAIL", "");
+        vi.stubEnv("INTAKE_ALERT_EMAIL", "");
         const result = await dispatchIntakeNotifications();
         expect(result.skipped).toBe("NO_RECIPIENT");
         expect(mock.rpc).not.toHaveBeenCalled();
+        expect(mock.send).not.toHaveBeenCalled();
+    });
+
+    const sentTo = () => mock.send.mock.calls.map(([to]) => to).sort();
+
+    it("uses PAYMENT_ALERT_EMAIL when only it is set", async () => {
+        vi.stubEnv("INTAKE_ALERT_EMAIL", "");
+        await dispatchIntakeNotifications();
+        expect(new Set(sentTo())).toEqual(new Set(["ops@example.invalid"]));
+    });
+
+    it("uses only INTAKE_ALERT_EMAIL when only it is set", async () => {
+        vi.stubEnv("PAYMENT_ALERT_EMAIL", "");
+        vi.stubEnv(
+            "INTAKE_ALERT_EMAIL",
+            "a@example.invalid, b@example.invalid",
+        );
+        await dispatchIntakeNotifications();
+        expect(new Set(sentTo())).toEqual(
+            new Set(["a@example.invalid", "b@example.invalid"]),
+        );
+        expect(mock.send).toHaveBeenCalledTimes(4); // 2건 × 2명
+    });
+
+    it("sends to both and dedupes overlapping addresses when both are set", async () => {
+        vi.stubEnv(
+            "PAYMENT_ALERT_EMAIL",
+            "Ops@Example.invalid, pay@example.invalid",
+        );
+        vi.stubEnv(
+            "INTAKE_ALERT_EMAIL",
+            " ops@example.invalid ,in@example.invalid",
+        );
+        await dispatchIntakeNotifications();
+        // 2건 × 3명(ops 중복 제거)
+        expect(mock.send).toHaveBeenCalledTimes(6);
+        const perRow = sentTo().map((a) => a.toLowerCase());
+        expect(perRow.filter((a) => a === "ops@example.invalid")).toHaveLength(
+            2,
+        );
+        expect(new Set(perRow)).toEqual(
+            new Set([
+                "ops@example.invalid",
+                "pay@example.invalid",
+                "in@example.invalid",
+            ]),
+        );
     });
 
     it("does nothing when the queue is empty", async () => {
