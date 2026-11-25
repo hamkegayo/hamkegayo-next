@@ -81,7 +81,7 @@ npm run dev                    # http://localhost:3000
 | `NEXT_PUBLIC_SITE_URL`                                        | –       | 결제 링크·메일의 절대 주소. 미설정 시 운영 주소로 폴백                                |
 | `RESEND_API_KEY` · `EMAIL_FROM`                               | –       | 메일 발송. 미설정 시 콘솔 Mock·기본 발신주소                                          |
 | `PAYMENT_ALERT_EMAIL`                                         | –       | 결제 사고 수신자. 미설정 시 적재만 하고 발송 안 함                                    |
-| `INTAKE_ALERT_EMAIL`                                          | –       | 신규 예약 접수 알림 수신자(미설정 시 `PAYMENT_ALERT_EMAIL` 폴백)                      |
+| `INTAKE_ALERT_EMAIL`                                          | –       | 신규 예약 접수 알림 수신자(둘 다 설정 시 중복 제거 후 동시 발송)                      |
 | `CRON_SECRET`                                                 | –       | Vercel Cron 인증. 미설정 시 크론 엔드포인트가 거부                                    |
 | `NEXT_PUBLIC_DIRECT_ASSIGNMENT_FLOW`                          | –       | 신규 예약 선결제·운영자 직접 배정 흐름(기본 켜짐, `false`로 비상 되돌리기 가능, #300) |
 | `DATA_GO_KR_SERVICE_KEY`                                      | –       | 공휴일 판정. 미설정 시 폴백 테이블                                                    |
