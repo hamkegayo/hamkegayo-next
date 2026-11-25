@@ -37,8 +37,8 @@ export default function manifest(): MetadataRoute.Manifest {
         scope: "/",
         display: "standalone",
         background_color: "#ffffff",
-        // --brand (app/globals.css)
-        theme_color: "#2e9ce6",
+        // 페이지 배경색 — layout 의 viewport.themeColor 와 같은 #ffffff
+        theme_color: "#ffffff",
         icons: [
             {
                 src: "/common/icon192.png",

@@ -59,9 +59,9 @@ export const metadata: Metadata = {
     },
 };
 
-// 주소창·상태바 색 — manifest theme_color 와 같은 --brand
+// 주소창·상태바 색 — manifest theme_color 와 같은 #ffffff (페이지 배경색)
 export const viewport: Viewport = {
-    themeColor: "#2e9ce6",
+    themeColor: "#ffffff",
 };
 
 export default function RootLayout({
