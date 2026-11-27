@@ -43,7 +43,7 @@ describe("고객센터 전화번호 노출 제거 (#319)", () => {
 
     it("취소·환불 정책 — 문의 링크는 문구이고 운영시간은 유지한다", () => {
         const m = html(createElement(RefundPolicyPage));
-        expect(m).toContain("전화 문의하기");
+        expect(m).toContain("전화 상담 받기");
         expect(m).toContain(COMPANY.hours);
         expect(m).toContain(`href="tel:${COMPANY.tel}"`);
         expect(visibleMarkup(m)).not.toContain(COMPANY.tel);
@@ -51,7 +51,7 @@ describe("고객센터 전화번호 노출 제거 (#319)", () => {
 
     it("마이페이지 고객센터 — 전화 채널은 문구이고 상담 시간은 유지한다", () => {
         const m = html(createElement(MypageSupport));
-        expect(m).toContain("전화 상담 받기");
+        expect(m).toContain("전화 연결하기");
         expect(m).toContain(COMPANY.hours);
         expect(m).toContain(`href="tel:${COMPANY.tel}"`);
         expect(visibleMarkup(m)).not.toContain(COMPANY.tel);
@@ -65,7 +65,7 @@ describe("고객센터 전화번호 노출 제거 (#319)", () => {
             }),
         );
         const m = full.slice(full.indexOf("<main"), full.indexOf("</main>"));
-        expect(m).toContain("전화 문의하기");
+        expect(m).toContain("전화 상담 받기");
         expect(m).toContain(COMPANY.hours);
         expect(m).toContain(`href="tel:${COMPANY.tel}"`);
         expect(visibleMarkup(m)).not.toContain(COMPANY.tel);
@@ -73,7 +73,7 @@ describe("고객센터 전화번호 노출 제거 (#319)", () => {
 
     // 서버 데이터·클라이언트 훅에 묶여 렌더가 무거운 화면은 소스에서 확인한다.
     it.each([
-        ["추가결제 링크 페이지", "app/pay/[token]/page.tsx", "전화 문의하기"],
+        ["추가결제 링크 페이지", "app/pay/[token]/page.tsx", "전화 상담 받기"],
         [
             "파트너 사이드바",
             "app/(partner)/_components/partner-sidebar.tsx",

@@ -24,7 +24,7 @@ import { PhoneContactLink } from "@/components/contact/phone-contact-link";
  *  값은 COMPANY 한 곳에서 읽는다 — 푸터·약관 부칙·처리방침과 어긋날 수 없게.
  */
 const CONTACTS: { label: string; value: string; href?: string }[] = [
-    { label: "전화 상담", value: "전화 상담 받기", href: `tel:${COMPANY.tel}` },
+    { label: "전화 상담", value: "전화 연결하기", href: `tel:${COMPANY.tel}` },
     {
         label: "이메일 문의",
         value: COMPANY.email,
