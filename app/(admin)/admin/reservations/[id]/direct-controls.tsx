@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { createContext, useContext, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import {
     ACCEPT_CHANNELS,
@@ -27,14 +28,64 @@ const btnCls =
 const subBtnCls =
     "border-border cursor-pointer rounded-lg border px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50";
 
+const DirectActionFeedbackContext = createContext<{
+    bannerResult: DirectActionResult | null;
+    setBannerResult: (result: DirectActionResult | null) => void;
+} | null>(null);
+
+export function DirectActionFeedbackProvider({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
+    const [bannerResult, setBannerResult] = useState<DirectActionResult | null>(
+        null,
+    );
+    return (
+        <DirectActionFeedbackContext.Provider
+            value={{ bannerResult, setBannerResult }}
+        >
+            {children}
+        </DirectActionFeedbackContext.Provider>
+    );
+}
+
+export function DirectActionResultBanner() {
+    const feedback = useContext(DirectActionFeedbackContext);
+    const result = feedback?.bannerResult;
+    if (!result?.ok || !result.message) return null;
+    return (
+        <p
+            role="status"
+            data-testid="direct-action-result"
+            className="sticky top-4 z-20 mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 shadow-sm"
+        >
+            {result.message}
+        </p>
+    );
+}
+
 function useRun() {
     const router = useRouter();
+    const feedback = useContext(DirectActionFeedbackContext);
     const [pending, start] = useTransition();
     const [result, setResult] = useState<DirectActionResult | null>(null);
     function run(fn: () => Promise<DirectActionResult>) {
         start(async () => {
+            setResult(null);
+            feedback?.setBannerResult(null);
             try {
-                setResult(await fn());
+                const res = await fn();
+                if (res.ok) {
+                    toast.success(res.message);
+                    if (feedback) {
+                        feedback.setBannerResult(res);
+                    } else {
+                        setResult(res);
+                    }
+                } else {
+                    setResult(res);
+                }
             } catch {
                 setResult({
                     ok: false,

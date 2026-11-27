@@ -326,6 +326,12 @@ test.describe("선결제 → 매칭 대기 → 관리자 배정(#300)", () => {
             await admin
                 .getByRole("button", { name: "배정하고 예약 확정" })
                 .click();
+            await expect(admin.getByTestId("direct-action-result")).toHaveText(
+                "파트너를 배정하고 예약을 확정했습니다.",
+                {
+                    timeout: 30_000,
+                },
+            );
             await expect
                 .poll(
                     async () => (await reservationByHospital(hospital)).status,
@@ -364,6 +370,10 @@ test.describe("선결제 → 매칭 대기 → 관리자 배정(#300)", () => {
             await admin
                 .getByRole("button", { name: "담당 파트너 변경" })
                 .click();
+            await expect(admin.getByTestId("direct-action-result")).toHaveText(
+                "담당 파트너를 변경했습니다. 새 담당자가 고객에게 확정 안내 문자를 보내야 합니다.",
+                { timeout: 30_000 },
+            );
             await expect
                 .poll(
                     async () =>
@@ -472,6 +482,9 @@ test.describe("선결제 → 매칭 대기 → 관리자 배정(#300)", () => {
             await expect(
                 admin.getByRole("heading", { name: "매칭 실패 · 환불 상태" }),
             ).toBeVisible({ timeout: 30_000 });
+            await expect(admin.getByTestId("direct-action-result")).toHaveText(
+                "PG 전액 환불까지 완료했습니다.",
+            );
             await expect(
                 admin
                     .locator("dt", { hasText: "PG 환불 상태" })
@@ -506,8 +519,16 @@ test.describe("선결제 → 매칭 대기 → 관리자 배정(#300)", () => {
                 .getByRole("button", { name: "실패 안내 완료 기록" })
                 .click();
             await expect(
-                admin.getByText("고객 실패 안내 완료를 기록했습니다."),
+                admin
+                    .locator("dt", { hasText: "고객 실패 안내" })
+                    .locator("xpath=following-sibling::dd[1]"),
+            ).toContainText("전화", { timeout: 30_000 });
+            await expect(
+                admin.getByText("고객 실패 안내 완료", { exact: true }),
             ).toBeVisible();
+            await expect(admin.getByTestId("direct-action-result")).toHaveText(
+                "고객 실패 안내 완료를 기록했습니다.",
+            );
             const after = await reservationByHospital(hospital);
             expect(after.failure_notice_at).not.toBeNull();
             const { data: refund } = await db()
