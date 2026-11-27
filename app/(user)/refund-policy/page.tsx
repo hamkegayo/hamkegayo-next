@@ -132,7 +132,7 @@ export default function RefundPolicyPage() {
                                 href={`tel:${COMPANY.tel}`}
                                 className="hover:text-brand underline-offset-4 hover:underline"
                             >
-                                {COMPANY.tel}
+                                전화 문의하기
                             </PhoneContactLink>
                             <span className="ml-2">({COMPANY.hours})</span>
                         </dd>

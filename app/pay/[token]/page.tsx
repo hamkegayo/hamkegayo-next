@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
 import { ExtensionPayView } from "./extension-pay-view";
 import { COMPANY } from "@/lib/legal/company";
+import { PhoneContactLink } from "@/components/contact/phone-contact-link";
 import { missingNicepayKeys } from "@/lib/payments/nicepay";
 import { PayShell } from "../_components/pay-shell";
 
@@ -48,7 +49,13 @@ function Notice({ title, body }: { title: string; body: string }) {
                 {body}
             </p>
             <p className="text-muted-foreground mt-6 text-xs">
-                문의 : 함께가요 고객센터 {COMPANY.tel} ({COMPANY.hours})
+                문의 : 함께가요 고객센터 ({COMPANY.hours}){" "}
+                <PhoneContactLink
+                    href={`tel:${COMPANY.tel}`}
+                    className="text-foreground font-semibold underline underline-offset-4"
+                >
+                    전화 문의하기
+                </PhoneContactLink>
             </p>
         </PayShell>
     );

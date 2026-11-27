@@ -8,6 +8,7 @@ import {
     FileText,
     Headphones,
     Home,
+    Phone,
     Users,
     Wallet,
     X,
@@ -17,6 +18,7 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePartnerNav } from "./partner-nav-context";
 import { COMPANY } from "@/lib/legal/company";
+import { PhoneContactLink } from "@/components/contact/phone-contact-link";
 import { InstallEntryButton } from "@/components/pwa/install-entry";
 
 const ITEMS: {
@@ -108,10 +110,14 @@ function SidebarContent({
                         <Headphones className="text-brand size-4" />
                         파트너 고객센터
                     </p>
-                    <p className="text-foreground mt-3 text-xl font-extrabold">
-                        {COMPANY.tel}
-                    </p>
-                    <p className="text-muted-foreground mt-1 text-xs">
+                    <PhoneContactLink
+                        href={`tel:${COMPANY.tel}`}
+                        className="bg-brand text-brand-foreground hover:bg-brand/90 mt-3 inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold transition-colors"
+                    >
+                        <Phone className="size-4" />
+                        전화하기
+                    </PhoneContactLink>
+                    <p className="text-muted-foreground mt-2 text-xs">
                         {COMPANY.hours}
                     </p>
                 </div>

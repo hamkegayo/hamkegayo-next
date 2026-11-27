@@ -34,7 +34,7 @@ export function FaqContactCta() {
                         className="border-border bg-background text-foreground hover:bg-muted inline-flex items-center justify-center gap-1.5 rounded-lg border px-5 py-3 text-sm font-bold whitespace-nowrap transition-colors"
                     >
                         <Phone className="size-4" />
-                        고객센터 {COMPANY.tel}
+                        전화 상담 받기
                     </ContactLink>
                     <ContactLink
                         href={COMPANY.kakaoUrl}
