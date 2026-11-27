@@ -101,7 +101,7 @@ export function FaqList() {
                                     >
                                         <Icon className="size-6" />
                                     </div>
-                                    <h2 className="text-foreground text-xl font-extrabold">
+                                    <h2 className="text-foreground text-xl font-extrabold break-keep">
                                         {cat.name}
                                     </h2>
                                 </div>
@@ -119,11 +119,14 @@ export function FaqList() {
                                                     aria-controls={`${it.id}-answer`}
                                                     className="hover:bg-muted/30 flex w-full items-center justify-between gap-3 px-6 py-5 text-left transition-colors"
                                                 >
-                                                    <span className="text-foreground text-base font-semibold">
-                                                        <span className="text-brand mr-1.5 font-bold">
+                                                    {/* Q. 를 별도 열로 두어 2줄째가 질문 본문 시작선에 맞춰지게 한다 */}
+                                                    <span className="text-foreground flex min-w-0 gap-1.5 text-base font-semibold">
+                                                        <span className="text-brand shrink-0 font-bold">
                                                             Q.
                                                         </span>
-                                                        {it.q}
+                                                        <span className="min-w-0 break-keep">
+                                                            {it.q}
+                                                        </span>
                                                     </span>
                                                     <ChevronDown
                                                         className={cn(
@@ -146,10 +149,19 @@ export function FaqList() {
                                                     )}
                                                 >
                                                     <div className="overflow-hidden">
-                                                        <div className="px-6 pb-5">
-                                                            <FaqAnswer
-                                                                item={it}
-                                                            />
+                                                        {/* 질문과 같은 Q. 열을 투명하게 두어 답변 시작선을 질문 본문에 맞춘다 */}
+                                                        <div className="flex gap-1.5 px-6 pb-5">
+                                                            <span
+                                                                aria-hidden
+                                                                className="invisible shrink-0 text-base font-bold"
+                                                            >
+                                                                Q.
+                                                            </span>
+                                                            <div className="min-w-0 flex-1">
+                                                                <FaqAnswer
+                                                                    item={it}
+                                                                />
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>

@@ -110,7 +110,7 @@ export function ReviewWriteView({
     /* ---------- 서비스 선택 ---------- */
     if (step === "select") {
         return (
-            <div className="mx-auto max-w-7xl px-4 py-10 md:py-14">
+            <div className="mx-auto w-full max-w-6xl px-4 py-10 md:py-14">
                 <div className="text-center">
                     <h1 className="text-foreground text-2xl font-extrabold md:text-3xl">
                         어떤 병원 동행 서비스에 대한 후기를 작성하시겠어요?

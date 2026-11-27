@@ -9,10 +9,10 @@ export function FaqHero() {
                     <h1 className="text-foreground text-4xl font-extrabold md:text-5xl">
                         FAQ
                     </h1>
-                    <p className="text-foreground mt-4 text-lg font-bold">
+                    <p className="text-foreground mt-4 text-lg font-bold break-keep">
                         자주 묻는 질문을 확인해보세요.
                     </p>
-                    <p className="text-description-foreground mt-1">
+                    <p className="text-description-foreground mt-1 break-keep">
                         궁금한 내용을 검색하거나 아래 목록에서 찾아보실 수
                         있습니다.
                     </p>
