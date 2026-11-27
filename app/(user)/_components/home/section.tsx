@@ -6,15 +6,17 @@ import { cn } from "@/lib/utils";
  * 폭을 바꾸려면 이 파일의 max-w 값만 수정하면 전체 섹션에 반영된다.
  */
 export function Section({
-  className,
-  children,
+    className,
+    children,
 }: {
-  className?: string;
-  children: React.ReactNode;
+    className?: string;
+    children: React.ReactNode;
 }) {
-  return (
-    <section className={cn("mx-auto w-full max-w-7xl px-4 py-12", className)}>
-      {children}
-    </section>
-  );
+    return (
+        <section
+            className={cn("mx-auto w-full max-w-6xl px-4 py-12", className)}
+        >
+            {children}
+        </section>
+    );
 }
