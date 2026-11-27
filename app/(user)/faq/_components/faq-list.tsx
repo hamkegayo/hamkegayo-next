@@ -89,7 +89,7 @@ export function FaqList() {
                         return (
                             <div
                                 key={cat.name}
-                                className="grid gap-4 md:grid-cols-[200px_1fr]"
+                                className="grid items-start gap-4 md:grid-cols-[200px_1fr]"
                             >
                                 <div className="flex flex-col items-start gap-3 md:pt-1">
                                     <div
@@ -136,12 +136,13 @@ export function FaqList() {
                                                 {/* grid-rows 0fr→1fr 트릭으로 높이 부드럽게 전환 */}
                                                 <div
                                                     id={`${it.id}-answer`}
-                                                    hidden={!isOpen}
+                                                    aria-hidden={!isOpen}
+                                                    inert={!isOpen}
                                                     className={cn(
-                                                        "grid transition-[grid-template-rows] duration-200 ease-out",
+                                                        "grid transition-[grid-template-rows,opacity] duration-200 ease-out",
                                                         isOpen
-                                                            ? "grid-rows-[1fr]"
-                                                            : "grid-rows-[0fr]",
+                                                            ? "grid-rows-[1fr] opacity-100"
+                                                            : "grid-rows-[0fr] opacity-0",
                                                     )}
                                                 >
                                                     <div className="overflow-hidden">

@@ -3,6 +3,7 @@ import { createNotification } from "@/lib/notifications";
 import { getEmailSender } from "@/lib/email";
 import { generateOrderId, generatePayToken } from "@/lib/payments/order";
 import { EXTENSION_REVIEW_THRESHOLD } from "@/lib/pricing";
+import { COMPANY } from "@/lib/legal/company";
 
 /**
  * 추가결제 링크 발급 (#75) — 약관 제21조 ⑤ · 제22조.
@@ -334,7 +335,7 @@ export async function sendExtensionReminder(target: {
           last
               ? `<p style="margin:20px 0 0;font-size:13px;color:#4b5563;line-height:1.6">
                    자동 안내 메일은 이번이 마지막입니다. 이후에는 고객센터에서
-                   직접 연락드립니다 (010-9345-2328 · 06:00~18:00).
+                   직접 연락드립니다 (${COMPANY.tel} · ${COMPANY.hours}).
                    미납 금액과 이용 제한은 결제 완료 시까지 유지됩니다.
                  </p>`
               : ""
