@@ -10,6 +10,7 @@ import {
     Headphones,
     HeartPulse,
     IdCard,
+    Phone,
     Plus,
     ShieldCheck,
     Upload,
@@ -58,6 +59,7 @@ import {
 } from "../../_components/qualification-add-modal";
 import { ProfilePreviewModal } from "../../_components/profile-preview-modal";
 import { COMPANY } from "@/lib/legal/company";
+import { PhoneContactLink } from "@/components/contact/phone-contact-link";
 import { ConfirmModal, Modal } from "@/components/ui/modal";
 import { PartnerEvidenceFiles } from "@/components/partner-evidence-files";
 import { EvidenceRegister } from "../../_components/evidence-register";
@@ -365,9 +367,13 @@ export function PartnerProfileView({
                             <Headphones className="text-brand size-4" />
                             파트너 고객센터
                         </p>
-                        <p className="text-foreground mt-3 text-xl leading-relaxed font-extrabold">
-                            {COMPANY.tel}
-                        </p>
+                        <PhoneContactLink
+                            href={`tel:${COMPANY.tel}`}
+                            className="bg-brand text-brand-foreground hover:bg-brand/90 mt-3 inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold transition-colors"
+                        >
+                            <Phone className="size-4" />
+                            전화하기
+                        </PhoneContactLink>
                         <p className="text-description-foreground mt-1 text-sm leading-relaxed">
                             {COMPANY.hours}
                         </p>

@@ -89,7 +89,7 @@ export function FaqList() {
                         return (
                             <div
                                 key={cat.name}
-                                className="grid gap-4 md:grid-cols-[200px_1fr]"
+                                className="grid items-start gap-4 md:grid-cols-[200px_1fr]"
                             >
                                 <div className="flex flex-col items-start gap-3 md:pt-1">
                                     <div
@@ -101,7 +101,7 @@ export function FaqList() {
                                     >
                                         <Icon className="size-6" />
                                     </div>
-                                    <h2 className="text-foreground text-xl font-extrabold">
+                                    <h2 className="text-foreground text-xl font-extrabold break-keep">
                                         {cat.name}
                                     </h2>
                                 </div>
@@ -119,11 +119,14 @@ export function FaqList() {
                                                     aria-controls={`${it.id}-answer`}
                                                     className="hover:bg-muted/30 flex w-full items-center justify-between gap-3 px-6 py-5 text-left transition-colors"
                                                 >
-                                                    <span className="text-foreground text-base font-semibold">
-                                                        <span className="text-brand mr-1.5 font-bold">
+                                                    {/* Q. 를 별도 열로 두어 2줄째가 질문 본문 시작선에 맞춰지게 한다 */}
+                                                    <span className="text-foreground flex min-w-0 gap-1.5 text-base font-semibold">
+                                                        <span className="text-brand shrink-0 font-bold">
                                                             Q.
                                                         </span>
-                                                        {it.q}
+                                                        <span className="min-w-0 break-keep">
+                                                            {it.q}
+                                                        </span>
                                                     </span>
                                                     <ChevronDown
                                                         className={cn(
@@ -136,19 +139,29 @@ export function FaqList() {
                                                 {/* grid-rows 0fr→1fr 트릭으로 높이 부드럽게 전환 */}
                                                 <div
                                                     id={`${it.id}-answer`}
-                                                    hidden={!isOpen}
+                                                    aria-hidden={!isOpen}
+                                                    inert={!isOpen}
                                                     className={cn(
-                                                        "grid transition-[grid-template-rows] duration-200 ease-out",
+                                                        "grid transition-[grid-template-rows,opacity] duration-200 ease-out",
                                                         isOpen
-                                                            ? "grid-rows-[1fr]"
-                                                            : "grid-rows-[0fr]",
+                                                            ? "grid-rows-[1fr] opacity-100"
+                                                            : "grid-rows-[0fr] opacity-0",
                                                     )}
                                                 >
                                                     <div className="overflow-hidden">
-                                                        <div className="px-6 pb-5">
-                                                            <FaqAnswer
-                                                                item={it}
-                                                            />
+                                                        {/* 질문과 같은 Q. 열을 투명하게 두어 답변 시작선을 질문 본문에 맞춘다 */}
+                                                        <div className="flex gap-1.5 px-6 pb-5">
+                                                            <span
+                                                                aria-hidden
+                                                                className="invisible shrink-0 text-base font-bold"
+                                                            >
+                                                                Q.
+                                                            </span>
+                                                            <div className="min-w-0 flex-1">
+                                                                <FaqAnswer
+                                                                    item={it}
+                                                                />
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>

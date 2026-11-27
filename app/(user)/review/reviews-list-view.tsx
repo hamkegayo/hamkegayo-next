@@ -28,7 +28,7 @@ export function ReviewsListView({ reviews }: { reviews: ReviewView[] }) {
             : [...reviews].sort((a, b) => b.rating - a.rating);
 
     return (
-        <div className="mx-auto max-w-7xl px-4 py-10 md:py-14">
+        <div className="mx-auto w-full max-w-6xl px-4 py-10 md:py-14">
             {/* 헤더 */}
             <div className="text-center">
                 <h1 className="text-foreground text-3xl font-extrabold">

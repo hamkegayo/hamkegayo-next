@@ -112,10 +112,10 @@ export function ServicePrinciples() {
                         <ShieldCheck className="size-5" />
                     </div>
                     <div>
-                        <h2 className="text-foreground text-lg font-bold">
+                        <h2 className="text-foreground text-lg font-bold break-keep">
                             서비스 이용 전 꼭 확인해주세요
                         </h2>
-                        <p className="text-description-foreground mt-1 text-sm leading-relaxed">
+                        <p className="text-description-foreground mt-1 text-sm leading-relaxed break-keep">
                             함께가요는 의료행위가 아닌 비의료 지원 서비스입니다.
                             보다 안전하고 신뢰할 수 있는 서비스를 제공하기 위해
                             명확한 운영 원칙을 지키고 있습니다.
@@ -137,7 +137,7 @@ export function ServicePrinciples() {
                                 <div
                                     key={title}
                                     className={cn(
-                                        "relative min-h-44 overflow-hidden rounded-2xl border p-5",
+                                        "relative min-h-44 overflow-hidden rounded-2xl border p-5 md:pb-16",
                                         t.box,
                                     )}
                                 >
@@ -149,7 +149,10 @@ export function ServicePrinciples() {
                                             )}
                                         />
                                         <h3
-                                            className={cn("font-bold", t.title)}
+                                            className={cn(
+                                                "font-bold break-keep",
+                                                t.title,
+                                            )}
                                         >
                                             {title}
                                         </h3>
@@ -158,7 +161,7 @@ export function ServicePrinciples() {
                                         {items.map((item) => (
                                             <li
                                                 key={item}
-                                                className="text-description-foreground text-sm leading-relaxed"
+                                                className="text-description-foreground text-sm leading-relaxed break-keep"
                                             >
                                                 {item}
                                             </li>
@@ -168,7 +171,7 @@ export function ServicePrinciples() {
                                     <Decor
                                         aria-hidden
                                         className={cn(
-                                            "pointer-events-none absolute -right-1 -bottom-2 size-16",
+                                            "pointer-events-none absolute -right-1 -bottom-2 hidden size-16 md:block",
                                             t.decor,
                                         )}
                                     />
