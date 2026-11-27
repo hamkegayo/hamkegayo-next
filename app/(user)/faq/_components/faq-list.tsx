@@ -149,10 +149,19 @@ export function FaqList() {
                                                     )}
                                                 >
                                                     <div className="overflow-hidden">
-                                                        <div className="px-6 pb-5">
-                                                            <FaqAnswer
-                                                                item={it}
-                                                            />
+                                                        {/* 질문과 같은 Q. 열을 투명하게 두어 답변 시작선을 질문 본문에 맞춘다 */}
+                                                        <div className="flex gap-1.5 px-6 pb-5">
+                                                            <span
+                                                                aria-hidden
+                                                                className="invisible shrink-0 text-base font-bold"
+                                                            >
+                                                                Q.
+                                                            </span>
+                                                            <div className="min-w-0 flex-1">
+                                                                <FaqAnswer
+                                                                    item={it}
+                                                                />
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>

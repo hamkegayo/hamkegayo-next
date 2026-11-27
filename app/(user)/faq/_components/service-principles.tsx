@@ -137,7 +137,7 @@ export function ServicePrinciples() {
                                 <div
                                     key={title}
                                     className={cn(
-                                        "relative min-h-44 overflow-hidden rounded-2xl border p-5 pb-16",
+                                        "relative min-h-44 overflow-hidden rounded-2xl border p-5 md:pb-16",
                                         t.box,
                                     )}
                                 >
@@ -171,7 +171,7 @@ export function ServicePrinciples() {
                                     <Decor
                                         aria-hidden
                                         className={cn(
-                                            "pointer-events-none absolute -right-1 -bottom-2 size-16",
+                                            "pointer-events-none absolute -right-1 -bottom-2 hidden size-16 md:block",
                                             t.decor,
                                         )}
                                     />
