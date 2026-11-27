@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import {
     ACCEPT_CHANNELS,
@@ -56,7 +57,8 @@ export function DirectActionResultBanner() {
     return (
         <p
             role="status"
-            className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800"
+            data-testid="direct-action-result"
+            className="sticky top-4 z-20 mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800 shadow-sm"
         >
             {result.message}
         </p>
@@ -74,8 +76,13 @@ function useRun() {
             feedback?.setBannerResult(null);
             try {
                 const res = await fn();
-                if (res.ok && feedback) {
-                    feedback.setBannerResult(res);
+                if (res.ok) {
+                    toast.success(res.message);
+                    if (feedback) {
+                        feedback.setBannerResult(res);
+                    } else {
+                        setResult(res);
+                    }
                 } else {
                     setResult(res);
                 }
